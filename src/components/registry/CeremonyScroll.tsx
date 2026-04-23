@@ -76,6 +76,9 @@ export function CeremonyScroll({ souls, rollups }: Props) {
           </p>
         </header>
 
+        {/* Top-level tabs — Registry, Ceremony, and the four Kingdom roll-ups as peers */}
+        <TopTabs view={view} setView={setView} rollups={rollups} />
+
         {/* Breadcrumb of the hierarchy */}
         <Breadcrumbs view={view} setView={setView} souls={souls} rollups={rollups} />
 
