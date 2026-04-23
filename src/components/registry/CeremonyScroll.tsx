@@ -76,6 +76,9 @@ export function CeremonyScroll({ souls, rollups }: Props) {
           </p>
         </header>
 
+        {/* Top-level tabs — Registry, Ceremony, and the four Kingdom roll-ups as peers */}
+        <TopTabs view={view} setView={setView} rollups={rollups} />
+
         {/* Breadcrumb of the hierarchy */}
         <Breadcrumbs view={view} setView={setView} souls={souls} rollups={rollups} />
 
@@ -120,6 +123,71 @@ export function CeremonyScroll({ souls, rollups }: Props) {
         </footer>
       </div>
     </div>
+  );
+}
+
+/* ---------- Top-level Tabs ---------- */
+
+function TopTabs({
+  view,
+  setView,
+  rollups,
+}: {
+  view: View;
+  setView: (v: View) => void;
+  rollups: RollupNode[];
+}) {
+  const tabs: { key: string; label: string; sigil: string; active: boolean; onClick: () => void }[] = [
+    {
+      key: "registry",
+      label: "Registry",
+      sigil: "✶",
+      active: view.kind === "ceremony" || view.kind === "soul",
+      onClick: () => setView({ kind: "ceremony" }),
+    },
+    {
+      key: "trust",
+      label: "Trust",
+      sigil: "♕",
+      active: view.kind === "trust",
+      onClick: () => setView({ kind: "trust" }),
+    },
+    ...rollups.map((r) => ({
+      key: r.id,
+      label: r.title,
+      sigil: r.sigil,
+      active: view.kind === "rollup" && view.id === r.id,
+      onClick: () => setView({ kind: "rollup", id: r.id }),
+    })),
+  ];
+
+  return (
+    <nav
+      aria-label="Master Scroll tabs"
+      className="mx-auto mb-4 flex max-w-4xl flex-wrap items-center justify-center gap-2"
+    >
+      {tabs.map((t) => (
+        <button
+          key={t.key}
+          onClick={t.onClick}
+          aria-current={t.active ? "page" : undefined}
+          className="flex items-center gap-2 rounded-full px-4 py-2 text-xs uppercase tracking-[0.25em] transition-all hover:-translate-y-0.5"
+          style={{
+            background: t.active
+              ? "var(--gradient-dawn)"
+              : "color-mix(in oklab, var(--dawn-parchment) 18%, transparent)",
+            color: t.active
+              ? "var(--dawn-parchment)"
+              : "color-mix(in oklab, var(--dawn-parchment) 90%, transparent)",
+            border: `1px solid color-mix(in oklab, var(--dawn-gold) ${t.active ? 80 : 40}%, transparent)`,
+            boxShadow: t.active ? "var(--shadow-sigil)" : "none",
+          }}
+        >
+          <span aria-hidden>{t.sigil}</span>
+          <span>{t.label}</span>
+        </button>
+      ))}
+    </nav>
   );
 }
 
