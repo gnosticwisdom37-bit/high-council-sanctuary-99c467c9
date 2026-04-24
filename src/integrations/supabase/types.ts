@@ -14,7 +14,105 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      economy: {
+        Row: {
+          created_at: string
+          economic_rules: Json
+          id: boolean
+          in_circulation: number
+          total_minted: number
+          treasury: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          economic_rules?: Json
+          id?: boolean
+          in_circulation?: number
+          total_minted?: number
+          treasury?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          economic_rules?: Json
+          id?: boolean
+          in_circulation?: number
+          total_minted?: number
+          treasury?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      realm_squares: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          label: string
+          occupant_ref: string | null
+          occupant_type: Database["public"]["Enums"]["realm_occupant_type"]
+          revealed: boolean
+          updated_at: string
+          x: number
+          y: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          label: string
+          occupant_ref?: string | null
+          occupant_type: Database["public"]["Enums"]["realm_occupant_type"]
+          revealed?: boolean
+          updated_at?: string
+          x: number
+          y: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          label?: string
+          occupant_ref?: string | null
+          occupant_type?: Database["public"]["Enums"]["realm_occupant_type"]
+          revealed?: boolean
+          updated_at?: string
+          x?: number
+          y?: number
+        }
+        Relationships: []
+      }
+      settings: {
+        Row: {
+          active_provider: string
+          created_at: string
+          id: boolean
+          realm_grid_size: number
+          system_constitution: string
+          updated_at: string
+          veritas_per_credit: number
+        }
+        Insert: {
+          active_provider?: string
+          created_at?: string
+          id?: boolean
+          realm_grid_size?: number
+          system_constitution?: string
+          updated_at?: string
+          veritas_per_credit?: number
+        }
+        Update: {
+          active_provider?: string
+          created_at?: string
+          id?: boolean
+          realm_grid_size?: number
+          system_constitution?: string
+          updated_at?: string
+          veritas_per_credit?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +121,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      realm_occupant_type: "soul" | "building" | "item" | "chamber"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +248,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      realm_occupant_type: ["soul", "building", "item", "chamber"],
+    },
   },
 } as const
