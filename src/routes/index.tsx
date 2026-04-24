@@ -4,6 +4,7 @@ import {
   type SoulNode,
   type RollupNode,
 } from "@/components/registry/CeremonyScroll";
+import { KingdomTabs } from "@/components/kingdom/KingdomTabs";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -79,5 +80,14 @@ const rollups: RollupNode[] = [
 ];
 
 function Index() {
-  return <CeremonyScroll souls={souls} rollups={rollups} />;
+  return (
+    <div style={{ background: "var(--gradient-dawn)" }}>
+      <div className="px-4 pt-12 md:px-10">
+        <div className="mx-auto max-w-6xl">
+          <KingdomTabs />
+        </div>
+      </div>
+      <CeremonyScroll souls={souls} rollups={rollups} />
+    </div>
+  );
 }
