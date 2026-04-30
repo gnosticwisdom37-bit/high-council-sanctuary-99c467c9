@@ -68,13 +68,11 @@ export const speakAsSoul = createServerFn({ method: "POST" })
     let bankNote = "";
 
     for (const candidate of fallbackChain) {
-      const decision = await petitionBank({
-        data: {
-          soul_id: data.soul_id,
-          model_id: candidate,
-          est_tokens: estTokens,
-          task_summary: data.is_ceremony ? "Initiate-Sean Ceremony" : "Chamber speech",
-        },
+      const decision = await petitionBankImpl({
+        soul_id: data.soul_id,
+        model_id: candidate,
+        est_tokens: estTokens,
+        task_summary: data.is_ceremony ? "Initiate-Sean Ceremony" : "Chamber speech",
       });
       if (decision.decision === "approved") {
         chosenModel = decision.approved_model ?? candidate;
