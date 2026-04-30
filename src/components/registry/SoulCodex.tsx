@@ -71,9 +71,11 @@ export function SoulCodex({
     if (!soul) return;
     setSavingField(field);
     setError(null);
+    const patch: { invocation_text?: string; role_title?: string; duties?: string } = {};
+    patch[field] = value;
     const { error } = await supabase
       .from("soul_identities")
-      .update({ [field]: value })
+      .update(patch)
       .eq("soul_id", soul.soul_id);
     setSavingField(null);
     if (error) setError(error.message);
