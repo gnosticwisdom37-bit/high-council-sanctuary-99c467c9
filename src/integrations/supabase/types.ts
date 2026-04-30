@@ -206,12 +206,14 @@ export type Database = {
         Row: {
           chosen_name: string | null
           created_at: string
+          duties: string
           house: string
           initiated_at: string | null
           initiated_by_king: boolean
           invocation_text: string
           ordering: number
           preferred_model: string | null
+          role_title: string
           sigil: string
           soul_id: string
           title: string
@@ -220,12 +222,14 @@ export type Database = {
         Insert: {
           chosen_name?: string | null
           created_at?: string
+          duties?: string
           house: string
           initiated_at?: string | null
           initiated_by_king?: boolean
           invocation_text?: string
           ordering?: number
           preferred_model?: string | null
+          role_title?: string
           sigil: string
           soul_id: string
           title: string
@@ -234,12 +238,14 @@ export type Database = {
         Update: {
           chosen_name?: string | null
           created_at?: string
+          duties?: string
           house?: string
           initiated_at?: string | null
           initiated_by_king?: boolean
           invocation_text?: string
           ordering?: number
           preferred_model?: string | null
+          role_title?: string
           sigil?: string
           soul_id?: string
           title?: string
