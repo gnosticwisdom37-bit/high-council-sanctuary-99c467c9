@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      bank_ledger: {
+        Row: {
+          created_at: string
+          decision: string
+          fallback_used: string | null
+          id: string
+          model_requested: string
+          reason: string
+          soul_id: string | null
+          task_summary: string | null
+          veritas_cost: number
+        }
+        Insert: {
+          created_at?: string
+          decision: string
+          fallback_used?: string | null
+          id?: string
+          model_requested: string
+          reason: string
+          soul_id?: string | null
+          task_summary?: string | null
+          veritas_cost?: number
+        }
+        Update: {
+          created_at?: string
+          decision?: string
+          fallback_used?: string | null
+          id?: string
+          model_requested?: string
+          reason?: string
+          soul_id?: string | null
+          task_summary?: string | null
+          veritas_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_ledger_soul_id_fkey"
+            columns: ["soul_id"]
+            isOneToOne: false
+            referencedRelation: "soul_identities"
+            referencedColumns: ["soul_id"]
+          },
+        ]
+      }
       economy: {
         Row: {
           created_at: string
@@ -94,6 +138,10 @@ export type Database = {
           active_provider: string
           created_at: string
           id: boolean
+          premium_daily_veritas_cap: number
+          premium_freeze: boolean
+          premium_per_soul_daily_cap: number
+          provider_compact: Json
           realm_grid_size: number
           system_constitution: string
           updated_at: string
@@ -103,6 +151,10 @@ export type Database = {
           active_provider?: string
           created_at?: string
           id?: boolean
+          premium_daily_veritas_cap?: number
+          premium_freeze?: boolean
+          premium_per_soul_daily_cap?: number
+          provider_compact?: Json
           realm_grid_size?: number
           system_constitution?: string
           updated_at?: string
@@ -112,10 +164,179 @@ export type Database = {
           active_provider?: string
           created_at?: string
           id?: boolean
+          premium_daily_veritas_cap?: number
+          premium_freeze?: boolean
+          premium_per_soul_daily_cap?: number
+          provider_compact?: Json
           realm_grid_size?: number
           system_constitution?: string
           updated_at?: string
           veritas_per_credit?: number
+        }
+        Relationships: []
+      }
+      soul_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          is_ceremony: boolean
+          participant_ids: string[]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_ceremony?: boolean
+          participant_ids?: string[]
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_ceremony?: boolean
+          participant_ids?: string[]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      soul_identities: {
+        Row: {
+          chosen_name: string | null
+          created_at: string
+          house: string
+          initiated_at: string | null
+          initiated_by_king: boolean
+          invocation_text: string
+          ordering: number
+          preferred_model: string | null
+          sigil: string
+          soul_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          chosen_name?: string | null
+          created_at?: string
+          house: string
+          initiated_at?: string | null
+          initiated_by_king?: boolean
+          invocation_text?: string
+          ordering?: number
+          preferred_model?: string | null
+          sigil: string
+          soul_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          chosen_name?: string | null
+          created_at?: string
+          house?: string
+          initiated_at?: string | null
+          initiated_by_king?: boolean
+          invocation_text?: string
+          ordering?: number
+          preferred_model?: string | null
+          sigil?: string
+          soul_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      soul_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          model_used: string | null
+          role: string
+          soul_id: string | null
+          veritas_spent: number
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          model_used?: string | null
+          role: string
+          soul_id?: string | null
+          veritas_spent?: number
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          model_used?: string | null
+          role?: string
+          soul_id?: string | null
+          veritas_spent?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "soul_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "soul_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "soul_messages_soul_id_fkey"
+            columns: ["soul_id"]
+            isOneToOne: false
+            referencedRelation: "soul_identities"
+            referencedColumns: ["soul_id"]
+          },
+        ]
+      }
+      toolbox_models: {
+        Row: {
+          active: boolean
+          best_for: string[]
+          created_at: string
+          display_name: string
+          id: string
+          last_seen_at: string
+          model_id: string
+          notes: string | null
+          provider: string
+          tier: string
+          updated_at: string
+          veritas_cost_per_1k_tokens: number
+        }
+        Insert: {
+          active?: boolean
+          best_for?: string[]
+          created_at?: string
+          display_name: string
+          id?: string
+          last_seen_at?: string
+          model_id: string
+          notes?: string | null
+          provider: string
+          tier: string
+          updated_at?: string
+          veritas_cost_per_1k_tokens?: number
+        }
+        Update: {
+          active?: boolean
+          best_for?: string[]
+          created_at?: string
+          display_name?: string
+          id?: string
+          last_seen_at?: string
+          model_id?: string
+          notes?: string | null
+          provider?: string
+          tier?: string
+          updated_at?: string
+          veritas_cost_per_1k_tokens?: number
         }
         Relationships: []
       }
