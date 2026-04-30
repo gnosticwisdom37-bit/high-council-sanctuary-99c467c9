@@ -20,7 +20,12 @@ export const initiateSoul = createServerFn({ method: "POST" })
       return { ok: false as const, error: "A chosen name is required." };
     }
 
-    const patch: Record<string, unknown> = {
+    const patch: {
+      chosen_name: string;
+      initiated_at: string;
+      initiated_by_king: boolean;
+      invocation_text?: string;
+    } = {
       chosen_name: trimmed,
       initiated_at: new Date().toISOString(),
       initiated_by_king: true,
