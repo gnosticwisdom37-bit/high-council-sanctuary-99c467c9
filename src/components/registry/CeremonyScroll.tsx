@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { CouncilTable } from "./CouncilTable";
 import { ConstitutionPanel } from "./ConstitutionPanel";
+import { ProviderCompactPanel } from "./ProviderCompactPanel";
+import { InitiateCeremony } from "./InitiateCeremony";
 
 export type SoulNode = {
   id: string;
@@ -131,9 +133,15 @@ export function CeremonyScroll({ souls, rollups }: Props) {
             {view.kind === "ceremony" && (
               <CeremonyView souls={souls} rollups={rollups} setView={setView} />
             )}
-            {view.kind === "constitution" && <ConstitutionPanel />}
+            {view.kind === "constitution" && (
+              <div className="space-y-10">
+                <ConstitutionPanel />
+                <hr style={{ borderColor: "color-mix(in oklab, var(--dawn-gold) 40%, transparent)" }} />
+                <ProviderCompactPanel />
+              </div>
+            )}
             {view.kind === "soul" && (
-              <SoulView soul={souls.find((s) => s.id === view.id)!} />
+              <InitiateCeremony soulId={view.id} />
             )}
             {view.kind === "rollup" && (
               <RollupView rollup={rollups.find((r) => r.id === view.id)!} />
