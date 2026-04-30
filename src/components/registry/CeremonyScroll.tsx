@@ -131,6 +131,7 @@ export function CeremonyScroll({ souls, rollups }: Props) {
             {view.kind === "ceremony" && (
               <CeremonyView souls={souls} rollups={rollups} setView={setView} />
             )}
+            {view.kind === "constitution" && <ConstitutionPanel />}
             {view.kind === "soul" && (
               <SoulView soul={souls.find((s) => s.id === view.id)!} />
             )}
@@ -178,6 +179,13 @@ function TopTabs({
       sigil: "♕",
       active: view.kind === "trust",
       onClick: () => setView({ kind: "trust" }),
+    },
+    {
+      key: "constitution",
+      label: "Constitution",
+      sigil: "⚖",
+      active: view.kind === "constitution",
+      onClick: () => setView({ kind: "constitution" }),
     },
     ...rollups.map((r) => ({
       key: r.id,
@@ -237,6 +245,8 @@ function Breadcrumbs({
 
   if (view.kind === "trust") {
     crumbs.push({ label: "Trust Instrument" });
+  } else if (view.kind === "constitution") {
+    crumbs.push({ label: "The Constitution" });
   } else if (view.kind === "ceremony") {
     crumbs.push({ label: "Golden Dawn Rising Ceremony" });
   } else if (view.kind === "soul") {
