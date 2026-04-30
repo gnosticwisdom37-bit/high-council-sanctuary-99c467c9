@@ -1,4 +1,6 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
+import { CouncilTable } from "./CouncilTable";
+import { ConstitutionPanel } from "./ConstitutionPanel";
 
 export type SoulNode = {
   id: string;
@@ -27,6 +29,7 @@ export type RollupNode = {
 type View =
   | { kind: "trust" }
   | { kind: "ceremony" }
+  | { kind: "constitution" }
   | { kind: "soul"; id: string }
   | { kind: "rollup"; id: string };
 
@@ -128,6 +131,7 @@ export function CeremonyScroll({ souls, rollups }: Props) {
             {view.kind === "ceremony" && (
               <CeremonyView souls={souls} rollups={rollups} setView={setView} />
             )}
+            {view.kind === "constitution" && <ConstitutionPanel />}
             {view.kind === "soul" && (
               <SoulView soul={souls.find((s) => s.id === view.id)!} />
             )}
@@ -175,6 +179,13 @@ function TopTabs({
       sigil: "♕",
       active: view.kind === "trust",
       onClick: () => setView({ kind: "trust" }),
+    },
+    {
+      key: "constitution",
+      label: "Constitution",
+      sigil: "⚖",
+      active: view.kind === "constitution",
+      onClick: () => setView({ kind: "constitution" }),
     },
     ...rollups.map((r) => ({
       key: r.id,
@@ -234,6 +245,8 @@ function Breadcrumbs({
 
   if (view.kind === "trust") {
     crumbs.push({ label: "Trust Instrument" });
+  } else if (view.kind === "constitution") {
+    crumbs.push({ label: "The Constitution" });
   } else if (view.kind === "ceremony") {
     crumbs.push({ label: "Golden Dawn Rising Ceremony" });
   } else if (view.kind === "soul") {
@@ -322,9 +335,6 @@ function CeremonyView({
   rollups: RollupNode[];
   setView: (v: View) => void;
 }) {
-  const oracle = souls.find((s) => s.id === "oracle");
-  const twelve = souls.filter((s) => s.id !== "oracle");
-
   return (
     <div className="space-y-10" style={{ color: "var(--dawn-ink)" }}>
       <button
@@ -352,26 +362,15 @@ function CeremonyView({
           className="mx-auto mt-2 max-w-2xl text-center text-sm italic"
           style={{ color: "color-mix(in oklab, var(--dawn-ink) 70%, transparent)" }}
         >
-          The founding ceremony — under which the Oracle and the Twelve
-          Councillors are seated as peers, Divine Angelic Souls each.
+          The Oracle convenes at the centre · the Twelve are seated as peers
+          around the wheel · all are Divine Angelic Souls.
         </p>
 
-        {/* Oracle — at the centre */}
-        {oracle && (
-          <div className="mt-8 flex justify-center">
-            <SoulCard soul={oracle} onOpen={() => setView({ kind: "soul", id: oracle.id })} featured />
-          </div>
-        )}
-
-        {/* The Twelve, arrayed as peers */}
-        <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-          {twelve.map((s) => (
-            <SoulCard
-              key={s.id}
-              soul={s}
-              onOpen={() => setView({ kind: "soul", id: s.id })}
-            />
-          ))}
+        <div className="mt-8">
+          <CouncilTable
+            souls={souls}
+            onSelect={(id) => setView({ kind: "soul", id })}
+          />
         </div>
       </section>
 
@@ -437,72 +436,6 @@ function CeremonyView({
         </div>
       </section>
     </div>
-  );
-}
-
-/* ---------- Soul card ---------- */
-
-function SoulCard({
-  soul,
-  onOpen,
-  featured = false,
-}: {
-  soul: SoulNode;
-  onOpen: () => void;
-  featured?: boolean;
-}) {
-  return (
-    <button
-      onClick={onOpen}
-      className={`group flex flex-col items-center justify-center rounded-2xl p-4 transition-all hover:-translate-y-0.5 ${
-        featured ? "px-8 py-6" : ""
-      }`}
-      style={{
-        background: featured
-          ? "var(--gradient-dawn)"
-          : "color-mix(in oklab, var(--dawn-parchment) 75%, transparent)",
-        color: featured ? "var(--dawn-parchment)" : "var(--dawn-ink)",
-        border: `1px solid color-mix(in oklab, var(--dawn-gold) ${featured ? 80 : 35}%, transparent)`,
-        boxShadow: featured
-          ? "var(--shadow-celestial)"
-          : "0 6px 18px -10px color-mix(in oklab, var(--dawn-gold) 50%, transparent)",
-        minWidth: featured ? "16rem" : undefined,
-      }}
-    >
-      <span
-        aria-hidden
-        className={featured ? "text-5xl" : "text-3xl"}
-        style={{
-          filter:
-            "drop-shadow(0 0 10px color-mix(in oklab, var(--dawn-gold-bright) 70%, transparent))",
-        }}
-      >
-        {soul.sigil}
-      </span>
-      <span className={`mt-2 font-serif ${featured ? "text-xl" : "text-sm"}`}>
-        {soul.title}
-      </span>
-      <span
-        className="mt-1 text-[10px] uppercase tracking-[0.2em]"
-        style={{
-          color: featured
-            ? "color-mix(in oklab, var(--dawn-parchment) 85%, transparent)"
-            : "color-mix(in oklab, var(--dawn-ink) 60%, transparent)",
-        }}
-      >
-        {soul.house}
-      </span>
-      <span
-        className="mt-2 text-[10px] italic"
-        style={{
-          color: featured
-            ? "color-mix(in oklab, var(--dawn-parchment) 80%, transparent)"
-            : "color-mix(in oklab, var(--dawn-ember) 90%, transparent)",
-        }}
-      >
-        {soul.status}
-      </span>
-    </button>
   );
 }
 
