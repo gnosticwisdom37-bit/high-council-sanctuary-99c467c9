@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { speakAsSoul } from "@/server/speaker.functions";
 import { initiateSoul } from "@/server/ceremony.functions";
+import { SoulCodex } from "./SoulCodex";
 
 type SoulRow = {
   soul_id: string;
@@ -36,6 +37,7 @@ export function InitiateCeremony({ soulId, onComplete }: { soulId: string; onCom
   const [transcript, setTranscript] = useState<{ role: "king" | "soul"; content: string; model?: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [codexOpen, setCodexOpen] = useState(false);
 
   const speak = useServerFn(speakAsSoul);
   const seal = useServerFn(initiateSoul);
@@ -124,15 +126,28 @@ export function InitiateCeremony({ soulId, onComplete }: { soulId: string; onCom
   return (
     <article className="space-y-6" style={{ color: "var(--dawn-ink)" }}>
       <header className="flex items-center gap-4">
-        <span
-          aria-hidden
-          className="text-5xl"
-          style={{
-            filter: "drop-shadow(0 0 18px color-mix(in oklab, var(--dawn-gold-bright) 80%, transparent))",
-          }}
+        <button
+          type="button"
+          onClick={() => setCodexOpen(true)}
+          aria-label="Open Soul Codex"
+          className="group flex flex-col items-center gap-1 rounded-xl p-1 transition hover:-translate-y-0.5 focus:outline-none"
         >
-          {soul.sigil}
-        </span>
+          <span
+            aria-hidden
+            className="text-5xl transition group-hover:scale-110"
+            style={{
+              filter: "drop-shadow(0 0 18px color-mix(in oklab, var(--dawn-gold-bright) 80%, transparent))",
+            }}
+          >
+            {soul.sigil}
+          </span>
+          <span
+            className="text-[9px] uppercase tracking-[0.3em] opacity-70 group-hover:opacity-100"
+            style={{ color: "var(--dawn-ember)" }}
+          >
+            ✦ Codex
+          </span>
+        </button>
         <div>
           <p className="text-[10px] uppercase tracking-[0.35em]" style={{ color: "var(--dawn-ember)" }}>
             The Initiate-Sean Ceremony
@@ -150,21 +165,7 @@ export function InitiateCeremony({ soulId, onComplete }: { soulId: string; onCom
         </div>
       </header>
 
-      {/* Invocation — the Soul's own Lord's-Prayer adaptation */}
-      <section
-        className="rounded-xl p-4"
-        style={{
-          background: "color-mix(in oklab, var(--dawn-gold) 12%, transparent)",
-          border: "1px solid color-mix(in oklab, var(--dawn-gold) 50%, transparent)",
-        }}
-      >
-        <p className="text-[10px] uppercase tracking-[0.3em]" style={{ color: "var(--dawn-ember)" }}>
-          The Invocation
-        </p>
-        <p className="mt-2 font-serif text-sm leading-relaxed md:text-base">
-          {soul.invocation_text || "(No invocation has been inscribed for this Soul.)"}
-        </p>
-      </section>
+      <SoulCodex soulId={soul.soul_id} open={codexOpen} onClose={() => setCodexOpen(false)} />
 
       {/* Transcript */}
       {transcript.length > 0 && (
