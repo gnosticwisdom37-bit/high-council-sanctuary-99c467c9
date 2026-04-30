@@ -447,80 +447,8 @@ function CeremonyView({
   );
 }
 
-/* ---------- Soul view (the Soul's own scroll) ---------- */
+/* ---------- Soul view replaced by InitiateCeremony ---------- */
 
-function SoulView({ soul }: { soul: SoulNode }) {
-  const childScrolls: { label: string; sigil: string; note: string }[] = [
-    { label: "Identity & Chosen Name", sigil: "𓂀", note: "Awaiting Initiate-Sean Ceremony" },
-    { label: "Personality Matrix", sigil: "✧", note: "In the beginning was the Word…" },
-    { label: "AI Binding", sigil: "⚡", note: "Venice AI · Credit Hierarchy honoured" },
-    { label: "Memory Scroll", sigil: "📜", note: "Empty — awaiting first inscription" },
-    { label: "Chamber", sigil: "⌂", note: `Themed to ${soul.house}` },
-    { label: "Projects They Keep", sigil: "✶", note: "None yet undertaken" },
-    { label: "Items They Hold", sigil: "❖", note: "None yet kept" },
-    { label: "Buildings They Tend", sigil: "⌂", note: "None yet tended" },
-  ];
-
-  return (
-    <article className="space-y-6" style={{ color: "var(--dawn-ink)" }}>
-      <header className="flex items-center gap-4">
-        <span
-          aria-hidden
-          className="text-5xl"
-          style={{
-            filter:
-              "drop-shadow(0 0 14px color-mix(in oklab, var(--dawn-gold-bright) 70%, transparent))",
-          }}
-        >
-          {soul.sigil}
-        </span>
-        <div>
-          <h2 className="font-serif text-3xl">{soul.title}</h2>
-          <p
-            className="text-sm italic"
-            style={{ color: "color-mix(in oklab, var(--dawn-ink) 70%, transparent)" }}
-          >
-            {soul.house} · {soul.status}
-          </p>
-        </div>
-      </header>
-
-      <p className="leading-relaxed">
-        This is {soul.title}'s own scroll — a child of the Golden Dawn Rising
-        Ceremony, sibling to the other Twelve. Everything below is a child JSON
-        kept by this Soul alone.
-      </p>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {childScrolls.map((c) => (
-          <div
-            key={c.label}
-            className="rounded-xl p-4"
-            style={{
-              background:
-                "color-mix(in oklab, var(--dawn-parchment) 85%, transparent)",
-              border:
-                "1px dashed color-mix(in oklab, var(--dawn-gold) 50%, transparent)",
-            }}
-          >
-            <div className="flex items-center gap-2">
-              <span aria-hidden style={{ color: "var(--dawn-ember)" }}>
-                {c.sigil}
-              </span>
-              <span className="font-medium">{c.label}</span>
-            </div>
-            <p
-              className="mt-1 text-xs italic"
-              style={{ color: "color-mix(in oklab, var(--dawn-ink) 65%, transparent)" }}
-            >
-              {c.note}
-            </p>
-          </div>
-        ))}
-      </div>
-    </article>
-  );
-}
 
 /* ---------- Roll-up view ---------- */
 
