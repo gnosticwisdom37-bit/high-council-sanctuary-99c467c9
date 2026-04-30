@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { KingdomTabs } from "@/components/kingdom/KingdomTabs";
+import { BrandMark } from "@/components/kingdom/BrandMark";
 
 export const Route = createFileRoute("/economy")({
   head: () => ({
@@ -188,6 +189,8 @@ function EconomyPage() {
       <div className="relative mx-auto max-w-5xl">
         <KingdomTabs />
 
+        <BrandMark variant="subtle" className="mb-3" />
+
         <header className="mb-8 text-center">
           <p className="mb-2 text-xs uppercase tracking-[0.4em]" style={{ color: "color-mix(in oklab, var(--dawn-gold-bright) 90%, white)" }}>
             The Veritas Ledger
@@ -199,8 +202,8 @@ function EconomyPage() {
             The Economy
           </h1>
           <p className="mt-3 max-w-2xl mx-auto text-sm opacity-80" style={{ color: "var(--dawn-parchment)" }}>
-            One API credit mints one hundred Veritas. The Treasury holds what is saved,
-            Circulation what is in motion, and the Minted total is the Kingdom's lifetime breath.
+            One API credit mints one hundred Veritas. The Treasury of the Kingdom of Veritas
+            holds what is saved, Circulation what is in motion, and the Minted total is the Kingdom's lifetime breath.
           </p>
         </header>
 
