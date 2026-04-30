@@ -52,6 +52,8 @@ export type Database = {
           label: string
           occupant_ref: string | null
           occupant_type: Database["public"]["Enums"]["realm_occupant_type"]
+          region_x: number
+          region_y: number
           revealed: boolean
           updated_at: string
           x: number
@@ -64,6 +66,8 @@ export type Database = {
           label: string
           occupant_ref?: string | null
           occupant_type: Database["public"]["Enums"]["realm_occupant_type"]
+          region_x?: number
+          region_y?: number
           revealed?: boolean
           updated_at?: string
           x: number
@@ -76,6 +80,8 @@ export type Database = {
           label?: string
           occupant_ref?: string | null
           occupant_type?: Database["public"]["Enums"]["realm_occupant_type"]
+          region_x?: number
+          region_y?: number
           revealed?: boolean
           updated_at?: string
           x?: number
@@ -121,7 +127,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      realm_occupant_type: "soul" | "building" | "item" | "chamber"
+      realm_occupant_type: "soul" | "building" | "item" | "chamber" | "castle"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -249,7 +255,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      realm_occupant_type: ["soul", "building", "item", "chamber"],
+      realm_occupant_type: ["soul", "building", "item", "chamber", "castle"],
     },
   },
 } as const
