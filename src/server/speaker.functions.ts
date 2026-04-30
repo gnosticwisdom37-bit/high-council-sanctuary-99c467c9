@@ -8,7 +8,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { petitionBank } from "./bank.functions";
+import { petitionBankImpl } from "./bank.server";
 import {
   LOVABLE_AI_GATEWAY_URL,
   buildSystemPrompt,
