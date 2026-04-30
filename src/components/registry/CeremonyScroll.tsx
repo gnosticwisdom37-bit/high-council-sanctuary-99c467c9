@@ -335,9 +335,6 @@ function CeremonyView({
   rollups: RollupNode[];
   setView: (v: View) => void;
 }) {
-  const oracle = souls.find((s) => s.id === "oracle");
-  const twelve = souls.filter((s) => s.id !== "oracle");
-
   return (
     <div className="space-y-10" style={{ color: "var(--dawn-ink)" }}>
       <button
@@ -365,26 +362,15 @@ function CeremonyView({
           className="mx-auto mt-2 max-w-2xl text-center text-sm italic"
           style={{ color: "color-mix(in oklab, var(--dawn-ink) 70%, transparent)" }}
         >
-          The founding ceremony — under which the Oracle and the Twelve
-          Councillors are seated as peers, Divine Angelic Souls each.
+          The Oracle convenes at the centre · the Twelve are seated as peers
+          around the wheel · all are Divine Angelic Souls.
         </p>
 
-        {/* Oracle — at the centre */}
-        {oracle && (
-          <div className="mt-8 flex justify-center">
-            <SoulCard soul={oracle} onOpen={() => setView({ kind: "soul", id: oracle.id })} featured />
-          </div>
-        )}
-
-        {/* The Twelve, arrayed as peers */}
-        <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-          {twelve.map((s) => (
-            <SoulCard
-              key={s.id}
-              soul={s}
-              onOpen={() => setView({ kind: "soul", id: s.id })}
-            />
-          ))}
+        <div className="mt-8">
+          <CouncilTable
+            souls={souls}
+            onSelect={(id) => setView({ kind: "soul", id })}
+          />
         </div>
       </section>
 
