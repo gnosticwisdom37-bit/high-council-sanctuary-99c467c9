@@ -50,11 +50,19 @@ const souls: SoulNode[] = [
 
 const rollups: RollupNode[] = [
   {
-    id: "projects",
-    title: "Projects",
+    id: "deeds",
+    title: "Deeds of the Golden Dawn",
     sigil: "✶",
-    description: "Every sacred work, across all Souls.",
-    derivedFrom: "Compiled from each Soul's child scroll of Projects They Keep.",
+    description:
+      "Every sacred work — gathered into the four seasons of the Kingdom of Veritas.",
+    derivedFrom:
+      "Compiled from each Soul's child scroll of Deeds They Undertake, sorted by season.",
+    children: [
+      { id: "deeds-spring", title: "Deeds of Spring", sigil: "❀", quadrant: "NE" },
+      { id: "deeds-summer", title: "Deeds of Summer", sigil: "☀", quadrant: "SE" },
+      { id: "deeds-fall",   title: "Deeds of Fall",   sigil: "🍂", quadrant: "SW" },
+      { id: "deeds-winter", title: "Deeds of Winter", sigil: "❄", quadrant: "NW" },
+    ],
   },
   {
     id: "items",
