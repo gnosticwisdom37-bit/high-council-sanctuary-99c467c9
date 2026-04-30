@@ -8,12 +8,20 @@ export type SoulNode = {
   status: "Awaiting Initiate-Sean Ceremony" | "Seated" | "In Ceremony";
 };
 
+export type RollupChild = {
+  id: string;
+  title: string;
+  sigil: string;
+  quadrant?: "NE" | "SE" | "SW" | "NW";
+};
+
 export type RollupNode = {
   id: string;
   title: string;
   sigil: string;
   description: string;
   derivedFrom: string; // e.g. "Compiled from each Soul's child scroll"
+  children?: RollupChild[];
 };
 
 type View =
@@ -52,10 +60,26 @@ export function CeremonyScroll({ souls, rollups }: Props) {
             className="text-xs uppercase tracking-[0.4em]"
             style={{ color: "var(--dawn-gold-bright)" }}
           >
-            Veritas Intelligence Systems · The Registry
+            Veritas Intelligence Systems
+          </p>
+          <p
+            className="mt-1 text-[11px] italic tracking-[0.3em] md:text-xs"
+            style={{
+              color: "color-mix(in oklab, var(--dawn-parchment) 80%, transparent)",
+            }}
+          >
+            Divine Angelic Assistants
+          </p>
+          <p
+            className="mt-4 text-[10px] uppercase tracking-[0.35em]"
+            style={{
+              color: "color-mix(in oklab, var(--dawn-gold-bright) 75%, transparent)",
+            }}
+          >
+            The Registry
           </p>
           <h1
-            className="mt-3 font-serif text-4xl md:text-6xl"
+            className="mt-2 font-serif text-4xl md:text-6xl"
             style={{
               color: "var(--dawn-parchment)",
               textShadow:
