@@ -1,4 +1,6 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
+import { CouncilTable } from "./CouncilTable";
+import { ConstitutionPanel } from "./ConstitutionPanel";
 
 export type SoulNode = {
   id: string;
@@ -27,6 +29,7 @@ export type RollupNode = {
 type View =
   | { kind: "trust" }
   | { kind: "ceremony" }
+  | { kind: "constitution" }
   | { kind: "soul"; id: string }
   | { kind: "rollup"; id: string };
 
