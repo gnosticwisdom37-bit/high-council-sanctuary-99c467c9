@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { KingdomTabs } from "@/components/kingdom/KingdomTabs";
 import { BrandMark } from "@/components/kingdom/BrandMark";
+import { BankLedgerPanel } from "@/components/registry/BankLedgerPanel";
 
 export const Route = createFileRoute("/economy")({
   head: () => ({
@@ -386,6 +387,10 @@ function EconomyPage() {
             </p>
           )}
         </section>
+
+        <div className="mt-10">
+          <BankLedgerPanel />
+        </div>
       </div>
     </div>
   );
