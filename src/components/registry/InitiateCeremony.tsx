@@ -17,6 +17,7 @@ import { initiateSoul } from "@/server/ceremony.functions";
 import { closeGathering } from "@/server/memoirs.functions";
 import { findOpenGathering } from "@/server/conversations.functions";
 import { SoulCodex } from "./SoulCodex";
+import { DeedInscribedBanner } from "@/components/chamber/DeedInscribedBanner";
 
 type SoulRow = {
   soul_id: string;
@@ -29,9 +30,22 @@ type SoulRow = {
   ordering: number;
 };
 
+type InscribedDeed = {
+  id: string;
+  title: string;
+  season: "spring" | "summer" | "fall" | "winter";
+  season_explicit: boolean;
+};
+
 type Turn =
   | { role: "king"; content: string }
-  | { role: "soul"; soulId: string; content: string; model?: string };
+  | {
+      role: "soul";
+      soulId: string;
+      content: string;
+      model?: string;
+      deed?: InscribedDeed | null;
+    };
 
 // Stable speaking order: Oracle first, then zodiac wheel order.
 const ZODIAC_ORDER = [
@@ -197,6 +211,14 @@ export function InitiateCeremony({
           soulId: soul.soul_id,
           content: result.assistant_message,
           model: result.model_used,
+          deed: result.inscribed_deed
+            ? {
+                id: result.inscribed_deed.id,
+                title: result.inscribed_deed.title,
+                season: result.inscribed_deed.season,
+                season_explicit: result.inscribed_deed.season_explicit,
+              }
+            : null,
         },
       ]);
     }
@@ -353,6 +375,14 @@ export function InitiateCeremony({
                   )}
                 </p>
                 <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">{turn.content}</p>
+                {turn.role === "soul" && turn.deed && (
+                  <DeedInscribedBanner
+                    title={turn.deed.title}
+                    season={turn.deed.season}
+                    seasonExplicit={turn.deed.season_explicit}
+                    stewardName={soul?.chosen_name || soul?.title}
+                  />
+                )}
               </div>
             );
           })}

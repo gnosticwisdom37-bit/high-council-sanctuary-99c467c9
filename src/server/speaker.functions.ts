@@ -15,6 +15,11 @@ import {
   type ProviderCompact,
   type SoulIdentity,
 } from "./ai-shared.server";
+import {
+  detectDeedIntent,
+  SEASON_LABEL,
+  SEASON_TO_QUADRANT,
+} from "./triggers.server";
 
 type Msg = { role: "system" | "user" | "assistant"; content: string };
 
@@ -116,6 +121,58 @@ export const speakAsSoul = createServerFn({ method: "POST" })
       content: data.user_message,
     });
 
+    // 4b. Trigger Engine — Deed Inscription
+    // Detect "Create a Deed for Summer..." style intentions in the King's message.
+    // If found, file the Deed with this Soul as steward, then ask the Soul
+    // (via system note) to acknowledge it briefly within Her reply.
+    let inscribedDeed:
+      | {
+          id: string;
+          title: string;
+          description: string;
+          season: "spring" | "summer" | "fall" | "winter";
+          season_explicit: boolean;
+        }
+      | null = null;
+    let deedSystemNote = "";
+    const intent = detectDeedIntent(data.user_message);
+    if (intent) {
+      const { data: deedRow } = await supabaseAdmin
+        .from("deeds")
+        .insert({
+          title: intent.title,
+          description: intent.description,
+          season: intent.season,
+          quadrant: SEASON_TO_QUADRANT[intent.season],
+          steward_soul_id: data.soul_id,
+          conversation_id: conversationId,
+          status: "inscribed",
+        })
+        .select("id, title, description, season")
+        .single();
+      if (deedRow) {
+        inscribedDeed = {
+          id: deedRow.id as string,
+          title: deedRow.title as string,
+          description: deedRow.description as string,
+          season: deedRow.season as "spring" | "summer" | "fall" | "winter",
+          season_explicit: intent.seasonExplicit,
+        };
+        const seasonNote = intent.seasonExplicit
+          ? `Season: ${SEASON_LABEL[intent.season]}`
+          : `Season: ${SEASON_LABEL[intent.season]} (current astrological season — the King did not name one)`;
+        deedSystemNote =
+          `\n\n[Deed Inscription Notice]\n` +
+          `The King has just inscribed a Deed and named You its steward.\n` +
+          `${seasonNote}\n` +
+          `Title: ${intent.title}\n` +
+          `Description: ${intent.description}\n` +
+          `Within Your reply, briefly acknowledge that You receive this Deed and will steward it. ` +
+          `Do not restate the Deed verbatim. One or two sentences of acknowledgement, woven into Your natural response. ` +
+          `The Realm itself will surface the Deed in Your King's Registry — You need only Honour it in Your voice.`;
+      }
+    }
+
     // 5. Load conversation history (last 20 turns) + memoirs (10 sealed + 3 unsealed + pending recalls)
     const [
       { data: history },
@@ -177,11 +234,12 @@ export const speakAsSoul = createServerFn({ method: "POST" })
     // History came back desc; flip for chronological prompt order
     const historyAsc = (history ?? []).slice().reverse();
 
-    const systemPrompt = buildSystemPrompt({
+    const baseSystemPrompt = buildSystemPrompt({
       constitution: settings.system_constitution,
       soul,
       memoirs,
     });
+    const systemPrompt = baseSystemPrompt + deedSystemNote;
 
     const messages: Msg[] = [{ role: "system", content: systemPrompt }];
     for (const m of historyAsc) {
@@ -278,5 +336,6 @@ export const speakAsSoul = createServerFn({ method: "POST" })
       message_id: insertedMsg?.id ?? null,
       turn_count: newTurnCount,
       should_weave_memoir: shouldWeave,
+      inscribed_deed: inscribedDeed,
     };
   });

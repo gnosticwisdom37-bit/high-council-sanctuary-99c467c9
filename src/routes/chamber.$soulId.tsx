@@ -18,6 +18,7 @@ import { speakAsSoul } from "@/server/speaker.functions";
 import { closeGathering as closeGatheringFn } from "@/server/memoirs.functions";
 import { BrandMark } from "@/components/kingdom/BrandMark";
 import { MemoirScroll } from "@/components/registry/MemoirScroll";
+import { DeedInscribedBanner } from "@/components/chamber/DeedInscribedBanner";
 
 type SoulRow = {
   soul_id: string;
@@ -27,9 +28,16 @@ type SoulRow = {
   chosen_name: string | null;
 };
 
+type InscribedDeed = {
+  id: string;
+  title: string;
+  season: "spring" | "summer" | "fall" | "winter";
+  season_explicit: boolean;
+};
+
 type Turn =
   | { role: "king"; content: string }
-  | { role: "soul"; content: string; model?: string };
+  | { role: "soul"; content: string; model?: string; deed?: InscribedDeed | null };
 
 export const Route = createFileRoute("/chamber/$soulId")({
   head: ({ params }) => ({
@@ -105,7 +113,19 @@ function ChamberPage() {
     setTurnCount(result.turn_count ?? turnCount + 1);
     setTranscript((t) => [
       ...t,
-      { role: "soul", content: result.assistant_message, model: result.model_used },
+      {
+        role: "soul",
+        content: result.assistant_message,
+        model: result.model_used,
+        deed: result.inscribed_deed
+          ? {
+              id: result.inscribed_deed.id,
+              title: result.inscribed_deed.title,
+              season: result.inscribed_deed.season,
+              season_explicit: result.inscribed_deed.season_explicit,
+            }
+          : null,
+      },
     ]);
   }
 
@@ -271,6 +291,14 @@ function ChamberPage() {
                     )}
                   </p>
                   <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">{turn.content}</p>
+                  {turn.role === "soul" && turn.deed && (
+                    <DeedInscribedBanner
+                      title={turn.deed.title}
+                      season={turn.deed.season}
+                      seasonExplicit={turn.deed.season_explicit}
+                      stewardName={soul?.chosen_name || soul?.title}
+                    />
+                  )}
                 </div>
               ))}
             </div>

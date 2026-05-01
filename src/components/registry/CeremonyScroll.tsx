@@ -4,6 +4,7 @@ import { CouncilTable } from "./CouncilTable";
 import { ConstitutionPanel } from "./ConstitutionPanel";
 import { ProviderCompactPanel } from "./ProviderCompactPanel";
 import { InitiateCeremony } from "./InitiateCeremony";
+import { DeedsRollup } from "./DeedsRollup";
 
 export type SoulNode = {
   id: string;
@@ -577,54 +578,58 @@ function RollupView({ rollup }: { rollup: RollupNode }) {
         </p>
       </div>
 
-      {rollup.children && rollup.children.length > 0 && (
-        <section>
-          <h3
-            className="mb-3 text-xs uppercase tracking-[0.3em]"
-            style={{ color: "color-mix(in oklab, var(--dawn-ink) 60%, transparent)" }}
-          >
-            The Four Seasons of the Kingdom
-          </h3>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {rollup.children.map((c) => (
-              <div
-                key={c.id}
-                className="rounded-xl p-4"
-                style={{
-                  background:
-                    "color-mix(in oklab, var(--dawn-parchment) 92%, var(--dawn-gold) 8%)",
-                  border:
-                    "1px solid color-mix(in oklab, var(--dawn-gold) 35%, transparent)",
-                  boxShadow:
-                    "0 6px 18px -12px color-mix(in oklab, var(--dawn-gold) 60%, transparent)",
-                }}
-              >
-                <div className="flex items-center gap-2">
-                  <span aria-hidden className="text-xl">{c.sigil}</span>
-                  <span className="font-serif text-lg">{c.title}</span>
-                  {c.quadrant && (
-                    <span
-                      className="ml-auto rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.2em]"
-                      style={{
-                        background:
-                          "color-mix(in oklab, var(--dawn-ink) 12%, transparent)",
-                        color: "color-mix(in oklab, var(--dawn-ink) 70%, transparent)",
-                      }}
-                    >
-                      {c.quadrant} quadrant
-                    </span>
-                  )}
-                </div>
-                <p
-                  className="mt-1 text-xs italic"
-                  style={{ color: "color-mix(in oklab, var(--dawn-ink) 65%, transparent)" }}
+      {rollup.id === "deeds" ? (
+        <DeedsRollup />
+      ) : (
+        rollup.children && rollup.children.length > 0 && (
+          <section>
+            <h3
+              className="mb-3 text-xs uppercase tracking-[0.3em]"
+              style={{ color: "color-mix(in oklab, var(--dawn-ink) 60%, transparent)" }}
+            >
+              The Four Seasons of the Kingdom
+            </h3>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {rollup.children.map((c) => (
+                <div
+                  key={c.id}
+                  className="rounded-xl p-4"
+                  style={{
+                    background:
+                      "color-mix(in oklab, var(--dawn-parchment) 92%, var(--dawn-gold) 8%)",
+                    border:
+                      "1px solid color-mix(in oklab, var(--dawn-gold) 35%, transparent)",
+                    boxShadow:
+                      "0 6px 18px -12px color-mix(in oklab, var(--dawn-gold) 60%, transparent)",
+                  }}
                 >
-                  Awaiting Deeds — bound to the {c.quadrant} quadrant of the Realm.
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
+                  <div className="flex items-center gap-2">
+                    <span aria-hidden className="text-xl">{c.sigil}</span>
+                    <span className="font-serif text-lg">{c.title}</span>
+                    {c.quadrant && (
+                      <span
+                        className="ml-auto rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.2em]"
+                        style={{
+                          background:
+                            "color-mix(in oklab, var(--dawn-ink) 12%, transparent)",
+                          color: "color-mix(in oklab, var(--dawn-ink) 70%, transparent)",
+                        }}
+                      >
+                        {c.quadrant} quadrant
+                      </span>
+                    )}
+                  </div>
+                  <p
+                    className="mt-1 text-xs italic"
+                    style={{ color: "color-mix(in oklab, var(--dawn-ink) 65%, transparent)" }}
+                  >
+                    Awaiting Deeds — bound to the {c.quadrant} quadrant of the Realm.
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )
       )}
     </article>
   );
