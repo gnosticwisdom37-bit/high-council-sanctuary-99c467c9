@@ -15,6 +15,12 @@ import {
   type ProviderCompact,
   type SoulIdentity,
 } from "./ai-shared.server";
+import {
+  detectDeedIntent,
+  SEASON_LABEL,
+  SEASON_SIGIL,
+  SEASON_TO_QUADRANT,
+} from "./triggers.server";
 
 type Msg = { role: "system" | "user" | "assistant"; content: string };
 
