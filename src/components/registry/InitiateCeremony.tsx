@@ -249,18 +249,36 @@ export function InitiateCeremony({
         </h2>
         {onClose && (
           <button
-            onClick={onClose}
-            className="ml-auto rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.25em] transition hover:-translate-y-0.5"
+            onClick={() => void handleClose()}
+            disabled={closing || busy}
+            className="ml-auto rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.25em] transition hover:-translate-y-0.5 disabled:opacity-50"
             style={{
               background: "color-mix(in oklab, var(--dawn-ink) 8%, transparent)",
               color: "color-mix(in oklab, var(--dawn-ink) 75%, transparent)",
               border: "1px solid color-mix(in oklab, var(--dawn-gold) 35%, transparent)",
             }}
           >
-            ✕ Close the Gathering
+            {closing
+              ? "✦ Sealing the gathering…"
+              : conversationId
+                ? "✕ Close & Seal the Gathering"
+                : "✕ Close the Gathering"}
           </button>
         )}
       </header>
+
+      {closedNotice && (
+        <p
+          className="rounded-lg p-3 text-sm italic"
+          style={{
+            background: "color-mix(in oklab, var(--dawn-gold) 18%, transparent)",
+            color: "var(--dawn-ink)",
+            border: "1px solid color-mix(in oklab, var(--dawn-gold) 50%, transparent)",
+          }}
+        >
+          {closedNotice}
+        </p>
+      )}
 
       {/* Present sigil row — tap to open Codex */}
       <div
