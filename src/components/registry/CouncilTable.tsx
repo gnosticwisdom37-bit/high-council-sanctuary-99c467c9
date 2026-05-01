@@ -177,7 +177,7 @@ export function CouncilTable({ souls, onVisit, onToggleAttendance, attendanceIds
               aria-label={`Visit the Chamber of ${soul.title}`}
               className="hcc-seat"
             >
-              <title>Visit the Chamber of {soul.title}</title>
+              <title>{`Visit the Chamber of ${soul.title}`}</title>
               {/* seat halo */}
               <circle
                 cx={x}
