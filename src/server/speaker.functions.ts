@@ -17,6 +17,8 @@ import {
 } from "./ai-shared.server";
 import {
   detectDeedIntent,
+  detectItemIntent,
+  detectBuildingIntent,
   SEASON_LABEL,
   SEASON_TO_QUADRANT,
 } from "./triggers.server";
@@ -170,6 +172,79 @@ export const speakAsSoul = createServerFn({ method: "POST" })
           `Within Your reply, briefly acknowledge that You receive this Deed and will steward it. ` +
           `Do not restate the Deed verbatim. One or two sentences of acknowledgement, woven into Your natural response. ` +
           `The Realm itself will surface the Deed in Your King's Registry — You need only Honour it in Your voice.`;
+      }
+    }
+
+    // 4c. Trigger Engine — Item Forging
+    let forgedItem:
+      | { id: string; title: string; description: string }
+      | null = null;
+    let itemSystemNote = "";
+    const itemIntent = detectItemIntent(data.user_message);
+    if (itemIntent) {
+      const { data: itemRow } = await supabaseAdmin
+        .from("items")
+        .insert({
+          title: itemIntent.title,
+          description: itemIntent.description,
+          steward_soul_id: data.soul_id,
+          conversation_id: conversationId,
+          status: "forged",
+        })
+        .select("id, title, description")
+        .single();
+      if (itemRow) {
+        forgedItem = {
+          id: itemRow.id as string,
+          title: itemRow.title as string,
+          description: itemRow.description as string,
+        };
+        itemSystemNote =
+          `\n\n[Item Forging Notice]\n` +
+          `The King has just forged an Item and entrusted You as its keeper.\n` +
+          `Title: ${itemIntent.title}\n` +
+          `Description: ${itemIntent.description}\n` +
+          `Within Your reply, briefly acknowledge that You receive this Item and will keep it. ` +
+          `Do not restate the Item verbatim. One or two sentences of acknowledgement, woven into Your natural response.`;
+      }
+    }
+
+    // 4d. Trigger Engine — Building Raising
+    let raisedBuilding:
+      | { id: string; title: string; description: string }
+      | null = null;
+    let buildingSystemNote = "";
+    const buildingIntent = detectBuildingIntent(data.user_message);
+    if (buildingIntent) {
+      const { data: buildingRow } = await supabaseAdmin
+        .from("buildings")
+        .insert({
+          title: buildingIntent.title,
+          description: buildingIntent.description,
+          steward_soul_id: data.soul_id,
+          conversation_id: conversationId,
+          status: "raised",
+          // All new Buildings default to the Origin Region (0,0)
+          // until the King's placement gesture exists.
+          region_x: 0,
+          region_y: 0,
+        })
+        .select("id, title, description")
+        .single();
+      if (buildingRow) {
+        raisedBuilding = {
+          id: buildingRow.id as string,
+          title: buildingRow.title as string,
+          description: buildingRow.description as string,
+        };
+        buildingSystemNote =
+          `\n\n[Building Raising Notice]\n` +
+          `The King has just raised a Building and named You its steward.\n` +
+          `Title: ${buildingIntent.title}\n` +
+          `Description: ${buildingIntent.description}\n` +
+          `It rises in the Origin Region of the Realm until the King later assigns its place. ` +
+          `Within Your reply, briefly acknowledge that You receive this Building and will steward it. ` +
+          `One or two sentences, woven into Your natural response.`;
       }
     }
 
