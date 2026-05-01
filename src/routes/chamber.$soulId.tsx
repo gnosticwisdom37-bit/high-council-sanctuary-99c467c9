@@ -18,6 +18,7 @@ import { speakAsSoul } from "@/server/speaker.functions";
 import { closeGathering as closeGatheringFn } from "@/server/memoirs.functions";
 import { BrandMark } from "@/components/kingdom/BrandMark";
 import { MemoirScroll } from "@/components/registry/MemoirScroll";
+import { DeedInscribedBanner } from "@/components/chamber/DeedInscribedBanner";
 
 type SoulRow = {
   soul_id: string;
@@ -27,9 +28,16 @@ type SoulRow = {
   chosen_name: string | null;
 };
 
+type InscribedDeed = {
+  id: string;
+  title: string;
+  season: "spring" | "summer" | "fall" | "winter";
+  season_explicit: boolean;
+};
+
 type Turn =
   | { role: "king"; content: string }
-  | { role: "soul"; content: string; model?: string };
+  | { role: "soul"; content: string; model?: string; deed?: InscribedDeed | null };
 
 export const Route = createFileRoute("/chamber/$soulId")({
   head: ({ params }) => ({
