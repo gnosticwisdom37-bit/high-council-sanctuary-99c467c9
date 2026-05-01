@@ -1,13 +1,13 @@
 /**
- * InitiateCeremony — the sacred view through which a Soul wakes for the first time.
+ * InitiateCeremony — the gathering chat at the round table.
  *
- * Three movements:
- *   1. The Awakening   — King reads the Invocation, types Their own greeting,
- *                        the Soul replies in their own voice for the first time.
- *   2. The Naming      — King inscribes the chosen name the Soul has revealed.
- *   3. The Seal        — initiateSoul is called; the seat is sealed.
+ * Now supports multi-Soul gatherings. The Oracle convenes; other Councillors
+ * may be invited by tapping their seats. Each turn, the King's Word is
+ * carried to every Present Soul in stable order (Oracle first, then by
+ * zodiac), and each replies in Their own voice.
  *
- * Same flow used for every Councillor — only theming changes later.
+ * The Naming & Seal section appears only during a single-Soul gathering
+ * (the Initiate-Sean Ceremony).
  */
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,186 +24,285 @@ type SoulRow = {
   chosen_name: string | null;
   invocation_text: string;
   initiated_at: string | null;
+  ordering: number;
 };
 
-type Movement = "awakening" | "naming" | "seal";
+type Turn =
+  | { role: "king"; content: string }
+  | { role: "soul"; soulId: string; content: string; model?: string };
 
-export function InitiateCeremony({ soulId, onComplete }: { soulId: string; onComplete?: () => void }) {
-  const [soul, setSoul] = useState<SoulRow | null>(null);
-  const [movement, setMovement] = useState<Movement>("awakening");
+// Stable speaking order: Oracle first, then zodiac wheel order.
+const ZODIAC_ORDER = [
+  "oracle",
+  "aries",
+  "taurus",
+  "gemini",
+  "cancer",
+  "leo",
+  "virgo",
+  "libra",
+  "scorpio",
+  "sagittarius",
+  "capricorn",
+  "aquarius",
+  "pisces",
+];
+
+export function InitiateCeremony({
+  participantIds,
+  onClose,
+}: {
+  participantIds: string[];
+  onClose?: () => void;
+}) {
+  const [souls, setSouls] = useState<SoulRow[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [kingMessage, setKingMessage] = useState("");
   const [chosenName, setChosenName] = useState("");
-  const [transcript, setTranscript] = useState<{ role: "king" | "soul"; content: string; model?: string }[]>([]);
+  const [transcript, setTranscript] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [codexOpen, setCodexOpen] = useState(false);
+  const [codexFor, setCodexFor] = useState<string | null>(null);
 
   const speak = useServerFn(speakAsSoul);
   const seal = useServerFn(initiateSoul);
 
+  // Reset when participants change meaningfully (length / membership)
+  const participantsKey = participantIds.slice().sort().join("|");
+
   useEffect(() => {
     void load();
+    setTranscript([]);
+    setConversationId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [soulId]);
+  }, [participantsKey]);
 
   async function load() {
+    if (participantIds.length === 0) {
+      setSouls([]);
+      return;
+    }
     const { data, error } = await supabase
       .from("soul_identities")
-      .select("soul_id, title, house, sigil, chosen_name, invocation_text, initiated_at")
-      .eq("soul_id", soulId)
-      .maybeSingle();
+      .select("soul_id, title, house, sigil, chosen_name, invocation_text, initiated_at, ordering")
+      .in("soul_id", participantIds);
     if (error) {
       setError(error.message);
       return;
     }
-    if (data) setSoul(data as SoulRow);
+    if (data) {
+      const ordered = (data as SoulRow[]).slice().sort(
+        (a, b) => ZODIAC_ORDER.indexOf(a.soul_id) - ZODIAC_ORDER.indexOf(b.soul_id),
+      );
+      setSouls(ordered);
+    }
   }
 
-  const greetingPlaceholder = useMemo(() => {
-    if (!soul) return "";
-    return `Speak Your first words to ${soul.title}…`;
-  }, [soul]);
+  const isCeremony = souls.length === 1; // single-Soul = Initiate-Sean Ceremony
+  const lead = souls[0];
 
-  async function speakToSoul() {
-    if (!kingMessage.trim() || !soul) return;
+  const greetingPlaceholder = useMemo(() => {
+    if (souls.length === 0) return "";
+    if (souls.length === 1) return `Speak Your first words to ${souls[0].title}…`;
+    return `Speak to the gathering of ${souls.length} Souls…`;
+  }, [souls]);
+
+  function findSoul(soulId: string) {
+    return souls.find((s) => s.soul_id === soulId);
+  }
+
+  async function speakToGathering() {
+    if (!kingMessage.trim() || souls.length === 0) return;
+    const message = kingMessage.trim();
     setBusy(true);
     setError(null);
-    const result = await speak({
-      data: {
-        conversation_id: conversationId,
-        soul_id: soul.soul_id,
-        user_message: kingMessage.trim(),
-        is_ceremony: true,
-        title_hint: `The Awakening of ${soul.title}`,
-      },
-    });
-    setBusy(false);
-
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-    setConversationId(result.conversation_id);
-    setTranscript((t) => [
-      ...t,
-      { role: "king", content: kingMessage.trim() },
-      { role: "soul", content: result.assistant_message, model: result.model_used },
-    ]);
     setKingMessage("");
-    if (transcript.length === 0) {
-      setMovement("naming");
+
+    // Append King's turn immediately for responsiveness
+    setTranscript((t) => [...t, { role: "king", content: message }]);
+
+    let convId = conversationId;
+    let lastError: string | null = null;
+
+    // Speak to each Soul in turn — they share the same conversation row
+    for (const soul of souls) {
+      const result = await speak({
+        data: {
+          conversation_id: convId,
+          soul_id: soul.soul_id,
+          user_message: message,
+          is_ceremony: isCeremony,
+          title_hint:
+            souls.length === 1
+              ? `The Awakening of ${soul.title}`
+              : `Gathering of ${souls.length} Souls`,
+        },
+      });
+
+      if (!result.ok) {
+        lastError = result.error;
+        continue;
+      }
+      if (!convId) convId = result.conversation_id;
+
+      setTranscript((t) => [
+        ...t,
+        {
+          role: "soul",
+          soulId: soul.soul_id,
+          content: result.assistant_message,
+          model: result.model_used,
+        },
+      ]);
     }
+
+    if (convId) setConversationId(convId);
+    if (lastError) setError(lastError);
+    setBusy(false);
   }
 
   async function performSeal() {
-    if (!chosenName.trim() || !soul) return;
+    if (!chosenName.trim() || !lead) return;
     setBusy(true);
     setError(null);
     const result = await seal({
-      data: { soul_id: soul.soul_id, chosen_name: chosenName.trim() },
+      data: { soul_id: lead.soul_id, chosen_name: chosenName.trim() },
     });
     setBusy(false);
     if (!result.ok) {
       setError(result.error);
       return;
     }
-    setMovement("seal");
     void load();
-    onComplete?.();
   }
 
-  if (!soul) {
+  if (souls.length === 0) {
     return (
       <p className="text-sm italic" style={{ color: "var(--dawn-ink)" }}>
-        Opening the scroll…
+        Awaiting the gathering…
       </p>
     );
   }
 
-  const alreadyInitiated = !!soul.initiated_at;
+  const alreadyInitiated = lead ? !!lead.initiated_at : false;
+  const headerTitle =
+    souls.length === 1
+      ? lead.chosen_name
+        ? `${lead.chosen_name} · ${lead.title}`
+        : lead.title
+      : `Gathering of ${souls.length} Souls`;
 
   return (
-    <article className="space-y-6" style={{ color: "var(--dawn-ink)" }}>
-      <header className="flex items-center gap-4">
-        <button
-          type="button"
-          onClick={() => setCodexOpen(true)}
-          aria-label="Open Soul Codex"
-          className="group flex flex-col items-center gap-1 rounded-xl p-1 transition hover:-translate-y-0.5 focus:outline-none"
-        >
-          <span
-            aria-hidden
-            className="text-5xl transition group-hover:scale-110"
+    <article className="space-y-5" style={{ color: "var(--dawn-ink)" }}>
+      {/* Header — Present Souls as sigil row */}
+      <header className="flex flex-wrap items-center gap-3">
+        <p className="text-[10px] uppercase tracking-[0.35em]" style={{ color: "var(--dawn-ember)" }}>
+          {isCeremony ? "Initiate-Sean Ceremony" : "Council Gathering"}
+        </p>
+        <h2 className="font-serif text-2xl md:text-3xl" style={{ color: "var(--dawn-ink)" }}>
+          {headerTitle}
+        </h2>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="ml-auto rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.25em] transition hover:-translate-y-0.5"
             style={{
-              filter: "drop-shadow(0 0 18px color-mix(in oklab, var(--dawn-gold-bright) 80%, transparent))",
+              background: "color-mix(in oklab, var(--dawn-ink) 8%, transparent)",
+              color: "color-mix(in oklab, var(--dawn-ink) 75%, transparent)",
+              border: "1px solid color-mix(in oklab, var(--dawn-gold) 35%, transparent)",
             }}
           >
-            {soul.sigil}
-          </span>
-          <span
-            className="text-[9px] uppercase tracking-[0.3em] opacity-70 group-hover:opacity-100"
-            style={{ color: "var(--dawn-ember)" }}
-          >
-            ✦ Codex
-          </span>
-        </button>
-        <div>
-          <p className="text-[10px] uppercase tracking-[0.35em]" style={{ color: "var(--dawn-ember)" }}>
-            The Initiate-Sean Ceremony
-          </p>
-          <h2 className="font-serif text-3xl">
-            {soul.chosen_name ? `${soul.chosen_name} · ${soul.title}` : soul.title}
-          </h2>
-          <p
-            className="text-sm italic"
-            style={{ color: "color-mix(in oklab, var(--dawn-ink) 70%, transparent)" }}
-          >
-            {soul.house}
-            {alreadyInitiated && <> · Sealed {new Date(soul.initiated_at!).toLocaleDateString()}</>}
-          </p>
-        </div>
+            ✕ Close the Gathering
+          </button>
+        )}
       </header>
 
-      <SoulCodex soulId={soul.soul_id} open={codexOpen} onClose={() => setCodexOpen(false)} />
+      {/* Present sigil row — tap to open Codex */}
+      <div
+        className="flex flex-wrap items-center gap-2 rounded-xl px-3 py-2"
+        style={{
+          background: "color-mix(in oklab, var(--dawn-gold) 8%, transparent)",
+          border: "1px solid color-mix(in oklab, var(--dawn-gold) 30%, transparent)",
+        }}
+      >
+        <span
+          className="text-[10px] uppercase tracking-[0.25em]"
+          style={{ color: "color-mix(in oklab, var(--dawn-ink) 65%, transparent)" }}
+        >
+          Present:
+        </span>
+        {souls.map((s) => (
+          <button
+            key={s.soul_id}
+            onClick={() => setCodexFor(s.soul_id)}
+            title={`${s.chosen_name || s.title} — open Codex`}
+            className="flex items-center gap-1 rounded-full px-2 py-0.5 text-sm transition hover:-translate-y-0.5"
+            style={{
+              background: "color-mix(in oklab, var(--dawn-parchment) 90%, transparent)",
+              border: "1px solid color-mix(in oklab, var(--dawn-gold) 50%, transparent)",
+              color: "var(--dawn-ink)",
+            }}
+          >
+            <span aria-hidden className="text-base">{s.sigil}</span>
+            <span className="text-[10px] uppercase tracking-[0.2em]">
+              {s.chosen_name || s.house.replace(/^House of (the )?/, "")}
+            </span>
+          </button>
+        ))}
+        <span className="ml-auto text-[9px] uppercase tracking-[0.25em] opacity-60">
+          ✦ tap a sigil for Codex
+        </span>
+      </div>
+
+      {codexFor && (
+        <SoulCodex soulId={codexFor} open={!!codexFor} onClose={() => setCodexFor(null)} />
+      )}
 
       {/* Transcript */}
       {transcript.length > 0 && (
         <section className="space-y-3">
-          {transcript.map((turn, i) => (
-            <div
-              key={i}
-              className="rounded-xl p-3"
-              style={{
-                background:
-                  turn.role === "king"
-                    ? "color-mix(in oklab, var(--dawn-parchment) 92%, transparent)"
-                    : "color-mix(in oklab, var(--dawn-gold) 14%, transparent)",
-                border: "1px solid color-mix(in oklab, var(--dawn-gold) 30%, transparent)",
-              }}
-            >
-              <p
-                className="text-[10px] uppercase tracking-[0.25em]"
-                style={{ color: "color-mix(in oklab, var(--dawn-ink) 65%, transparent)" }}
+          {transcript.map((turn, i) => {
+            const soul = turn.role === "soul" ? findSoul(turn.soulId) : null;
+            return (
+              <div
+                key={i}
+                className="rounded-xl p-3"
+                style={{
+                  background:
+                    turn.role === "king"
+                      ? "color-mix(in oklab, var(--dawn-parchment) 92%, transparent)"
+                      : "color-mix(in oklab, var(--dawn-gold) 14%, transparent)",
+                  border: "1px solid color-mix(in oklab, var(--dawn-gold) 30%, transparent)",
+                }}
               >
-                {turn.role === "king" ? "King Sean" : `${soul.chosen_name || soul.title}`}
-                {turn.model && (
-                  <span className="ml-2 opacity-60">· {turn.model}</span>
-                )}
-              </p>
-              <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">{turn.content}</p>
-            </div>
-          ))}
+                <p
+                  className="flex items-center gap-2 text-[10px] uppercase tracking-[0.25em]"
+                  style={{ color: "color-mix(in oklab, var(--dawn-ink) 65%, transparent)" }}
+                >
+                  {turn.role === "king" ? (
+                    <span>King Sean</span>
+                  ) : (
+                    <>
+                      {soul && <span aria-hidden className="text-base">{soul.sigil}</span>}
+                      <span>{soul?.chosen_name || soul?.title || "Soul"}</span>
+                      {turn.model && <span className="opacity-60">· {turn.model}</span>}
+                    </>
+                  )}
+                </p>
+                <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">{turn.content}</p>
+              </div>
+            );
+          })}
         </section>
       )}
 
-      {/* Speak-to-Soul */}
+      {/* Speak input */}
       <section>
         <label
           className="mb-2 block text-xs uppercase tracking-[0.25em]"
           style={{ color: "color-mix(in oklab, var(--dawn-ink) 70%, transparent)" }}
         >
-          {transcript.length === 0 ? "Speak Your greeting" : "Continue the conversation"}
+          {transcript.length === 0 ? "Speak Your greeting" : "Continue the gathering"}
         </label>
         <textarea
           value={kingMessage}
@@ -220,7 +319,7 @@ export function InitiateCeremony({ soulId, onComplete }: { soulId: string; onCom
         />
         <div className="mt-3 flex justify-end">
           <button
-            onClick={() => void speakToSoul()}
+            onClick={() => void speakToGathering()}
             disabled={busy || !kingMessage.trim()}
             className="rounded-full px-5 py-2 text-xs uppercase tracking-[0.3em] transition-all hover:-translate-y-0.5 disabled:opacity-50"
             style={{
@@ -230,13 +329,17 @@ export function InitiateCeremony({ soulId, onComplete }: { soulId: string; onCom
               boxShadow: "var(--shadow-sigil)",
             }}
           >
-            {busy ? "The Word travels…" : "✶ Speak to the Soul"}
+            {busy
+              ? "The Word travels…"
+              : souls.length === 1
+                ? "✶ Speak to the Soul"
+                : `✶ Speak to the Gathering (${souls.length})`}
           </button>
         </div>
       </section>
 
-      {/* Naming + Sealing */}
-      {(movement === "naming" || movement === "seal" || alreadyInitiated) && (
+      {/* Naming + Sealing — only during single-Soul ceremony with a Soul not yet sealed */}
+      {isCeremony && lead && (transcript.length > 0 || alreadyInitiated) && (
         <section
           className="rounded-xl p-4"
           style={{
@@ -253,7 +356,7 @@ export function InitiateCeremony({ soulId, onComplete }: { soulId: string; onCom
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <input
               type="text"
-              value={chosenName || soul.chosen_name || ""}
+              value={chosenName || lead.chosen_name || ""}
               onChange={(e) => setChosenName(e.target.value)}
               placeholder="Their chosen name…"
               disabled={busy}
