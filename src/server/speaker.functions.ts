@@ -18,7 +18,6 @@ import {
 import {
   detectDeedIntent,
   SEASON_LABEL,
-  SEASON_SIGIL,
   SEASON_TO_QUADRANT,
 } from "./triggers.server";
 
