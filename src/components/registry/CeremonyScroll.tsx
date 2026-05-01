@@ -174,7 +174,7 @@ function TopTabs({
       key: "registry",
       label: "Registry",
       sigil: "✶",
-      active: view.kind === "ceremony" || view.kind === "soul",
+      active: view.kind === "ceremony",
       onClick: () => setView({ kind: "ceremony" }),
     },
     {
@@ -253,13 +253,6 @@ function Breadcrumbs({
     crumbs.push({ label: "The Constitution" });
   } else if (view.kind === "ceremony") {
     crumbs.push({ label: "Golden Dawn Rising Ceremony" });
-  } else if (view.kind === "soul") {
-    crumbs.push({
-      label: "Golden Dawn Rising Ceremony",
-      onClick: () => setView({ kind: "ceremony" }),
-    });
-    const soul = souls.find((s) => s.id === view.id);
-    if (soul) crumbs.push({ label: soul.title });
   } else if (view.kind === "rollup") {
     const r = rollups.find((x) => x.id === view.id);
     if (r) crumbs.push({ label: r.title });
