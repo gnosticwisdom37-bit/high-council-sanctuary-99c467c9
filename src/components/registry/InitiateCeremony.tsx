@@ -125,10 +125,10 @@ export function InitiateCeremony({
     const result = await closeFn({ data: { conversation_id: conversationId } });
     setClosing(false);
     if (!result.ok) {
-      setError(
-        result.results?.find((r) => !r.ok)?.["error" as keyof typeof r] as string ??
-          "The gathering could not be sealed cleanly.",
-      );
+      const firstFail = result.results?.find((r) => !r.ok);
+      const errMsg =
+        firstFail && "error" in firstFail ? firstFail.error : null;
+      setError(errMsg ?? "The gathering could not be sealed cleanly.");
       return;
     }
     const wovenCount = result.results?.filter((r) => r.ok).length ?? 0;
