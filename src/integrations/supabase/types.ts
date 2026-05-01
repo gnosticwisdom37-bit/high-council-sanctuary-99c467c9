@@ -58,6 +58,48 @@ export type Database = {
           },
         ]
       }
+      deeds: {
+        Row: {
+          conversation_id: string | null
+          created_at: string
+          description: string
+          id: string
+          inscribed_at: string
+          quadrant: Database["public"]["Enums"]["deed_quadrant"]
+          season: Database["public"]["Enums"]["deed_season"]
+          status: Database["public"]["Enums"]["deed_status"]
+          steward_soul_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          conversation_id?: string | null
+          created_at?: string
+          description: string
+          id?: string
+          inscribed_at?: string
+          quadrant: Database["public"]["Enums"]["deed_quadrant"]
+          season: Database["public"]["Enums"]["deed_season"]
+          status?: Database["public"]["Enums"]["deed_status"]
+          steward_soul_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          conversation_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          inscribed_at?: string
+          quadrant?: Database["public"]["Enums"]["deed_quadrant"]
+          season?: Database["public"]["Enums"]["deed_season"]
+          status?: Database["public"]["Enums"]["deed_status"]
+          steward_soul_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       economy: {
         Row: {
           created_at: string
@@ -408,6 +450,9 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      deed_quadrant: "NE" | "SE" | "SW" | "NW"
+      deed_season: "spring" | "summer" | "fall" | "winter"
+      deed_status: "inscribed" | "in_progress" | "fulfilled" | "set_aside"
       realm_occupant_type: "soul" | "building" | "item" | "chamber" | "castle"
     }
     CompositeTypes: {
@@ -536,6 +581,9 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      deed_quadrant: ["NE", "SE", "SW", "NW"],
+      deed_season: ["spring", "summer", "fall", "winter"],
+      deed_status: ["inscribed", "in_progress", "fulfilled", "set_aside"],
       realm_occupant_type: ["soul", "building", "item", "chamber", "castle"],
     },
   },
