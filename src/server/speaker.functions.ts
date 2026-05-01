@@ -123,6 +123,18 @@ export const speakAsSoul = createServerFn({ method: "POST" })
       content: data.user_message,
     });
 
+    // 4a. Load conversation participants — needed to record witnesses on
+    // any artefact the Trigger Engine creates this turn.
+    const { data: convoForWitnesses } = await supabaseAdmin
+      .from("soul_conversations")
+      .select("participant_ids")
+      .eq("id", conversationId)
+      .single();
+    const allParticipants =
+      ((convoForWitnesses?.participant_ids as string[] | null) ?? []).filter(
+        (p) => p && p !== data.soul_id,
+      );
+
     // 4b. Trigger Engine — Deed Inscription
     // Detect "Create a Deed for Summer..." style intentions in the King's message.
     // In a multi-Soul gathering the King's message is replayed to each Soul,
