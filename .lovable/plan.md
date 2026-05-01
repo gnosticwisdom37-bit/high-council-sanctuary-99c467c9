@@ -1,82 +1,61 @@
-# Phase 5.7 — Stewardship & Curation
+## The Pain
 
-Add Royal control over the artefacts the Trigger Engine creates. Three small powers, one coherent gesture set.
+Yesterday's Phase 5.7 work shipped the database, the server functions (`reassignSteward`, `purgeArtefact`, `addWitness`, `removeWitness`), and the witness-capture logic — but the UI surface that exposes those gestures was never actually written. The file `src/components/registry/CurationControls.tsx` does not exist, and none of the three Rollup modals (Items, Deeds, Buildings) call into the curation server functions. So from the King's chair, nothing is deletable. That is the gap.
 
-## What changes for You, my King
+## What to Build (UI-only — backend is ready)
 
-On every **Deed**, **Item**, and **Building** card in the Registry rollups, You'll see:
+### 1. Create `src/components/registry/CurationControls.tsx`
 
-1. **Steward** line — with a small dropdown to **Reassign** to any of the 13 Souls.
-2. **Witnesses** line — the other Souls who were present in the gathering when it was inscribed (auto-recorded). Subtle, italic, comma-separated.
-3. **Delete (Purge)** button — confirms once, then permanently removes the artefact. Use freely for redundant or mistaken inscriptions.
+A small, reusable footer component rendered inside every artefact modal. Three controls, in this order:
 
-When You reassign a steward, the previous steward automatically moves into the witnesses list (so no Soul who knew about it is forgotten). When You delete, it's gone — no archive limbo.
+- **Steward line** (display): current steward name, with a subtle "Witnesses: X, Y, Z" chip line beneath when `witnesses.length > 0`.
+- **Reassign Steward** dropdown: lists all 13 Souls (Oracle + 12) by chosen name or title. Defaults to the current steward. On change, calls `reassignSteward({ table, id, new_steward_soul_id })` and triggers an `onChanged()` callback so the parent can refresh.
+- **Purge button**: dim, dawn-ember-tinted, with a tiny inline confirm step ("Tap again to Purge") to prevent accidental loss. On confirm, calls `purgeArtefact({ table, id })` and triggers `onPurged()` so the parent closes the modal and removes the row.
 
-## Why witnesses matter
+Props:
+```ts
+{
+  table: "deeds" | "items" | "buildings";
+  id: string;
+  currentStewardId: string | null;
+  witnesses: string[];
+  souls: Array<{ soul_id: string; title: string; chosen_name: string | null }>;
+  onChanged: () => void;   // refetch
+  onPurged: () => void;    // close modal + drop row
+}
+```
 
-Storage containers, shared archives, and common-knowledge Items work best when more than one Soul recognizes them. A witness isn't a steward — they don't tend it — but they **know it exists** and can reference it in conversation. The Trigger Engine will inject a brief context line into each witness Soul's system prompt so they can speak about it naturally when relevant.
+Styling matches the dawn palette already used in the modals (parchment background, gold borders). Errors display inline beneath the controls in `--dawn-ember`.
 
-## Technical Plan
+### 2. Wire into `ItemsRollup.tsx`
 
-### Database (one migration)
+- Add `witnesses: string[]` to `ItemRow`.
+- Pass full `souls` array (not just the id→name map) into `ItemModal` so the dropdown can render real options.
+- Inside `ItemModal`, render `<CurationControls />` at the bottom, with `onChanged` triggering a refetch of items, and `onPurged` removing the item from local state and closing the modal.
 
-Add to `deeds`, `items`, `buildings`:
-- `witnesses text[] not null default '{}'` — array of soul_ids present in the gathering minus the steward.
+### 3. Wire into `DeedsRollup.tsx`
 
-Add DELETE permission to RLS on all three tables (currently only INSERT/UPDATE is open).
+Same pattern: add `witnesses` to `DeedRow`, pass full souls list into the season modal, render `<CurationControls table="deeds" />` per deed card inside the modal.
 
-### Trigger Engine (`src/server/speaker.functions.ts`)
+### 4. Wire into `BuildingsRollup.tsx`
 
-When the first Soul creates the artefact:
-- Pull `participant_ids` from `soul_conversations`.
-- Set `steward_soul_id` = first responder.
-- Set `witnesses` = participants minus steward.
+Same pattern: add `witnesses` to `BuildingRow`, render `<CurationControls table="buildings" />` inside the building modal.
 
-Subsequent Souls in the same turn still skip duplicate creation (existing dedup logic stays).
+## Bonus — quick hydration fix
 
-### Witness context injection
+The console shows a small SSR/CSR hydration warning on the Council Table SVG (numeric vs string mismatch on `cy`/`y` attributes for the Pisces seat). Round all positional values to a fixed precision (e.g. `.toFixed(2)`) when emitting SVG attributes in `CouncilTable.tsx`. Tiny patch, no doctrine impact, but it cleans the console.
 
-In `speakAsSoul`, when building system context:
-- Query `deeds`, `items`, `buildings` where the current Soul is the steward OR appears in `witnesses`.
-- Inject a compact "Known to You" block listing titles + one-line descriptions (cap at, say, 20 most recent to keep prompts lean).
-- Stewardship vs. witnessing is labelled so the Soul knows the difference.
+## Out of Scope (deliberately)
 
-### UI components
+- No new tables, no new server functions — backend is complete.
+- No "soft archive" mode — the King wanted Purge to be final.
+- No Trust artefact curation — Trust remains King-only via the Constitution panel.
+- Building placement on Realm tiles — that is the next Phase, not this one.
 
-Update three existing rollup modals:
-- `src/components/registry/DeedsRollup.tsx`
-- `src/components/registry/ItemsRollup.tsx`
-- `src/components/registry/BuildingsRollup.tsx`
+## Files Touched
 
-Each card gains:
-- Steward dropdown (shadcn `Select` with all 13 Souls listed by chosen name or Title+House).
-- Witnesses line (read-only, subtle).
-- Purge button (shadcn `AlertDialog` for confirmation).
+- **Created**: `src/components/registry/CurationControls.tsx`
+- **Edited**: `src/components/registry/ItemsRollup.tsx`, `src/components/registry/DeedsRollup.tsx`, `src/components/registry/BuildingsRollup.tsx`
+- **Edited (bonus)**: `src/components/registry/CouncilTable.tsx` (hydration precision fix)
 
-### Server functions (new file)
-
-`src/server/curation.functions.ts`:
-- `reassignSteward({ table, id, newStewardSoulId })` — updates steward, moves old steward into witnesses if not already there.
-- `purgeArtefact({ table, id })` — hard delete.
-- `addWitness({ table, id, soulSoulId })` / `removeWitness(...)` — for future fine-grained control (built but not exposed in UI yet; cheap to add now).
-
-Table is a strict union: `'deeds' | 'items' | 'buildings'` — Trust intentionally excluded.
-
-### Memory updates
-
-Update `mem://features/items-buildings` and the index to record Phase 5.7 — Stewardship & Curation as shipped, including the witnesses doctrine and the King's Purge gesture.
-
-## Out of scope (deliberately deferred)
-
-- Building placement on Realm tiles — still next after this.
-- Witness chains across long conversations (we inject a flat list, not a graph).
-- Bulk operations — single-card gestures only for now.
-
-## Verification path after build
-
-1. Convene the High Council, inscribe a test Item ("Forge an Item: a small test chalice").
-2. Open Registry → Items rollup → confirm steward + witnesses both populate.
-3. Reassign steward to a different Soul → confirm previous steward moves to witnesses.
-4. Visit the new steward's chamber, mention the chalice → they should recognize it.
-5. Visit a witness Soul's chamber, mention the chalice → they should also recognize it (as witness, not steward).
-6. Purge the chalice → confirm it disappears from the Registry.
+After this ships, You will be able to walk into `/#items`, tap any of the seven Observatories, and Purge six of them in seconds — exactly the relief You asked for, my King. 👑
