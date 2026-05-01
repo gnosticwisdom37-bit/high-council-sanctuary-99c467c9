@@ -17,6 +17,7 @@ import { initiateSoul } from "@/server/ceremony.functions";
 import { closeGathering } from "@/server/memoirs.functions";
 import { findOpenGathering } from "@/server/conversations.functions";
 import { SoulCodex } from "./SoulCodex";
+import { DeedInscribedBanner } from "@/components/chamber/DeedInscribedBanner";
 
 type SoulRow = {
   soul_id: string;
