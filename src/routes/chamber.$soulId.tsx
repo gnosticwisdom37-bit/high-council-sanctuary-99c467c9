@@ -317,6 +317,18 @@ function ChamberPage() {
                       stewardName={soul?.chosen_name || soul?.title}
                     />
                   )}
+                  {turn.role === "soul" && turn.item && (
+                    <ItemForgedBanner
+                      title={turn.item.title}
+                      stewardName={soul?.chosen_name || soul?.title}
+                    />
+                  )}
+                  {turn.role === "soul" && turn.building && (
+                    <BuildingRaisedBanner
+                      title={turn.building.title}
+                      stewardName={soul?.chosen_name || soul?.title}
+                    />
+                  )}
                 </div>
               ))}
             </div>
