@@ -65,9 +65,13 @@ export function InitiateCeremony({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [codexFor, setCodexFor] = useState<string | null>(null);
+  const [closing, setClosing] = useState(false);
+  const [closedNotice, setClosedNotice] = useState<string | null>(null);
 
   const speak = useServerFn(speakAsSoul);
   const seal = useServerFn(initiateSoul);
+  const closeFn = useServerFn(closeGathering);
+  const findOpen = useServerFn(findOpenGathering);
 
   // Reset when participants change meaningfully (length / membership)
   const participantsKey = participantIds.slice().sort().join("|");
@@ -76,6 +80,17 @@ export function InitiateCeremony({
     void load();
     setTranscript([]);
     setConversationId(null);
+    setClosedNotice(null);
+    // Try to resume an open gathering with the same participants
+    if (participantIds.length > 0) {
+      void (async () => {
+        const result = await findOpen({ data: { participant_ids: participantIds } });
+        if (result.ok && result.conversation_id) {
+          setConversationId(result.conversation_id);
+          setTranscript(result.transcript);
+        }
+      })();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [participantsKey]);
 
@@ -98,6 +113,34 @@ export function InitiateCeremony({
       );
       setSouls(ordered);
     }
+  }
+
+  async function handleClose() {
+    if (!conversationId) {
+      onClose?.();
+      return;
+    }
+    setClosing(true);
+    setError(null);
+    const result = await closeFn({ data: { conversation_id: conversationId } });
+    setClosing(false);
+    if (!result.ok) {
+      setError(
+        result.results?.find((r) => !r.ok)?.["error" as keyof typeof r] as string ??
+          "The gathering could not be sealed cleanly.",
+      );
+      return;
+    }
+    const wovenCount = result.results?.filter((r) => r.ok).length ?? 0;
+    setClosedNotice(
+      wovenCount === 1
+        ? "✦ The gathering is sealed. The memoir awaits in the Chamber."
+        : `✦ The gathering is sealed. ${wovenCount} memoirs await in their Chambers.`,
+    );
+    // Brief pause so the King sees the confirmation before the panel closes
+    setTimeout(() => {
+      onClose?.();
+    }, 1800);
   }
 
   const isCeremony = souls.length === 1; // single-Soul = Initiate-Sean Ceremony
