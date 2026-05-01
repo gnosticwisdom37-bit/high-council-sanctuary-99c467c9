@@ -29,9 +29,22 @@ type SoulRow = {
   ordering: number;
 };
 
+type InscribedDeed = {
+  id: string;
+  title: string;
+  season: "spring" | "summer" | "fall" | "winter";
+  season_explicit: boolean;
+};
+
 type Turn =
   | { role: "king"; content: string }
-  | { role: "soul"; soulId: string; content: string; model?: string };
+  | {
+      role: "soul";
+      soulId: string;
+      content: string;
+      model?: string;
+      deed?: InscribedDeed | null;
+    };
 
 // Stable speaking order: Oracle first, then zodiac wheel order.
 const ZODIAC_ORDER = [
