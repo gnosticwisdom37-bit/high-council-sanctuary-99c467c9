@@ -2,15 +2,18 @@
  * BuildingsRollup — live Registry view of raised Buildings.
  * Phase 5.6 sibling of DeedsRollup. All Buildings default to the Origin
  * Region (0,0) until the King's placement gesture exists.
+ * Phase 5.7: King's Curation (reassign + purge).
  */
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { CurationControls, type SoulOption } from "./CurationControls";
 
 type BuildingRow = {
   id: string;
   title: string;
   description: string;
   steward_soul_id: string | null;
+  witnesses: string[];
   status: "raised" | "in_use" | "archived";
   region_x: number;
   region_y: number;
@@ -26,27 +29,44 @@ const STATUS_LABEL: Record<BuildingRow["status"], string> = {
 export function BuildingsRollup() {
   const [buildings, setBuildings] = useState<BuildingRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [stewards, setStewards] = useState<Record<string, string>>({});
+  const [souls, setSouls] = useState<SoulOption[]>([]);
   const [open, setOpen] = useState<BuildingRow | null>(null);
+
+  const stewards = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const s of souls) m[s.soul_id] = s.chosen_name || s.title;
+    return m;
+  }, [souls]);
+
+  async function refetch() {
+    const { data } = await supabase
+      .from("buildings")
+      .select("*")
+      .order("raised_at", { ascending: false });
+    setBuildings((data ?? []) as unknown as BuildingRow[]);
+  }
 
   useEffect(() => {
     let active = true;
     (async () => {
       const [{ data: rows }, { data: soulRows }] = await Promise.all([
         supabase.from("buildings").select("*").order("raised_at", { ascending: false }),
-        supabase.from("soul_identities").select("soul_id, title, chosen_name"),
+        supabase.from("soul_identities").select("soul_id, title, chosen_name").order("ordering"),
       ]);
       if (!active) return;
-      setBuildings((rows ?? []) as BuildingRow[]);
-      const map: Record<string, string> = {};
-      for (const s of (soulRows ?? []) as Array<{ soul_id: string; title: string; chosen_name: string | null }>) {
-        map[s.soul_id] = s.chosen_name || s.title;
-      }
-      setStewards(map);
+      setBuildings((rows ?? []) as unknown as BuildingRow[]);
+      setSouls((soulRows ?? []) as SoulOption[]);
       setLoading(false);
     })();
     return () => { active = false; };
   }, []);
+
+  // Keep `open` in sync after refetch
+  useEffect(() => {
+    if (!open) return;
+    const fresh = buildings.find((b) => b.id === open.id);
+    if (fresh && fresh !== open) setOpen(fresh);
+  }, [buildings, open]);
 
   const grouped = useMemo(() => {
     const m: Record<BuildingRow["status"], BuildingRow[]> = { raised: [], in_use: [], archived: [] };
@@ -183,6 +203,18 @@ export function BuildingsRollup() {
                 Steward: {stewards[open.steward_soul_id] || open.steward_soul_id}
               </p>
             )}
+            <CurationControls
+              table="buildings"
+              id={open.id}
+              currentStewardId={open.steward_soul_id}
+              witnesses={open.witnesses ?? []}
+              souls={souls}
+              onChanged={() => void refetch()}
+              onPurged={() => {
+                setBuildings((prev) => prev.filter((b) => b.id !== open.id));
+                setOpen(null);
+              }}
+            />
           </div>
         </div>
       )}

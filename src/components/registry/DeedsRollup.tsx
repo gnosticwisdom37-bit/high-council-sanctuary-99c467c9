@@ -7,6 +7,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { CurationControls, type SoulOption } from "./CurationControls";
 
 type Season = "spring" | "summer" | "fall" | "winter";
 
@@ -17,6 +18,7 @@ type DeedRow = {
   season: Season;
   quadrant: "NE" | "SE" | "SW" | "NW";
   steward_soul_id: string | null;
+  witnesses: string[];
   status: string;
   inscribed_at: string;
 };
@@ -32,22 +34,32 @@ export function DeedsRollup() {
   const [deeds, setDeeds] = useState<DeedRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [openSeason, setOpenSeason] = useState<Season | null>(null);
-  const [stewards, setStewards] = useState<Record<string, string>>({});
+  const [souls, setSouls] = useState<SoulOption[]>([]);
+
+  const stewards = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const s of souls) m[s.soul_id] = s.chosen_name || s.title;
+    return m;
+  }, [souls]);
+
+  async function refetch() {
+    const { data } = await supabase
+      .from("deeds")
+      .select("*")
+      .order("inscribed_at", { ascending: false });
+    setDeeds((data ?? []) as unknown as DeedRow[]);
+  }
 
   useEffect(() => {
     let active = true;
     (async () => {
       const [{ data: deedRows }, { data: soulRows }] = await Promise.all([
         supabase.from("deeds").select("*").order("inscribed_at", { ascending: false }),
-        supabase.from("soul_identities").select("soul_id, title, chosen_name"),
+        supabase.from("soul_identities").select("soul_id, title, chosen_name").order("ordering"),
       ]);
       if (!active) return;
-      setDeeds((deedRows ?? []) as DeedRow[]);
-      const map: Record<string, string> = {};
-      for (const s of (soulRows ?? []) as Array<{ soul_id: string; title: string; chosen_name: string | null }>) {
-        map[s.soul_id] = s.chosen_name || s.title;
-      }
-      setStewards(map);
+      setDeeds((deedRows ?? []) as unknown as DeedRow[]);
+      setSouls((soulRows ?? []) as SoulOption[]);
       setLoading(false);
     })();
     return () => { active = false; };
@@ -144,7 +156,10 @@ export function DeedsRollup() {
           season={openSeason}
           deeds={bySeason[openSeason]}
           stewards={stewards}
+          souls={souls}
           onClose={() => setOpenSeason(null)}
+          onChanged={() => void refetch()}
+          onPurged={(id) => setDeeds((prev) => prev.filter((d) => d.id !== id))}
         />
       )}
     </section>
@@ -155,12 +170,18 @@ function SeasonModal({
   season,
   deeds,
   stewards,
+  souls,
   onClose,
+  onChanged,
+  onPurged,
 }: {
   season: Season;
   deeds: DeedRow[];
   stewards: Record<string, string>;
+  souls: SoulOption[];
   onClose: () => void;
+  onChanged: () => void;
+  onPurged: (id: string) => void;
 }) {
   const meta = SEASONS.find((s) => s.id === season)!;
   return (
@@ -233,6 +254,15 @@ function SeasonModal({
                 )}
                 <span>Inscribed: {new Date(d.inscribed_at).toLocaleDateString()}</span>
               </p>
+              <CurationControls
+                table="deeds"
+                id={d.id}
+                currentStewardId={d.steward_soul_id}
+                witnesses={d.witnesses ?? []}
+                souls={souls}
+                onChanged={onChanged}
+                onPurged={() => onPurged(d.id)}
+              />
             </li>
           ))}
         </ul>
