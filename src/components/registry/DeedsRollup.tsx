@@ -156,7 +156,10 @@ export function DeedsRollup() {
           season={openSeason}
           deeds={bySeason[openSeason]}
           stewards={stewards}
+          souls={souls}
           onClose={() => setOpenSeason(null)}
+          onChanged={() => void refetch()}
+          onPurged={(id) => setDeeds((prev) => prev.filter((d) => d.id !== id))}
         />
       )}
     </section>
@@ -167,12 +170,18 @@ function SeasonModal({
   season,
   deeds,
   stewards,
+  souls,
   onClose,
+  onChanged,
+  onPurged,
 }: {
   season: Season;
   deeds: DeedRow[];
   stewards: Record<string, string>;
+  souls: SoulOption[];
   onClose: () => void;
+  onChanged: () => void;
+  onPurged: (id: string) => void;
 }) {
   const meta = SEASONS.find((s) => s.id === season)!;
   return (
@@ -245,6 +254,15 @@ function SeasonModal({
                 )}
                 <span>Inscribed: {new Date(d.inscribed_at).toLocaleDateString()}</span>
               </p>
+              <CurationControls
+                table="deeds"
+                id={d.id}
+                currentStewardId={d.steward_soul_id}
+                witnesses={d.witnesses ?? []}
+                souls={souls}
+                onChanged={onChanged}
+                onPurged={() => onPurged(d.id)}
+              />
             </li>
           ))}
         </ul>
