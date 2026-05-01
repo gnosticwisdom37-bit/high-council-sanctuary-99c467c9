@@ -112,13 +112,20 @@ export function SoulCodex({
 
     // Composite update: when the name changes, re-weave the Mind so the
     // stored invocation_text always matches what the Codex displays.
-    const patch: Record<string, string | null> = {};
+    const patch: {
+      chosen_name?: string | null;
+      invocation_text?: string;
+      role_title?: string;
+      duties?: string;
+    } = {};
     if (field === "chosen_name") {
       const trimmed = value.trim();
       patch.chosen_name = trimmed.length ? trimmed : null;
       patch.invocation_text = weaveHeartScript(trimmed.length ? trimmed : null, soul.house);
-    } else {
-      patch[field] = value;
+    } else if (field === "role_title") {
+      patch.role_title = value;
+    } else if (field === "duties") {
+      patch.duties = value;
     }
 
     const { error } = await supabase
