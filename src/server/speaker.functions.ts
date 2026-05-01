@@ -177,6 +177,7 @@ export const speakAsSoul = createServerFn({ method: "POST" })
             steward_soul_id: data.soul_id,
             conversation_id: conversationId,
             status: "inscribed",
+            witnesses: allParticipants,
           })
           .select("id, title, description, season, steward_soul_id")
           .single();
@@ -238,6 +239,7 @@ export const speakAsSoul = createServerFn({ method: "POST" })
             steward_soul_id: data.soul_id,
             conversation_id: conversationId,
             status: "forged",
+            witnesses: allParticipants,
           })
           .select("id, title, description, steward_soul_id")
           .single();
@@ -292,6 +294,7 @@ export const speakAsSoul = createServerFn({ method: "POST" })
             steward_soul_id: data.soul_id,
             conversation_id: conversationId,
             status: "raised",
+            witnesses: allParticipants,
             // All new Buildings default to the Origin Region (0,0)
             // until the King's placement gesture exists.
             region_x: 0,
