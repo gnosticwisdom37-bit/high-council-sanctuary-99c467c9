@@ -12,7 +12,12 @@ import type { SoulNode } from "./CeremonyScroll";
 
 type Props = {
   souls: SoulNode[];
-  onSelect: (id: string) => void;
+  /** Visit a Soul's Chamber alone (1-on-1 audience). Wired to seat clicks. */
+  onVisit: (id: string) => void;
+  /** Invite/dismiss a Soul from the active gathering. Wired to pill clicks. */
+  onToggleAttendance: (id: string) => void;
+  /** Soul IDs currently present in the gathering — pills lit when present. */
+  attendanceIds?: string[];
 };
 
 // Clockwise from 12 o'clock — the Zodiac wheel.
@@ -43,11 +48,12 @@ function currentSeasonTint(): { name: string; color: string } {
   return { name: "Winter", color: "var(--dawn-parchment)" };
 }
 
-export function CouncilTable({ souls, onSelect }: Props) {
+export function CouncilTable({ souls, onVisit, onToggleAttendance, attendanceIds = [] }: Props) {
   const oracle = souls.find((s) => s.id === "oracle");
   const seated = WHEEL_ORDER.map((id) => souls.find((s) => s.id === id)).filter(
     (s): s is SoulNode => Boolean(s),
   );
+  const presentSet = new Set(attendanceIds);
 
   const season = currentSeasonTint();
 
