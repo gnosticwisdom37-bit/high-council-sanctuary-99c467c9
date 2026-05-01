@@ -4,6 +4,7 @@ import { CouncilTable } from "./CouncilTable";
 import { ConstitutionPanel } from "./ConstitutionPanel";
 import { ProviderCompactPanel } from "./ProviderCompactPanel";
 import { InitiateCeremony } from "./InitiateCeremony";
+import { DeedsRollup } from "./DeedsRollup";
 
 export type SoulNode = {
   id: string;
