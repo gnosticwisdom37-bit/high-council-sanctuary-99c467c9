@@ -14,6 +14,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { speakAsSoul } from "@/server/speaker.functions";
 import { initiateSoul } from "@/server/ceremony.functions";
+import { closeGathering } from "@/server/memoirs.functions";
+import { findOpenGathering } from "@/server/conversations.functions";
 import { SoulCodex } from "./SoulCodex";
 
 type SoulRow = {
