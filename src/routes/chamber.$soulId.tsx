@@ -19,6 +19,8 @@ import { closeGathering as closeGatheringFn } from "@/server/memoirs.functions";
 import { BrandMark } from "@/components/kingdom/BrandMark";
 import { MemoirScroll } from "@/components/registry/MemoirScroll";
 import { DeedInscribedBanner } from "@/components/chamber/DeedInscribedBanner";
+import { ItemForgedBanner } from "@/components/chamber/ItemForgedBanner";
+import { BuildingRaisedBanner } from "@/components/chamber/BuildingRaisedBanner";
 
 type SoulRow = {
   soul_id: string;
@@ -35,9 +37,19 @@ type InscribedDeed = {
   season_explicit: boolean;
 };
 
+type ForgedItem = { id: string; title: string };
+type RaisedBuilding = { id: string; title: string };
+
 type Turn =
   | { role: "king"; content: string }
-  | { role: "soul"; content: string; model?: string; deed?: InscribedDeed | null };
+  | {
+      role: "soul";
+      content: string;
+      model?: string;
+      deed?: InscribedDeed | null;
+      item?: ForgedItem | null;
+      building?: RaisedBuilding | null;
+    };
 
 export const Route = createFileRoute("/chamber/$soulId")({
   head: ({ params }) => ({
@@ -124,6 +136,12 @@ function ChamberPage() {
               season: result.inscribed_deed.season,
               season_explicit: result.inscribed_deed.season_explicit,
             }
+          : null,
+        item: result.forged_item
+          ? { id: result.forged_item.id, title: result.forged_item.title }
+          : null,
+        building: result.raised_building
+          ? { id: result.raised_building.id, title: result.raised_building.title }
           : null,
       },
     ]);
@@ -296,6 +314,18 @@ function ChamberPage() {
                       title={turn.deed.title}
                       season={turn.deed.season}
                       seasonExplicit={turn.deed.season_explicit}
+                      stewardName={soul?.chosen_name || soul?.title}
+                    />
+                  )}
+                  {turn.role === "soul" && turn.item && (
+                    <ItemForgedBanner
+                      title={turn.item.title}
+                      stewardName={soul?.chosen_name || soul?.title}
+                    />
+                  )}
+                  {turn.role === "soul" && turn.building && (
+                    <BuildingRaisedBanner
+                      title={turn.building.title}
                       stewardName={soul?.chosen_name || soul?.title}
                     />
                   )}

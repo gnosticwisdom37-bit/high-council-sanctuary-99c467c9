@@ -5,6 +5,8 @@ import { ConstitutionPanel } from "./ConstitutionPanel";
 import { ProviderCompactPanel } from "./ProviderCompactPanel";
 import { InitiateCeremony } from "./InitiateCeremony";
 import { DeedsRollup } from "./DeedsRollup";
+import { ItemsRollup } from "./ItemsRollup";
+import { BuildingsRollup } from "./BuildingsRollup";
 
 export type SoulNode = {
   id: string;
@@ -596,6 +598,10 @@ function RollupView({ rollup }: { rollup: RollupNode }) {
 
       {rollup.id === "deeds" ? (
         <DeedsRollup />
+      ) : rollup.id === "items" ? (
+        <ItemsRollup />
+      ) : rollup.id === "buildings" ? (
+        <BuildingsRollup />
       ) : (
         rollup.children && rollup.children.length > 0 && (
           <section>

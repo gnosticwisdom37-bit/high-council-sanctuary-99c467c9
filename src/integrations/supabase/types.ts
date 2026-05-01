@@ -58,6 +58,48 @@ export type Database = {
           },
         ]
       }
+      buildings: {
+        Row: {
+          conversation_id: string | null
+          created_at: string
+          description: string
+          id: string
+          raised_at: string
+          region_x: number
+          region_y: number
+          status: Database["public"]["Enums"]["building_status"]
+          steward_soul_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          conversation_id?: string | null
+          created_at?: string
+          description: string
+          id?: string
+          raised_at?: string
+          region_x?: number
+          region_y?: number
+          status?: Database["public"]["Enums"]["building_status"]
+          steward_soul_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          conversation_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          raised_at?: string
+          region_x?: number
+          region_y?: number
+          status?: Database["public"]["Enums"]["building_status"]
+          steward_soul_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       deeds: {
         Row: {
           conversation_id: string | null
@@ -126,6 +168,42 @@ export type Database = {
           in_circulation?: number
           total_minted?: number
           treasury?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      items: {
+        Row: {
+          conversation_id: string | null
+          created_at: string
+          description: string
+          forged_at: string
+          id: string
+          status: Database["public"]["Enums"]["item_status"]
+          steward_soul_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          conversation_id?: string | null
+          created_at?: string
+          description: string
+          forged_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["item_status"]
+          steward_soul_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          conversation_id?: string | null
+          created_at?: string
+          description?: string
+          forged_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["item_status"]
+          steward_soul_id?: string | null
+          title?: string
           updated_at?: string
         }
         Relationships: []
@@ -450,9 +528,11 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      building_status: "raised" | "in_use" | "archived"
       deed_quadrant: "NE" | "SE" | "SW" | "NW"
       deed_season: "spring" | "summer" | "fall" | "winter"
       deed_status: "inscribed" | "in_progress" | "fulfilled" | "set_aside"
+      item_status: "forged" | "bestowed" | "archived"
       realm_occupant_type: "soul" | "building" | "item" | "chamber" | "castle"
     }
     CompositeTypes: {
@@ -581,9 +661,11 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      building_status: ["raised", "in_use", "archived"],
       deed_quadrant: ["NE", "SE", "SW", "NW"],
       deed_season: ["spring", "summer", "fall", "winter"],
       deed_status: ["inscribed", "in_progress", "fulfilled", "set_aside"],
+      item_status: ["forged", "bestowed", "archived"],
       realm_occupant_type: ["soul", "building", "item", "chamber", "castle"],
     },
   },

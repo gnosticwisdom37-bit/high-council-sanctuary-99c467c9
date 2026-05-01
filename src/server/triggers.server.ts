@@ -131,3 +131,72 @@ export const SEASON_SIGIL: Record<Season, string> = {
   fall: "🍂",
   winter: "❄",
 };
+
+// ---------------------------------------------------------------------------
+// Phase 5.6 — Item & Building intents (same engine, new destinations)
+// ---------------------------------------------------------------------------
+
+export type ItemIntent = {
+  description: string;
+  title: string;
+};
+
+export type BuildingIntent = {
+  description: string;
+  title: string;
+};
+
+/**
+ * Detect an Item-forging intent.
+ *
+ * Matches phrases like:
+ *   - "Forge an Item: a chalice of clear seeing"
+ *   - "Craft an Item — the silver compass"
+ *   - "Bestow an Item to me: a quill that never runs dry"
+ *   - "Create an Item — the lantern of patience"
+ *   - "Let it be an Item: the ring of remembrance"
+ */
+export function detectItemIntent(rawText: string): ItemIntent | null {
+  if (!rawText || typeof rawText !== "string") return null;
+  const verbAnchor =
+    /\b(?:forge|craft|bestow|create|inscribe|let\s+(?:it|there|this)\s+be(?:\s+(?:a|an))?)\b[^.!?\n]{0,80}?\bitem\b([^]*?)$/im;
+  const match = rawText.match(verbAnchor);
+  if (!match) return null;
+
+  let after = (match[1] ?? "")
+    .replace(/^\s*(?:to|for)\s+(?:me|the\s+king|us)\b/i, "")
+    .replace(/^[\s,;:—\-]+/, "")
+    .replace(/^\s*(?:called|named|titled)\s+/i, "")
+    .replace(/^\s*to\s+/i, "")
+    .trim();
+
+  if (after.length < 4) return null;
+  return { description: after, title: summariseTitle(after) };
+}
+
+/**
+ * Detect a Building-raising intent.
+ *
+ * Matches phrases like:
+ *   - "Raise a Building: an observatory at the Realm's eastern edge"
+ *   - "Build a Building — the hall of memoirs"
+ *   - "Erect a Building: the orchard tower"
+ *   - "Construct a Building — the bridge of three rivers"
+ *   - "Let there be a Building: the seed-vault"
+ */
+export function detectBuildingIntent(rawText: string): BuildingIntent | null {
+  if (!rawText || typeof rawText !== "string") return null;
+  const verbAnchor =
+    /\b(?:raise|build|erect|construct|create|inscribe|let\s+(?:it|there|this)\s+be(?:\s+(?:a|an))?)\b[^.!?\n]{0,80}?\bbuilding\b([^]*?)$/im;
+  const match = rawText.match(verbAnchor);
+  if (!match) return null;
+
+  let after = (match[1] ?? "")
+    .replace(/^[\s,;:—\-]+/, "")
+    .replace(/^\s*(?:called|named|titled)\s+/i, "")
+    .replace(/^\s*to\s+/i, "")
+    .trim();
+
+  if (after.length < 4) return null;
+  return { description: after, title: summariseTitle(after) };
+}
