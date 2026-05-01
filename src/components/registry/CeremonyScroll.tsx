@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { CouncilTable } from "./CouncilTable";
 import { ConstitutionPanel } from "./ConstitutionPanel";
@@ -43,6 +43,22 @@ type Props = {
 
 export function CeremonyScroll({ souls, rollups }: Props) {
   const [view, setView] = useState<View>({ kind: "ceremony" });
+
+  // Honour deep-links like "/#deeds" — used by the Deed Inscribed banner
+  // to bring the King straight to the relevant rollup.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const applyHash = () => {
+      const id = window.location.hash.replace(/^#/, "");
+      if (!id) return;
+      if (rollups.some((r) => r.id === id)) {
+        setView({ kind: "rollup", id });
+      }
+    };
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, [rollups]);
 
   return (
     <div
