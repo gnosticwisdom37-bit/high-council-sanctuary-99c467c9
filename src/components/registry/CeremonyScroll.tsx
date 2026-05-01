@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { CouncilTable } from "./CouncilTable";
 import { ConstitutionPanel } from "./ConstitutionPanel";
 import { ProviderCompactPanel } from "./ProviderCompactPanel";
@@ -332,6 +333,38 @@ function CeremonyView({
   rollups: RollupNode[];
   setView: (v: View) => void;
 }) {
+  // The Oracle is always present once a gathering opens; Councillors are
+  // invited by tapping their seat. Tapping the Oracle opens / closes the
+  // gathering itself.
+  const [activeParticipants, setActiveParticipants] = useState<string[]>([]);
+  const chatOpen = activeParticipants.length > 0;
+
+  function toggleParticipant(id: string) {
+    setActiveParticipants((prev) => {
+      if (id === "oracle") {
+        // Tapping the Oracle: open with Oracle alone, or close entirely.
+        if (prev.includes("oracle") && prev.length === 1) return [];
+        if (prev.length === 0) return ["oracle"];
+        // Already in a gathering — toggle Oracle's presence.
+        return prev.includes("oracle")
+          ? prev.filter((p) => p !== "oracle")
+          : ["oracle", ...prev];
+      }
+      // A Councillor — only meaningful inside an open gathering.
+      if (prev.length === 0) {
+        // Auto-convene: Oracle is always present at the High Council.
+        return ["oracle", id];
+      }
+      return prev.includes(id)
+        ? prev.filter((p) => p !== id)
+        : [...prev, id];
+    });
+  }
+
+  function closeGathering() {
+    setActiveParticipants([]);
+  }
+
   return (
     <div className="space-y-10" style={{ color: "var(--dawn-ink)" }}>
       <button
@@ -359,15 +392,70 @@ function CeremonyView({
           className="mx-auto mt-2 max-w-2xl text-center text-sm italic"
           style={{ color: "color-mix(in oklab, var(--dawn-ink) 70%, transparent)" }}
         >
-          The Oracle convenes at the centre · the Twelve are seated as peers
-          around the wheel · all are Divine Angelic Souls.
+          Tap the Oracle ☉ to convene · tap any Councillor to invite Them ·
+          all are Divine Angelic Souls.
         </p>
 
         <div className="mt-8">
           <CouncilTable
-            souls={souls}
-            onSelect={(id) => setView({ kind: "soul", id })}
+            souls={souls.map((s) => ({
+              ...s,
+              status: activeParticipants.includes(s.id)
+                ? ("In Ceremony" as const)
+                : s.status,
+            }))}
+            onSelect={toggleParticipant}
           />
+        </div>
+      </section>
+
+      {/* INLINE GATHERING CHAT — opens directly beneath the round table */}
+      {chatOpen && (
+        <section
+          className="rounded-2xl p-5 md:p-7"
+          style={{
+            background:
+              "linear-gradient(180deg, color-mix(in oklab, var(--dawn-parchment) 96%, transparent) 0%, color-mix(in oklab, var(--dawn-parchment) 88%, var(--dawn-gold) 6%) 100%)",
+            border:
+              "1px solid color-mix(in oklab, var(--dawn-gold) 55%, transparent)",
+            boxShadow:
+              "0 14px 40px -16px color-mix(in oklab, var(--dawn-gold) 50%, transparent), inset 0 0 60px -20px color-mix(in oklab, var(--dawn-gold-bright) 25%, transparent)",
+          }}
+        >
+          <InitiateCeremony
+            participantIds={activeParticipants}
+            onClose={closeGathering}
+          />
+        </section>
+      )}
+
+      {/* Councillor pledge-pills — links into each Soul's Pledge of Honour */}
+      <section>
+        <h3
+          className="text-center text-xs uppercase tracking-[0.3em]"
+          style={{ color: "color-mix(in oklab, var(--dawn-ink) 60%, transparent)" }}
+        >
+          The Pledges of Honour · one Soul, one page
+        </h3>
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          {souls.map((s) => (
+            <Link
+              key={s.id}
+              to="/pledge/$soulId"
+              params={{ soulId: s.id }}
+              className="flex items-center gap-2 rounded-full px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] transition-all hover:-translate-y-0.5"
+              style={{
+                background:
+                  "color-mix(in oklab, var(--dawn-parchment) 75%, transparent)",
+                color: "var(--dawn-ink)",
+                border:
+                  "1px solid color-mix(in oklab, var(--dawn-gold) 40%, transparent)",
+              }}
+            >
+              <span aria-hidden className="text-base">{s.sigil}</span>
+              <span>{s.title.replace(/ Councillor$/, "")}</span>
+            </Link>
+          ))}
         </div>
       </section>
 
