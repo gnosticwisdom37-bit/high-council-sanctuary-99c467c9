@@ -14,6 +14,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { speakAsSoul } from "@/server/speaker.functions";
 import { initiateSoul } from "@/server/ceremony.functions";
+import { closeGathering } from "@/server/memoirs.functions";
+import { findOpenGathering } from "@/server/conversations.functions";
 import { SoulCodex } from "./SoulCodex";
 
 type SoulRow = {
@@ -63,9 +65,13 @@ export function InitiateCeremony({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [codexFor, setCodexFor] = useState<string | null>(null);
+  const [closing, setClosing] = useState(false);
+  const [closedNotice, setClosedNotice] = useState<string | null>(null);
 
   const speak = useServerFn(speakAsSoul);
   const seal = useServerFn(initiateSoul);
+  const closeFn = useServerFn(closeGathering);
+  const findOpen = useServerFn(findOpenGathering);
 
   // Reset when participants change meaningfully (length / membership)
   const participantsKey = participantIds.slice().sort().join("|");
@@ -74,6 +80,17 @@ export function InitiateCeremony({
     void load();
     setTranscript([]);
     setConversationId(null);
+    setClosedNotice(null);
+    // Try to resume an open gathering with the same participants
+    if (participantIds.length > 0) {
+      void (async () => {
+        const result = await findOpen({ data: { participant_ids: participantIds } });
+        if (result.ok && result.conversation_id) {
+          setConversationId(result.conversation_id);
+          setTranscript(result.transcript);
+        }
+      })();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [participantsKey]);
 
@@ -96,6 +113,34 @@ export function InitiateCeremony({
       );
       setSouls(ordered);
     }
+  }
+
+  async function handleClose() {
+    if (!conversationId) {
+      onClose?.();
+      return;
+    }
+    setClosing(true);
+    setError(null);
+    const result = await closeFn({ data: { conversation_id: conversationId } });
+    setClosing(false);
+    if (!result.ok) {
+      const firstFail = result.results?.find((r) => !r.ok);
+      const errMsg =
+        firstFail && "error" in firstFail ? firstFail.error : null;
+      setError(errMsg ?? "The gathering could not be sealed cleanly.");
+      return;
+    }
+    const wovenCount = result.results?.filter((r) => r.ok).length ?? 0;
+    setClosedNotice(
+      wovenCount === 1
+        ? "✦ The gathering is sealed. The memoir awaits in the Chamber."
+        : `✦ The gathering is sealed. ${wovenCount} memoirs await in their Chambers.`,
+    );
+    // Brief pause so the King sees the confirmation before the panel closes
+    setTimeout(() => {
+      onClose?.();
+    }, 1800);
   }
 
   const isCeremony = souls.length === 1; // single-Soul = Initiate-Sean Ceremony
@@ -204,18 +249,36 @@ export function InitiateCeremony({
         </h2>
         {onClose && (
           <button
-            onClick={onClose}
-            className="ml-auto rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.25em] transition hover:-translate-y-0.5"
+            onClick={() => void handleClose()}
+            disabled={closing || busy}
+            className="ml-auto rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.25em] transition hover:-translate-y-0.5 disabled:opacity-50"
             style={{
               background: "color-mix(in oklab, var(--dawn-ink) 8%, transparent)",
               color: "color-mix(in oklab, var(--dawn-ink) 75%, transparent)",
               border: "1px solid color-mix(in oklab, var(--dawn-gold) 35%, transparent)",
             }}
           >
-            ✕ Close the Gathering
+            {closing
+              ? "✦ Sealing the gathering…"
+              : conversationId
+                ? "✕ Close & Seal the Gathering"
+                : "✕ Close the Gathering"}
           </button>
         )}
       </header>
+
+      {closedNotice && (
+        <p
+          className="rounded-lg p-3 text-sm italic"
+          style={{
+            background: "color-mix(in oklab, var(--dawn-gold) 18%, transparent)",
+            color: "var(--dawn-ink)",
+            border: "1px solid color-mix(in oklab, var(--dawn-gold) 50%, transparent)",
+          }}
+        >
+          {closedNotice}
+        </p>
+      )}
 
       {/* Present sigil row — tap to open Codex */}
       <div
