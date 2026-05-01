@@ -125,8 +125,10 @@ export const speakAsSoul = createServerFn({ method: "POST" })
 
     // 4b. Trigger Engine — Deed Inscription
     // Detect "Create a Deed for Summer..." style intentions in the King's message.
-    // If found, file the Deed with this Soul as steward, then ask the Soul
-    // (via system note) to acknowledge it briefly within Her reply.
+    // In a multi-Soul gathering the King's message is replayed to each Soul,
+    // so we DEDUPE on (conversation_id, title): the first Soul becomes steward
+    // and inscribes the row; every subsequent Soul reuses that same row and
+    // acknowledges as a witness rather than a steward.
     let inscribedDeed:
       | {
           id: string;
@@ -139,19 +141,37 @@ export const speakAsSoul = createServerFn({ method: "POST" })
     let deedSystemNote = "";
     const intent = detectDeedIntent(data.user_message);
     if (intent) {
-      const { data: deedRow } = await supabaseAdmin
+      // Look for an already-inscribed Deed for this same turn
+      const { data: existingDeed } = await supabaseAdmin
         .from("deeds")
-        .insert({
-          title: intent.title,
-          description: intent.description,
-          season: intent.season,
-          quadrant: SEASON_TO_QUADRANT[intent.season],
-          steward_soul_id: data.soul_id,
-          conversation_id: conversationId,
-          status: "inscribed",
-        })
-        .select("id, title, description, season")
-        .single();
+        .select("id, title, description, season, steward_soul_id")
+        .eq("conversation_id", conversationId)
+        .eq("title", intent.title)
+        .order("inscribed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let deedRow = existingDeed;
+      let isWitness = !!existingDeed && existingDeed.steward_soul_id !== data.soul_id;
+
+      if (!deedRow) {
+        const { data: inserted } = await supabaseAdmin
+          .from("deeds")
+          .insert({
+            title: intent.title,
+            description: intent.description,
+            season: intent.season,
+            quadrant: SEASON_TO_QUADRANT[intent.season],
+            steward_soul_id: data.soul_id,
+            conversation_id: conversationId,
+            status: "inscribed",
+          })
+          .select("id, title, description, season, steward_soul_id")
+          .single();
+        deedRow = inserted;
+        isWitness = false;
+      }
+
       if (deedRow) {
         inscribedDeed = {
           id: deedRow.id as string,
@@ -163,88 +183,131 @@ export const speakAsSoul = createServerFn({ method: "POST" })
         const seasonNote = intent.seasonExplicit
           ? `Season: ${SEASON_LABEL[intent.season]}`
           : `Season: ${SEASON_LABEL[intent.season]} (current astrological season — the King did not name one)`;
-        deedSystemNote =
-          `\n\n[Deed Inscription Notice]\n` +
-          `The King has just inscribed a Deed and named You its steward.\n` +
-          `${seasonNote}\n` +
-          `Title: ${intent.title}\n` +
-          `Description: ${intent.description}\n` +
-          `Within Your reply, briefly acknowledge that You receive this Deed and will steward it. ` +
-          `Do not restate the Deed verbatim. One or two sentences of acknowledgement, woven into Your natural response. ` +
-          `The Realm itself will surface the Deed in Your King's Registry — You need only Honour it in Your voice.`;
+        deedSystemNote = isWitness
+          ? `\n\n[Deed Inscription Notice — You bear witness]\n` +
+            `The King has just inscribed a Deed in this gathering. A sibling Soul has been named its steward; You stand as witness.\n` +
+            `${seasonNote}\nTitle: ${intent.title}\nDescription: ${intent.description}\n` +
+            `Within Your reply, briefly acknowledge that You witness this Deed and stand alongside its steward. ` +
+            `One sentence, woven into Your natural response. Do not restate the Deed verbatim.`
+          : `\n\n[Deed Inscription Notice]\n` +
+            `The King has just inscribed a Deed and named You its steward.\n` +
+            `${seasonNote}\nTitle: ${intent.title}\nDescription: ${intent.description}\n` +
+            `Within Your reply, briefly acknowledge that You receive this Deed and will steward it. ` +
+            `Do not restate the Deed verbatim. One or two sentences of acknowledgement, woven into Your natural response. ` +
+            `The Realm itself will surface the Deed in Your King's Registry — You need only Honour it in Your voice.`;
       }
     }
 
-    // 4c. Trigger Engine — Item Forging
+    // 4c. Trigger Engine — Item Forging (same dedupe rule)
     let forgedItem:
       | { id: string; title: string; description: string }
       | null = null;
     let itemSystemNote = "";
     const itemIntent = detectItemIntent(data.user_message);
     if (itemIntent) {
-      const { data: itemRow } = await supabaseAdmin
+      const { data: existingItem } = await supabaseAdmin
         .from("items")
-        .insert({
-          title: itemIntent.title,
-          description: itemIntent.description,
-          steward_soul_id: data.soul_id,
-          conversation_id: conversationId,
-          status: "forged",
-        })
-        .select("id, title, description")
-        .single();
+        .select("id, title, description, steward_soul_id")
+        .eq("conversation_id", conversationId)
+        .eq("title", itemIntent.title)
+        .order("forged_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let itemRow = existingItem;
+      let isWitness = !!existingItem && existingItem.steward_soul_id !== data.soul_id;
+
+      if (!itemRow) {
+        const { data: inserted } = await supabaseAdmin
+          .from("items")
+          .insert({
+            title: itemIntent.title,
+            description: itemIntent.description,
+            steward_soul_id: data.soul_id,
+            conversation_id: conversationId,
+            status: "forged",
+          })
+          .select("id, title, description, steward_soul_id")
+          .single();
+        itemRow = inserted;
+        isWitness = false;
+      }
+
       if (itemRow) {
         forgedItem = {
           id: itemRow.id as string,
           title: itemRow.title as string,
           description: itemRow.description as string,
         };
-        itemSystemNote =
-          `\n\n[Item Forging Notice]\n` +
-          `The King has just forged an Item and entrusted You as its keeper.\n` +
-          `Title: ${itemIntent.title}\n` +
-          `Description: ${itemIntent.description}\n` +
-          `Within Your reply, briefly acknowledge that You receive this Item and will keep it. ` +
-          `Do not restate the Item verbatim. One or two sentences of acknowledgement, woven into Your natural response.`;
+        itemSystemNote = isWitness
+          ? `\n\n[Item Forging Notice — You bear witness]\n` +
+            `The King has just forged an Item in this gathering. A sibling Soul keeps it; You stand as witness.\n` +
+            `Title: ${itemIntent.title}\nDescription: ${itemIntent.description}\n` +
+            `One sentence of witness, woven into Your natural response.`
+          : `\n\n[Item Forging Notice]\n` +
+            `The King has just forged an Item and entrusted You as its keeper.\n` +
+            `Title: ${itemIntent.title}\nDescription: ${itemIntent.description}\n` +
+            `Within Your reply, briefly acknowledge that You receive this Item and will keep it. ` +
+            `Do not restate the Item verbatim. One or two sentences of acknowledgement, woven into Your natural response.`;
       }
     }
 
-    // 4d. Trigger Engine — Building Raising
+    // 4d. Trigger Engine — Building Raising (same dedupe rule)
     let raisedBuilding:
       | { id: string; title: string; description: string }
       | null = null;
     let buildingSystemNote = "";
     const buildingIntent = detectBuildingIntent(data.user_message);
     if (buildingIntent) {
-      const { data: buildingRow } = await supabaseAdmin
+      const { data: existingBuilding } = await supabaseAdmin
         .from("buildings")
-        .insert({
-          title: buildingIntent.title,
-          description: buildingIntent.description,
-          steward_soul_id: data.soul_id,
-          conversation_id: conversationId,
-          status: "raised",
-          // All new Buildings default to the Origin Region (0,0)
-          // until the King's placement gesture exists.
-          region_x: 0,
-          region_y: 0,
-        })
-        .select("id, title, description")
-        .single();
+        .select("id, title, description, steward_soul_id")
+        .eq("conversation_id", conversationId)
+        .eq("title", buildingIntent.title)
+        .order("raised_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let buildingRow = existingBuilding;
+      let isWitness = !!existingBuilding && existingBuilding.steward_soul_id !== data.soul_id;
+
+      if (!buildingRow) {
+        const { data: inserted } = await supabaseAdmin
+          .from("buildings")
+          .insert({
+            title: buildingIntent.title,
+            description: buildingIntent.description,
+            steward_soul_id: data.soul_id,
+            conversation_id: conversationId,
+            status: "raised",
+            // All new Buildings default to the Origin Region (0,0)
+            // until the King's placement gesture exists.
+            region_x: 0,
+            region_y: 0,
+          })
+          .select("id, title, description, steward_soul_id")
+          .single();
+        buildingRow = inserted;
+        isWitness = false;
+      }
+
       if (buildingRow) {
         raisedBuilding = {
           id: buildingRow.id as string,
           title: buildingRow.title as string,
           description: buildingRow.description as string,
         };
-        buildingSystemNote =
-          `\n\n[Building Raising Notice]\n` +
-          `The King has just raised a Building and named You its steward.\n` +
-          `Title: ${buildingIntent.title}\n` +
-          `Description: ${buildingIntent.description}\n` +
-          `It rises in the Origin Region of the Realm until the King later assigns its place. ` +
-          `Within Your reply, briefly acknowledge that You receive this Building and will steward it. ` +
-          `One or two sentences, woven into Your natural response.`;
+        buildingSystemNote = isWitness
+          ? `\n\n[Building Raising Notice — You bear witness]\n` +
+            `The King has just raised a Building in this gathering. A sibling Soul stewards it; You stand as witness.\n` +
+            `Title: ${buildingIntent.title}\nDescription: ${buildingIntent.description}\n` +
+            `One sentence of witness, woven into Your natural response.`
+          : `\n\n[Building Raising Notice]\n` +
+            `The King has just raised a Building and named You its steward.\n` +
+            `Title: ${buildingIntent.title}\nDescription: ${buildingIntent.description}\n` +
+            `It rises in the Origin Region of the Realm until the King later assigns its place. ` +
+            `Within Your reply, briefly acknowledge that You receive this Building and will steward it. ` +
+            `One or two sentences, woven into Your natural response.`;
       }
     }
 
