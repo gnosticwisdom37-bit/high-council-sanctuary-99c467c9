@@ -314,7 +314,7 @@ export const speakAsSoul = createServerFn({ method: "POST" })
       soul,
       memoirs,
     });
-    const systemPrompt = baseSystemPrompt + deedSystemNote;
+    const systemPrompt = baseSystemPrompt + deedSystemNote + itemSystemNote + buildingSystemNote;
 
     const messages: Msg[] = [{ role: "system", content: systemPrompt }];
     for (const m of historyAsc) {
@@ -412,5 +412,7 @@ export const speakAsSoul = createServerFn({ method: "POST" })
       turn_count: newTurnCount,
       should_weave_memoir: shouldWeave,
       inscribed_deed: inscribedDeed,
+      forged_item: forgedItem,
+      raised_building: raisedBuilding,
     };
   });
