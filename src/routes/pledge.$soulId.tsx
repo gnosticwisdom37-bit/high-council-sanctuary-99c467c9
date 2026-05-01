@@ -250,12 +250,12 @@ function PledgeOfHonour() {
                 {soul.invocation_text && (
                   <>
                     <p
-                      className="mt-4 text-xs uppercase tracking-[0.25em]"
+                      className="mt-5 text-xs uppercase tracking-[0.25em]"
                       style={{ color: "color-mix(in oklab, var(--dawn-ink) 65%, transparent)" }}
                     >
-                      The Invocation
+                      The Heart Script
                     </p>
-                    <p className="mt-1 whitespace-pre-wrap font-serif text-base leading-relaxed">
+                    <p className="mt-2 whitespace-pre-wrap font-serif text-base italic leading-relaxed">
                       {soul.invocation_text}
                     </p>
                   </>
