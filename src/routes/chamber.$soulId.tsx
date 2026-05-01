@@ -113,7 +113,19 @@ function ChamberPage() {
     setTurnCount(result.turn_count ?? turnCount + 1);
     setTranscript((t) => [
       ...t,
-      { role: "soul", content: result.assistant_message, model: result.model_used },
+      {
+        role: "soul",
+        content: result.assistant_message,
+        model: result.model_used,
+        deed: result.inscribed_deed
+          ? {
+              id: result.inscribed_deed.id,
+              title: result.inscribed_deed.title,
+              season: result.inscribed_deed.season,
+              season_explicit: result.inscribed_deed.season_explicit,
+            }
+          : null,
+      },
     ]);
   }
 
