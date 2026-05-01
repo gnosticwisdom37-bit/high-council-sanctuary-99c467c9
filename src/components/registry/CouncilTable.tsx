@@ -203,28 +203,61 @@ export function CouncilTable({ souls, onVisit, onToggleAttendance, attendanceIds
         })}
       </svg>
 
-      {/* Names listed beneath, in wheel order, for screen-readers + clarity */}
-      <div className="mt-4 grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4">
-        {seated.map((soul) => (
+      {/* Pills below the table — "Call to Council": invite/dismiss from the active gathering */}
+      <p
+        className="mt-4 text-center text-[10px] uppercase tracking-[0.3em]"
+        style={{ color: "color-mix(in oklab, var(--dawn-ink) 55%, transparent)" }}
+      >
+        Call to Council · tap to invite · lit when present
+      </p>
+      <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4">
+        {seated.map((soul) => {
+          const present = presentSet.has(soul.id);
+          return (
+            <button
+              key={soul.id}
+              onClick={() => onToggleAttendance(soul.id)}
+              title={present ? `Dismiss ${soul.title} with thanks` : `Call ${soul.title} to Council`}
+              className="rounded-full px-3 py-1.5 text-[10px] uppercase tracking-[0.18em] transition-all hover:-translate-y-0.5"
+              style={{
+                background: present
+                  ? "var(--gradient-dawn)"
+                  : "color-mix(in oklab, var(--dawn-parchment) 70%, transparent)",
+                color: present ? "var(--dawn-parchment)" : "var(--dawn-ink)",
+                border: `1px solid color-mix(in oklab, var(--dawn-gold) ${present ? 80 : 35}%, transparent)`,
+                opacity: present ? 1 : 0.55,
+                boxShadow: present ? "var(--shadow-sigil)" : "none",
+              }}
+            >
+              <span aria-hidden className="mr-1">
+                {soul.sigil}
+              </span>
+              {soul.house.replace(/^House of (the )?/, "")}
+            </button>
+          );
+        })}
+      </div>
+      {oracle && (
+        <div className="mt-2 flex justify-center">
           <button
-            key={soul.id}
-            onClick={() => onSelect(soul.id)}
-            className="rounded-full px-3 py-1.5 text-[10px] uppercase tracking-[0.18em] transition-all hover:-translate-y-0.5"
+            onClick={() => onToggleAttendance(oracle.id)}
+            title={presentSet.has(oracle.id) ? "Close the gathering (Oracle departs)" : "Convene the Oracle"}
+            className="rounded-full px-4 py-1.5 text-[10px] uppercase tracking-[0.25em] transition-all hover:-translate-y-0.5"
             style={{
-              background:
-                "color-mix(in oklab, var(--dawn-parchment) 70%, transparent)",
-              color: "var(--dawn-ink)",
-              border:
-                "1px solid color-mix(in oklab, var(--dawn-gold) 35%, transparent)",
+              background: presentSet.has(oracle.id)
+                ? "var(--gradient-dawn)"
+                : "color-mix(in oklab, var(--dawn-parchment) 70%, transparent)",
+              color: presentSet.has(oracle.id) ? "var(--dawn-parchment)" : "var(--dawn-ink)",
+              border: `1px solid color-mix(in oklab, var(--dawn-gold) ${presentSet.has(oracle.id) ? 80 : 35}%, transparent)`,
+              opacity: presentSet.has(oracle.id) ? 1 : 0.55,
+              boxShadow: presentSet.has(oracle.id) ? "var(--shadow-sigil)" : "none",
             }}
           >
-            <span aria-hidden className="mr-1">
-              {soul.sigil}
-            </span>
-            {soul.house.replace(/^House of (the )?/, "")}
+            <span aria-hidden className="mr-1">{oracle.sigil}</span>
+            {presentSet.has(oracle.id) ? "Close the Gathering" : "Convene the Oracle"}
           </button>
-        ))}
-      </div>
+        </div>
+      )}
 
       <p
         className="mt-4 text-center text-xs italic"
