@@ -68,6 +68,7 @@ export function DeedInscribedBanner({ title, season, seasonExplicit = true, stew
       </div>
       <Link
         to="/"
+        hash="deeds"
         className="self-end whitespace-nowrap rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.25em] transition-all hover:scale-[1.04] sm:self-auto"
         style={{
           background: "linear-gradient(135deg, var(--dawn-gold) 0%, var(--dawn-gold-bright) 100%)",
