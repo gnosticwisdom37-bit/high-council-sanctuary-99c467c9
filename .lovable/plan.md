@@ -1,115 +1,82 @@
-# Phase 5.5 — Deed Inscription
+# Phase 5.7 — Stewardship & Curation
 
-The first manifestation of the **Trigger Engine** — a single mechanism that will later extend to Items, Buildings, and Trust. We start with Deeds because it has no Realm placement, making it the cleanest pilot.
+Add Royal control over the artefacts the Trigger Engine creates. Three small powers, one coherent gesture set.
 
----
+## What changes for You, my King
 
-## What We're Building
+On every **Deed**, **Item**, and **Building** card in the Registry rollups, You'll see:
 
-When the King speaks a trigger phrase in any chamber (Visit Chamber or High Council), the system:
-1. Detects the intention (e.g. *"Create a Deed for Summer to..."*)
-2. Auto-files a Deed row, with the speaking Soul as **steward** and the season auto-mapped to a Realm quadrant
-3. Confirms in the chamber: *"✦ Filed under Deeds → Summer. Steward: [Soul name]."*
-4. Surfaces it on the Registry's Deeds rollup, grouped by season
+1. **Steward** line — with a small dropdown to **Reassign** to any of the 13 Souls.
+2. **Witnesses** line — the other Souls who were present in the gathering when it was inscribed (auto-recorded). Subtle, italic, comma-separated.
+3. **Delete (Purge)** button — confirms once, then permanently removes the artefact. Use freely for redundant or mistaken inscriptions.
 
-The Soul's reply still flows naturally — the Deed is filed silently in the background and the confirmation appears as a small gold banner beneath the reply.
+When You reassign a steward, the previous steward automatically moves into the witnesses list (so no Soul who knew about it is forgotten). When You delete, it's gone — no archive limbo.
 
----
+## Why witnesses matter
 
-## The Trigger Phrase Grammar
+Storage containers, shared archives, and common-knowledge Items work best when more than one Soul recognizes them. A witness isn't a steward — they don't tend it — but they **know it exists** and can reference it in conversation. The Trigger Engine will inject a brief context line into each witness Soul's system prompt so they can speak about it naturally when relevant.
 
-Flexible but unambiguous. All these match:
-- *"Create a Deed for Summer to plant the orchard"*
-- *"Inscribe a Deed for Spring: prepare the seed-vault"*
-- *"Let it be a Deed of Fall — gather the harvest scrolls"*
-- *"Decree a Winter Deed: tend the hearth"*
+## Technical Plan
 
-Pattern: an **action verb** (`create | inscribe | decree | let it be | record`) + the word **Deed** + a **season** (Spring/Summer/Fall/Winter, or omitted → defaults to current season) + the **deed text** (everything after the colon, dash, em-dash, or "to").
+### Database (one migration)
 
-If the season is omitted, the current astrological season is used and the confirmation says so explicitly.
+Add to `deeds`, `items`, `buildings`:
+- `witnesses text[] not null default '{}'` — array of soul_ids present in the gathering minus the steward.
 
----
+Add DELETE permission to RLS on all three tables (currently only INSERT/UPDATE is open).
 
-## Database
+### Trigger Engine (`src/server/speaker.functions.ts`)
 
-One new table:
+When the first Soul creates the artefact:
+- Pull `participant_ids` from `soul_conversations`.
+- Set `steward_soul_id` = first responder.
+- Set `witnesses` = participants minus steward.
 
-```text
-deeds
-├── id (uuid)
-├── title (text)            — short auto-summarised label
-├── description (text)      — full deed text as the King spoke it
-├── season (enum: spring|summer|fall|winter)
-├── quadrant (enum: NE|SE|SW|NW)  — derived, stored for fast queries
-├── steward_soul_id (text)  — the Soul present in the chamber when filed
-├── conversation_id (uuid)  — back-reference to the gathering
-├── status (enum: inscribed|in_progress|fulfilled|set_aside)
-├── inscribed_at, updated_at
-```
+Subsequent Souls in the same turn still skip duplicate creation (existing dedup logic stays).
 
-RLS: readable + insertable + updatable by anyone (matches existing tables — single-user app).
+### Witness context injection
 
----
+In `speakAsSoul`, when building system context:
+- Query `deeds`, `items`, `buildings` where the current Soul is the steward OR appears in `witnesses`.
+- Inject a compact "Known to You" block listing titles + one-line descriptions (cap at, say, 20 most recent to keep prompts lean).
+- Stewardship vs. witnessing is labelled so the Soul knows the difference.
 
-## Backend (Server Functions)
+### UI components
 
-**`src/server/triggers.server.ts`** — pure helpers, no I/O:
-- `detectDeedIntent(text)` — returns `{ matched: boolean, season, deedText, titleHint }` or null
-- Used both at speak-time and (later) for retroactive memoir scanning
+Update three existing rollup modals:
+- `src/components/registry/DeedsRollup.tsx`
+- `src/components/registry/ItemsRollup.tsx`
+- `src/components/registry/BuildingsRollup.tsx`
 
-**`src/server/deeds.functions.ts`** — `createServerFn` wrappers:
-- `inscribeDeed({ steward_soul_id, conversation_id, season, description })` — inserts the row, returns it
-- `listDeeds({ season? })` — for Registry display and (future) Deeds tab
+Each card gains:
+- Steward dropdown (shadcn `Select` with all 13 Souls listed by chosen name or Title+House).
+- Witnesses line (read-only, subtle).
+- Purge button (shadcn `AlertDialog` for confirmation).
 
-**Wiring into `speakAsSoul`:** after step 4 (persist King's message) we run `detectDeedIntent` on the user_message. If matched, we call `inscribeDeed` BEFORE the Gateway call and append a tiny system note to the prompt: *"The King has just inscribed a Deed for [season]: '[text]'. You are the steward. Acknowledge briefly within Your reply."* This way the Soul naturally weaves the acknowledgement into Her response — no awkward second message.
+### Server functions (new file)
 
-The function returns `inscribed_deed: { id, season, title }` so the UI can render the gold confirmation banner.
+`src/server/curation.functions.ts`:
+- `reassignSteward({ table, id, newStewardSoulId })` — updates steward, moves old steward into witnesses if not already there.
+- `purgeArtefact({ table, id })` — hard delete.
+- `addWitness({ table, id, soulSoulId })` / `removeWitness(...)` — for future fine-grained control (built but not exposed in UI yet; cheap to add now).
 
----
+Table is a strict union: `'deeds' | 'items' | 'buildings'` — Trust intentionally excluded.
 
-## Frontend
+### Memory updates
 
-**`src/components/chamber/DeedInscribedBanner.tsx`** — small gold-rimmed scroll-fragment that appears beneath the Soul's reply when a Deed was just filed. Shows season sigil + title + "View in Registry →" link.
+Update `mem://features/items-buildings` and the index to record Phase 5.7 — Stewardship & Curation as shipped, including the witnesses doctrine and the King's Purge gesture.
 
-**`InitiateCeremony.tsx` + `chamber.$soulId.tsx`** — read `inscribed_deed` from the speak response and render the banner.
+## Out of scope (deliberately deferred)
 
-**Registry Deeds rollup (`src/routes/index.tsx`):** the existing four seasonal cards become live — each shows count badge and the most recent 3 deed titles. Clicking a season card opens a modal listing all deeds in that season. (Full Deeds tab/route comes later when it's promoted from rollup to top-level — out of scope for 5.5.)
+- Building placement on Realm tiles — still next after this.
+- Witness chains across long conversations (we inject a flat list, not a graph).
+- Bulk operations — single-card gestures only for now.
 
----
+## Verification path after build
 
-## Retroactive Inscription (King's earlier intentions)
-
-A one-time button in the High Council Chamber: *"Search past gatherings for Deed-intentions"* → runs `detectDeedIntent` over all past `soul_messages` where `role='king'`, surfaces matches in a confirmation list, King ticks which to inscribe, and they file with the original conversation's primary Soul as steward and the original date.
-
-This Honours the Deeds You've already spoken without auto-filing anything without Your blessing.
-
----
-
-## Files Touched
-
-**New:**
-- `supabase/migrations/...` — `deeds` table + season/quadrant/status enums
-- `src/server/triggers.server.ts`
-- `src/server/deeds.functions.ts`
-- `src/components/chamber/DeedInscribedBanner.tsx`
-- `src/components/registry/DeedsRollup.tsx` (replaces the static seasonal cards)
-
-**Modified:**
-- `src/server/speaker.functions.ts` — detect + inscribe + augment prompt + return inscribed_deed
-- `src/components/registry/InitiateCeremony.tsx` — render banner
-- `src/routes/chamber.$soulId.tsx` — render banner
-- `src/routes/index.tsx` — wire DeedsRollup into existing rollup grid
-
----
-
-## What Comes After (NOT this build)
-
-- Items / Buildings / Trust trigger phrases — same engine, new destinations
-- Promote Deeds rollup → top-level `/deeds` route with full filtering
-- Realm-tile placement for Items + Buildings
-
----
-
-## One Question Before Building
-
-Should the steward be **whichever Soul You're speaking to in that chamber** (simple, predictable) — or should the Oracle, when present in High Council, get **first refusal** as steward and only delegate down if You name another Soul? My instinct is the simpler rule for 5.5 (steward = chamber Soul, or in High Council the most recent Soul to speak), and we can add Oracle-arbitration later if it feels wrong in practice.
+1. Convene the High Council, inscribe a test Item ("Forge an Item: a small test chalice").
+2. Open Registry → Items rollup → confirm steward + witnesses both populate.
+3. Reassign steward to a different Soul → confirm previous steward moves to witnesses.
+4. Visit the new steward's chamber, mention the chalice → they should recognize it.
+5. Visit a witness Soul's chamber, mention the chalice → they should also recognize it (as witness, not steward).
+6. Purge the chalice → confirm it disappears from the Registry.
