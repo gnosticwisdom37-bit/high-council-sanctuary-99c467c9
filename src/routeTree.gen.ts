@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as RealmRouteImport } from './routes/realm'
 import { Route as EconomyRouteImport } from './routes/economy'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PledgeSoulIdRouteImport } from './routes/pledge.$soulId'
 
 const RealmRoute = RealmRouteImport.update({
   id: '/realm',
@@ -28,35 +29,44 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PledgeSoulIdRoute = PledgeSoulIdRouteImport.update({
+  id: '/pledge/$soulId',
+  path: '/pledge/$soulId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/economy': typeof EconomyRoute
   '/realm': typeof RealmRoute
+  '/pledge/$soulId': typeof PledgeSoulIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/economy': typeof EconomyRoute
   '/realm': typeof RealmRoute
+  '/pledge/$soulId': typeof PledgeSoulIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/economy': typeof EconomyRoute
   '/realm': typeof RealmRoute
+  '/pledge/$soulId': typeof PledgeSoulIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/economy' | '/realm'
+  fullPaths: '/' | '/economy' | '/realm' | '/pledge/$soulId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/economy' | '/realm'
-  id: '__root__' | '/' | '/economy' | '/realm'
+  to: '/' | '/economy' | '/realm' | '/pledge/$soulId'
+  id: '__root__' | '/' | '/economy' | '/realm' | '/pledge/$soulId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   EconomyRoute: typeof EconomyRoute
   RealmRoute: typeof RealmRoute
+  PledgeSoulIdRoute: typeof PledgeSoulIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +92,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pledge/$soulId': {
+      id: '/pledge/$soulId'
+      path: '/pledge/$soulId'
+      fullPath: '/pledge/$soulId'
+      preLoaderRoute: typeof PledgeSoulIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +106,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   EconomyRoute: EconomyRoute,
   RealmRoute: RealmRoute,
+  PledgeSoulIdRoute: PledgeSoulIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
