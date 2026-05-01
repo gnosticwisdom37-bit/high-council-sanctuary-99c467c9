@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { CouncilTable } from "./CouncilTable";
 import { ConstitutionPanel } from "./ConstitutionPanel";
