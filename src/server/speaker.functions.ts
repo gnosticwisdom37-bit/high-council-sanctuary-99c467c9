@@ -116,17 +116,71 @@ export const speakAsSoul = createServerFn({ method: "POST" })
       content: data.user_message,
     });
 
-    // 5. Load conversation history (last 20 turns)
-    const { data: history } = await supabaseAdmin
-      .from("soul_messages")
-      .select("role, content, soul_id")
-      .eq("conversation_id", conversationId)
-      .order("created_at", { ascending: true })
-      .limit(20);
+    // 5. Load conversation history (last 20 turns) + memoirs (10 sealed + 3 unsealed + pending recalls)
+    const [
+      { data: history },
+      { data: sealedMemoirs },
+      { data: unsealedMemoirs },
+      { data: convoState },
+    ] = await Promise.all([
+      supabaseAdmin
+        .from("soul_messages")
+        .select("role, content, soul_id")
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: false })
+        .limit(20),
+      supabaseAdmin
+        .from("soul_memoirs")
+        .select("id, content, sealed, created_at")
+        .eq("soul_id", data.soul_id)
+        .eq("sealed", true)
+        .is("faded_at", null)
+        .order("created_at", { ascending: false })
+        .limit(10),
+      supabaseAdmin
+        .from("soul_memoirs")
+        .select("id, content, sealed, created_at")
+        .eq("soul_id", data.soul_id)
+        .eq("sealed", false)
+        .is("faded_at", null)
+        .order("created_at", { ascending: false })
+        .limit(3),
+      supabaseAdmin
+        .from("soul_conversations")
+        .select("turn_count, last_memoir_at_turn, pending_recall_ids")
+        .eq("id", conversationId)
+        .single(),
+    ]);
+
+    // Pending recalls — fetch and clear in same pass
+    let recalledMemoirs: Array<{ content: string; sealed: boolean; created_at: string }> = [];
+    const pendingIds = (convoState?.pending_recall_ids as string[]) || [];
+    if (pendingIds.length > 0) {
+      const { data: recalled } = await supabaseAdmin
+        .from("soul_memoirs")
+        .select("content, sealed, created_at")
+        .in("id", pendingIds);
+      recalledMemoirs = recalled ?? [];
+      // Clear flags now that we've loaded them
+      await supabaseAdmin
+        .from("soul_conversations")
+        .update({ pending_recall_ids: [] })
+        .eq("id", conversationId);
+    }
+
+    const memoirs = [
+      ...(sealedMemoirs ?? []),
+      ...(unsealedMemoirs ?? []),
+      ...recalledMemoirs,
+    ];
+
+    // History came back desc; flip for chronological prompt order
+    const historyAsc = (history ?? []).slice().reverse();
 
     const systemPrompt = buildSystemPrompt({
       constitution: settings.system_constitution,
       soul,
+      memoirs,
     });
 
     const messages: Msg[] = [{ role: "system", content: systemPrompt }];
