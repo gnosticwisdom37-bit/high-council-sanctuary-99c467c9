@@ -7,6 +7,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { CurationControls, type SoulOption } from "./CurationControls";
 
 type Season = "spring" | "summer" | "fall" | "winter";
 
@@ -17,6 +18,7 @@ type DeedRow = {
   season: Season;
   quadrant: "NE" | "SE" | "SW" | "NW";
   steward_soul_id: string | null;
+  witnesses: string[];
   status: string;
   inscribed_at: string;
 };
