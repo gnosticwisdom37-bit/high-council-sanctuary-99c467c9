@@ -337,5 +337,6 @@ export const speakAsSoul = createServerFn({ method: "POST" })
       message_id: insertedMsg?.id ?? null,
       turn_count: newTurnCount,
       should_weave_memoir: shouldWeave,
+      inscribed_deed: inscribedDeed,
     };
   });
