@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { CouncilTable } from "./CouncilTable";
 import { ConstitutionPanel } from "./ConstitutionPanel";
 import { ProviderCompactPanel } from "./ProviderCompactPanel";
@@ -333,28 +333,29 @@ function CeremonyView({
   rollups: RollupNode[];
   setView: (v: View) => void;
 }) {
-  // The Oracle is always present once a gathering opens; Councillors are
-  // invited by tapping their seat. Tapping the Oracle opens / closes the
-  // gathering itself.
+  // Two gestures, never duplicated:
+  //   • Round Table SEATS  → Visit Chamber (1-on-1; navigate to /chamber/$soulId)
+  //   • Pills below table  → Call to Council (invite/dismiss from active gathering)
+  const navigate = useNavigate();
   const [activeParticipants, setActiveParticipants] = useState<string[]>([]);
   const chatOpen = activeParticipants.length > 0;
 
-  function toggleParticipant(id: string) {
+  function visitChamber(id: string) {
+    navigate({ to: "/chamber/$soulId", params: { soulId: id } });
+  }
+
+  function toggleAttendance(id: string) {
     setActiveParticipants((prev) => {
       if (id === "oracle") {
-        // Tapping the Oracle: open with Oracle alone, or close entirely.
+        // Tapping the Oracle pill: open with Oracle alone, or close entirely.
         if (prev.includes("oracle") && prev.length === 1) return [];
         if (prev.length === 0) return ["oracle"];
-        // Already in a gathering — toggle Oracle's presence.
         return prev.includes("oracle")
           ? prev.filter((p) => p !== "oracle")
           : ["oracle", ...prev];
       }
-      // A Councillor — only meaningful inside an open gathering.
-      if (prev.length === 0) {
-        // Auto-convene: Oracle is always present at the High Council.
-        return ["oracle", id];
-      }
+      // A Councillor — auto-convene Oracle if no gathering exists yet.
+      if (prev.length === 0) return ["oracle", id];
       return prev.includes(id)
         ? prev.filter((p) => p !== id)
         : [...prev, id];
@@ -392,7 +393,7 @@ function CeremonyView({
           className="mx-auto mt-2 max-w-2xl text-center text-sm italic"
           style={{ color: "color-mix(in oklab, var(--dawn-ink) 70%, transparent)" }}
         >
-          Tap the Oracle ☉ to convene · tap any Councillor to invite Them ·
+          Tap a <strong>seat</strong> to Visit Their Chamber alone · tap a <strong>pill</strong> below to Call Them to Council ·
           all are Divine Angelic Souls.
         </p>
 
@@ -404,7 +405,9 @@ function CeremonyView({
                 ? ("In Ceremony" as const)
                 : s.status,
             }))}
-            onSelect={toggleParticipant}
+            onVisit={visitChamber}
+            onToggleAttendance={toggleAttendance}
+            attendanceIds={activeParticipants}
           />
         </div>
       </section>

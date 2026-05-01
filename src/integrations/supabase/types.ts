@@ -183,6 +183,7 @@ export type Database = {
           is_ceremony: boolean
           last_memoir_at_turn: number
           participant_ids: string[]
+          pending_recall_ids: string[]
           title: string
           turn_count: number
           updated_at: string
@@ -194,6 +195,7 @@ export type Database = {
           is_ceremony?: boolean
           last_memoir_at_turn?: number
           participant_ids?: string[]
+          pending_recall_ids?: string[]
           title?: string
           turn_count?: number
           updated_at?: string
@@ -205,6 +207,7 @@ export type Database = {
           is_ceremony?: boolean
           last_memoir_at_turn?: number
           participant_ids?: string[]
+          pending_recall_ids?: string[]
           title?: string
           turn_count?: number
           updated_at?: string

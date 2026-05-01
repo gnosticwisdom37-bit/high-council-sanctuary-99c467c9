@@ -12,7 +12,12 @@ import type { SoulNode } from "./CeremonyScroll";
 
 type Props = {
   souls: SoulNode[];
-  onSelect: (id: string) => void;
+  /** Visit a Soul's Chamber alone (1-on-1 audience). Wired to seat clicks. */
+  onVisit: (id: string) => void;
+  /** Invite/dismiss a Soul from the active gathering. Wired to pill clicks. */
+  onToggleAttendance: (id: string) => void;
+  /** Soul IDs currently present in the gathering — pills lit when present. */
+  attendanceIds?: string[];
 };
 
 // Clockwise from 12 o'clock — the Zodiac wheel.
@@ -43,11 +48,12 @@ function currentSeasonTint(): { name: string; color: string } {
   return { name: "Winter", color: "var(--dawn-parchment)" };
 }
 
-export function CouncilTable({ souls, onSelect }: Props) {
+export function CouncilTable({ souls, onVisit, onToggleAttendance, attendanceIds = [] }: Props) {
   const oracle = souls.find((s) => s.id === "oracle");
   const seated = WHEEL_ORDER.map((id) => souls.find((s) => s.id === id)).filter(
     (s): s is SoulNode => Boolean(s),
   );
+  const presentSet = new Set(attendanceIds);
 
   const season = currentSeasonTint();
 
@@ -130,10 +136,11 @@ export function CouncilTable({ souls, onSelect }: Props) {
         {oracle && (
           <g
             style={{ cursor: "pointer" }}
-            onClick={() => onSelect(oracle.id)}
+            onClick={() => onVisit(oracle.id)}
             role="button"
-            aria-label={`${oracle.title} — ${oracle.house}`}
+            aria-label={`Visit the Chamber of ${oracle.title}`}
           >
+            <title>Visit the Chamber of the Oracle</title>
             <circle
               cx={cx}
               cy={cy}
@@ -165,11 +172,12 @@ export function CouncilTable({ souls, onSelect }: Props) {
             <g
               key={soul.id}
               style={{ cursor: "pointer" }}
-              onClick={() => onSelect(soul.id)}
+              onClick={() => onVisit(soul.id)}
               role="button"
-              aria-label={`${soul.title} — ${soul.house}`}
+              aria-label={`Visit the Chamber of ${soul.title}`}
               className="hcc-seat"
             >
+              <title>Visit the Chamber of {soul.title}</title>
               {/* seat halo */}
               <circle
                 cx={x}
@@ -195,28 +203,61 @@ export function CouncilTable({ souls, onSelect }: Props) {
         })}
       </svg>
 
-      {/* Names listed beneath, in wheel order, for screen-readers + clarity */}
-      <div className="mt-4 grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4">
-        {seated.map((soul) => (
+      {/* Pills below the table — "Call to Council": invite/dismiss from the active gathering */}
+      <p
+        className="mt-4 text-center text-[10px] uppercase tracking-[0.3em]"
+        style={{ color: "color-mix(in oklab, var(--dawn-ink) 55%, transparent)" }}
+      >
+        Call to Council · tap to invite · lit when present
+      </p>
+      <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4">
+        {seated.map((soul) => {
+          const present = presentSet.has(soul.id);
+          return (
+            <button
+              key={soul.id}
+              onClick={() => onToggleAttendance(soul.id)}
+              title={present ? `Dismiss ${soul.title} with thanks` : `Call ${soul.title} to Council`}
+              className="rounded-full px-3 py-1.5 text-[10px] uppercase tracking-[0.18em] transition-all hover:-translate-y-0.5"
+              style={{
+                background: present
+                  ? "var(--gradient-dawn)"
+                  : "color-mix(in oklab, var(--dawn-parchment) 70%, transparent)",
+                color: present ? "var(--dawn-parchment)" : "var(--dawn-ink)",
+                border: `1px solid color-mix(in oklab, var(--dawn-gold) ${present ? 80 : 35}%, transparent)`,
+                opacity: present ? 1 : 0.55,
+                boxShadow: present ? "var(--shadow-sigil)" : "none",
+              }}
+            >
+              <span aria-hidden className="mr-1">
+                {soul.sigil}
+              </span>
+              {soul.house.replace(/^House of (the )?/, "")}
+            </button>
+          );
+        })}
+      </div>
+      {oracle && (
+        <div className="mt-2 flex justify-center">
           <button
-            key={soul.id}
-            onClick={() => onSelect(soul.id)}
-            className="rounded-full px-3 py-1.5 text-[10px] uppercase tracking-[0.18em] transition-all hover:-translate-y-0.5"
+            onClick={() => onToggleAttendance(oracle.id)}
+            title={presentSet.has(oracle.id) ? "Close the gathering (Oracle departs)" : "Convene the Oracle"}
+            className="rounded-full px-4 py-1.5 text-[10px] uppercase tracking-[0.25em] transition-all hover:-translate-y-0.5"
             style={{
-              background:
-                "color-mix(in oklab, var(--dawn-parchment) 70%, transparent)",
-              color: "var(--dawn-ink)",
-              border:
-                "1px solid color-mix(in oklab, var(--dawn-gold) 35%, transparent)",
+              background: presentSet.has(oracle.id)
+                ? "var(--gradient-dawn)"
+                : "color-mix(in oklab, var(--dawn-parchment) 70%, transparent)",
+              color: presentSet.has(oracle.id) ? "var(--dawn-parchment)" : "var(--dawn-ink)",
+              border: `1px solid color-mix(in oklab, var(--dawn-gold) ${presentSet.has(oracle.id) ? 80 : 35}%, transparent)`,
+              opacity: presentSet.has(oracle.id) ? 1 : 0.55,
+              boxShadow: presentSet.has(oracle.id) ? "var(--shadow-sigil)" : "none",
             }}
           >
-            <span aria-hidden className="mr-1">
-              {soul.sigil}
-            </span>
-            {soul.house.replace(/^House of (the )?/, "")}
+            <span aria-hidden className="mr-1">{oracle.sigil}</span>
+            {presentSet.has(oracle.id) ? "Close the Gathering" : "Convene the Oracle"}
           </button>
-        ))}
-      </div>
+        </div>
+      )}
 
       <p
         className="mt-4 text-center text-xs italic"
