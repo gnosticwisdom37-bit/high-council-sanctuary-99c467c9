@@ -32,7 +32,6 @@ type View =
   | { kind: "trust" }
   | { kind: "ceremony" }
   | { kind: "constitution" }
-  | { kind: "soul"; id: string }
   | { kind: "rollup"; id: string };
 
 type Props = {
