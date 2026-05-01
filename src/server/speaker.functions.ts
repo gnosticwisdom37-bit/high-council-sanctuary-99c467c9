@@ -184,7 +184,7 @@ export const speakAsSoul = createServerFn({ method: "POST" })
     });
 
     const messages: Msg[] = [{ role: "system", content: systemPrompt }];
-    for (const m of history ?? []) {
+    for (const m of historyAsc) {
       if (m.role === "king") messages.push({ role: "user", content: m.content });
       else if (m.role === "soul") messages.push({ role: "assistant", content: m.content });
     }
@@ -259,6 +259,16 @@ export const speakAsSoul = createServerFn({ method: "POST" })
       }
     }
 
+    // 9. Increment turn count; auto-trigger memoir weave at 40-turn mark
+    const newTurnCount = (convoState?.turn_count || 0) + 1;
+    const lastWeave = convoState?.last_memoir_at_turn || 0;
+    await supabaseAdmin
+      .from("soul_conversations")
+      .update({ turn_count: newTurnCount })
+      .eq("id", conversationId);
+
+    const shouldWeave = newTurnCount - lastWeave >= 40;
+
     return {
       ok: true as const,
       conversation_id: conversationId,
@@ -266,5 +276,7 @@ export const speakAsSoul = createServerFn({ method: "POST" })
       model_used: chosenModel,
       veritas_spent: veritasSpent,
       message_id: insertedMsg?.id ?? null,
+      turn_count: newTurnCount,
+      should_weave_memoir: shouldWeave,
     };
   });
