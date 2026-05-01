@@ -235,11 +235,12 @@ export const speakAsSoul = createServerFn({ method: "POST" })
     // History came back desc; flip for chronological prompt order
     const historyAsc = (history ?? []).slice().reverse();
 
-    const systemPrompt = buildSystemPrompt({
+    const baseSystemPrompt = buildSystemPrompt({
       constitution: settings.system_constitution,
       soul,
       memoirs,
     });
+    const systemPrompt = baseSystemPrompt + deedSystemNote;
 
     const messages: Msg[] = [{ role: "system", content: systemPrompt }];
     for (const m of historyAsc) {
