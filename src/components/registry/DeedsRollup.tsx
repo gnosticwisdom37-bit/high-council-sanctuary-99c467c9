@@ -34,22 +34,32 @@ export function DeedsRollup() {
   const [deeds, setDeeds] = useState<DeedRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [openSeason, setOpenSeason] = useState<Season | null>(null);
-  const [stewards, setStewards] = useState<Record<string, string>>({});
+  const [souls, setSouls] = useState<SoulOption[]>([]);
+
+  const stewards = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const s of souls) m[s.soul_id] = s.chosen_name || s.title;
+    return m;
+  }, [souls]);
+
+  async function refetch() {
+    const { data } = await supabase
+      .from("deeds")
+      .select("*")
+      .order("inscribed_at", { ascending: false });
+    setDeeds((data ?? []) as unknown as DeedRow[]);
+  }
 
   useEffect(() => {
     let active = true;
     (async () => {
       const [{ data: deedRows }, { data: soulRows }] = await Promise.all([
         supabase.from("deeds").select("*").order("inscribed_at", { ascending: false }),
-        supabase.from("soul_identities").select("soul_id, title, chosen_name"),
+        supabase.from("soul_identities").select("soul_id, title, chosen_name").order("ordering"),
       ]);
       if (!active) return;
-      setDeeds((deedRows ?? []) as DeedRow[]);
-      const map: Record<string, string> = {};
-      for (const s of (soulRows ?? []) as Array<{ soul_id: string; title: string; chosen_name: string | null }>) {
-        map[s.soul_id] = s.chosen_name || s.title;
-      }
-      setStewards(map);
+      setDeeds((deedRows ?? []) as unknown as DeedRow[]);
+      setSouls((soulRows ?? []) as SoulOption[]);
       setLoading(false);
     })();
     return () => { active = false; };
