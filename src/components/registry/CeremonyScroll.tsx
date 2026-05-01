@@ -139,9 +139,6 @@ export function CeremonyScroll({ souls, rollups }: Props) {
                 <ProviderCompactPanel />
               </div>
             )}
-            {view.kind === "soul" && (
-              <InitiateCeremony soulId={view.id} />
-            )}
             {view.kind === "rollup" && (
               <RollupView rollup={rollups.find((r) => r.id === view.id)!} />
             )}
