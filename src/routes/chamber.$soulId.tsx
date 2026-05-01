@@ -291,6 +291,14 @@ function ChamberPage() {
                     )}
                   </p>
                   <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">{turn.content}</p>
+                  {turn.role === "soul" && turn.deed && (
+                    <DeedInscribedBanner
+                      title={turn.deed.title}
+                      season={turn.deed.season}
+                      seasonExplicit={turn.deed.season_explicit}
+                      stewardName={soul?.chosen_name || soul?.title}
+                    />
+                  )}
                 </div>
               ))}
             </div>
