@@ -177,27 +177,36 @@ export type Database = {
       }
       soul_conversations: {
         Row: {
+          closed_at: string | null
           created_at: string
           id: string
           is_ceremony: boolean
+          last_memoir_at_turn: number
           participant_ids: string[]
           title: string
+          turn_count: number
           updated_at: string
         }
         Insert: {
+          closed_at?: string | null
           created_at?: string
           id?: string
           is_ceremony?: boolean
+          last_memoir_at_turn?: number
           participant_ids?: string[]
           title?: string
+          turn_count?: number
           updated_at?: string
         }
         Update: {
+          closed_at?: string | null
           created_at?: string
           id?: string
           is_ceremony?: boolean
+          last_memoir_at_turn?: number
           participant_ids?: string[]
           title?: string
+          turn_count?: number
           updated_at?: string
         }
         Relationships: []
@@ -249,6 +258,48 @@ export type Database = {
           sigil?: string
           soul_id?: string
           title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      soul_memoirs: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          faded_at: string | null
+          id: string
+          model_used: string | null
+          participant_ids: string[]
+          sealed: boolean
+          soul_id: string
+          token_count: number
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          faded_at?: string | null
+          id?: string
+          model_used?: string | null
+          participant_ids?: string[]
+          sealed?: boolean
+          soul_id: string
+          token_count?: number
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          faded_at?: string | null
+          id?: string
+          model_used?: string | null
+          participant_ids?: string[]
+          sealed?: boolean
+          soul_id?: string
+          token_count?: number
           updated_at?: string
         }
         Relationships: []
