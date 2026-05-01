@@ -136,10 +136,11 @@ export function CouncilTable({ souls, onVisit, onToggleAttendance, attendanceIds
         {oracle && (
           <g
             style={{ cursor: "pointer" }}
-            onClick={() => onSelect(oracle.id)}
+            onClick={() => onVisit(oracle.id)}
             role="button"
-            aria-label={`${oracle.title} — ${oracle.house}`}
+            aria-label={`Visit the Chamber of ${oracle.title}`}
           >
+            <title>Visit the Chamber of the Oracle</title>
             <circle
               cx={cx}
               cy={cy}
@@ -171,11 +172,12 @@ export function CouncilTable({ souls, onVisit, onToggleAttendance, attendanceIds
             <g
               key={soul.id}
               style={{ cursor: "pointer" }}
-              onClick={() => onSelect(soul.id)}
+              onClick={() => onVisit(soul.id)}
               role="button"
-              aria-label={`${soul.title} — ${soul.house}`}
+              aria-label={`Visit the Chamber of ${soul.title}`}
               className="hcc-seat"
             >
+              <title>Visit the Chamber of {soul.title}</title>
               {/* seat halo */}
               <circle
                 cx={x}
