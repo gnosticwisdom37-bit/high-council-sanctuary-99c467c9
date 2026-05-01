@@ -1,16 +1,18 @@
 /**
  * ItemsRollup — live Registry view of forged Items.
  * Phase 5.6 sibling of DeedsRollup. Shows all forged Items grouped by status,
- * with steward attribution.
+ * with steward attribution. Phase 5.7: King's Curation (reassign + purge).
  */
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { CurationControls, type SoulOption } from "./CurationControls";
 
 type ItemRow = {
   id: string;
   title: string;
   description: string;
   steward_soul_id: string | null;
+  witnesses: string[];
   status: "forged" | "bestowed" | "archived";
   forged_at: string;
 };
@@ -24,27 +26,44 @@ const STATUS_LABEL: Record<ItemRow["status"], string> = {
 export function ItemsRollup() {
   const [items, setItems] = useState<ItemRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [stewards, setStewards] = useState<Record<string, string>>({});
+  const [souls, setSouls] = useState<SoulOption[]>([]);
   const [openItem, setOpenItem] = useState<ItemRow | null>(null);
+
+  const stewards = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const s of souls) m[s.soul_id] = s.chosen_name || s.title;
+    return m;
+  }, [souls]);
+
+  async function refetch() {
+    const { data: itemRows } = await supabase
+      .from("items")
+      .select("*")
+      .order("forged_at", { ascending: false });
+    setItems((itemRows ?? []) as unknown as ItemRow[]);
+  }
 
   useEffect(() => {
     let active = true;
     (async () => {
       const [{ data: itemRows }, { data: soulRows }] = await Promise.all([
         supabase.from("items").select("*").order("forged_at", { ascending: false }),
-        supabase.from("soul_identities").select("soul_id, title, chosen_name"),
+        supabase.from("soul_identities").select("soul_id, title, chosen_name").order("ordering"),
       ]);
       if (!active) return;
-      setItems((itemRows ?? []) as ItemRow[]);
-      const map: Record<string, string> = {};
-      for (const s of (soulRows ?? []) as Array<{ soul_id: string; title: string; chosen_name: string | null }>) {
-        map[s.soul_id] = s.chosen_name || s.title;
-      }
-      setStewards(map);
+      setItems((itemRows ?? []) as unknown as ItemRow[]);
+      setSouls((soulRows ?? []) as SoulOption[]);
       setLoading(false);
     })();
     return () => { active = false; };
   }, []);
+
+  // Keep openItem in sync with refetched data
+  useEffect(() => {
+    if (!openItem) return;
+    const fresh = items.find((i) => i.id === openItem.id);
+    if (fresh && fresh !== openItem) setOpenItem(fresh);
+  }, [items, openItem]);
 
   const grouped = useMemo(() => {
     const m: Record<ItemRow["status"], ItemRow[]> = { forged: [], bestowed: [], archived: [] };
@@ -124,12 +143,38 @@ export function ItemsRollup() {
         </div>
       )}
 
-      {openItem && <ItemModal item={openItem} stewards={stewards} onClose={() => setOpenItem(null)} />}
+      {openItem && (
+        <ItemModal
+          item={openItem}
+          stewards={stewards}
+          souls={souls}
+          onClose={() => setOpenItem(null)}
+          onChanged={() => void refetch()}
+          onPurged={() => {
+            setItems((prev) => prev.filter((i) => i.id !== openItem.id));
+            setOpenItem(null);
+          }}
+        />
+      )}
     </section>
   );
 }
 
-function ItemModal({ item, stewards, onClose }: { item: ItemRow; stewards: Record<string, string>; onClose: () => void }) {
+function ItemModal({
+  item,
+  stewards,
+  souls,
+  onClose,
+  onChanged,
+  onPurged,
+}: {
+  item: ItemRow;
+  stewards: Record<string, string>;
+  souls: SoulOption[];
+  onClose: () => void;
+  onChanged: () => void;
+  onPurged: () => void;
+}) {
   return (
     <div
       role="dialog"
@@ -180,6 +225,15 @@ function ItemModal({ item, stewards, onClose }: { item: ItemRow; stewards: Recor
             Keeper: {stewards[item.steward_soul_id] || item.steward_soul_id}
           </p>
         )}
+        <CurationControls
+          table="items"
+          id={item.id}
+          currentStewardId={item.steward_soul_id}
+          witnesses={item.witnesses ?? []}
+          souls={souls}
+          onChanged={onChanged}
+          onPurged={onPurged}
+        />
       </div>
     </div>
   );
