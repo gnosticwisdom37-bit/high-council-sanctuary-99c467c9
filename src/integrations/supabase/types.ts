@@ -71,6 +71,7 @@ export type Database = {
           steward_soul_id: string | null
           title: string
           updated_at: string
+          witnesses: string[]
         }
         Insert: {
           conversation_id?: string | null
@@ -84,6 +85,7 @@ export type Database = {
           steward_soul_id?: string | null
           title: string
           updated_at?: string
+          witnesses?: string[]
         }
         Update: {
           conversation_id?: string | null
@@ -97,6 +99,7 @@ export type Database = {
           steward_soul_id?: string | null
           title?: string
           updated_at?: string
+          witnesses?: string[]
         }
         Relationships: []
       }
@@ -113,6 +116,7 @@ export type Database = {
           steward_soul_id: string | null
           title: string
           updated_at: string
+          witnesses: string[]
         }
         Insert: {
           conversation_id?: string | null
@@ -126,6 +130,7 @@ export type Database = {
           steward_soul_id?: string | null
           title: string
           updated_at?: string
+          witnesses?: string[]
         }
         Update: {
           conversation_id?: string | null
@@ -139,6 +144,7 @@ export type Database = {
           steward_soul_id?: string | null
           title?: string
           updated_at?: string
+          witnesses?: string[]
         }
         Relationships: []
       }
@@ -183,6 +189,7 @@ export type Database = {
           steward_soul_id: string | null
           title: string
           updated_at: string
+          witnesses: string[]
         }
         Insert: {
           conversation_id?: string | null
@@ -194,6 +201,7 @@ export type Database = {
           steward_soul_id?: string | null
           title: string
           updated_at?: string
+          witnesses?: string[]
         }
         Update: {
           conversation_id?: string | null
@@ -205,6 +213,7 @@ export type Database = {
           steward_soul_id?: string | null
           title?: string
           updated_at?: string
+          witnesses?: string[]
         }
         Relationships: []
       }
