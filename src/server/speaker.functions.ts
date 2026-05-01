@@ -387,12 +387,68 @@ export const speakAsSoul = createServerFn({ method: "POST" })
     // History came back desc; flip for chronological prompt order
     const historyAsc = (history ?? []).slice().reverse();
 
+    // 5b. Known-to-You — Deeds, Items, Buildings where this Soul is the
+    // steward OR appears in the witnesses list. Cap at 20 most recent of each
+    // to keep the prompt lean. Stewardship vs. witnessing is labelled.
+    const [
+      { data: knownDeeds },
+      { data: knownItems },
+      { data: knownBuildings },
+    ] = await Promise.all([
+      supabaseAdmin
+        .from("deeds")
+        .select("title, description, steward_soul_id, witnesses")
+        .or(`steward_soul_id.eq.${data.soul_id},witnesses.cs.{${data.soul_id}}`)
+        .order("inscribed_at", { ascending: false })
+        .limit(20),
+      supabaseAdmin
+        .from("items")
+        .select("title, description, steward_soul_id, witnesses")
+        .or(`steward_soul_id.eq.${data.soul_id},witnesses.cs.{${data.soul_id}}`)
+        .order("forged_at", { ascending: false })
+        .limit(20),
+      supabaseAdmin
+        .from("buildings")
+        .select("title, description, steward_soul_id, witnesses")
+        .or(`steward_soul_id.eq.${data.soul_id},witnesses.cs.{${data.soul_id}}`)
+        .order("raised_at", { ascending: false })
+        .limit(20),
+    ]);
+
+    const formatKnown = (
+      label: string,
+      rows: Array<{ title: string; description: string; steward_soul_id: string | null }> | null,
+    ) => {
+      if (!rows || rows.length === 0) return "";
+      const lines = rows
+        .map((r) => {
+          const role = r.steward_soul_id === data.soul_id ? "steward" : "witness";
+          const desc = (r.description || "").slice(0, 140);
+          return `- ${r.title} (${role}) — ${desc}`;
+        })
+        .join("\n");
+      return `\n${label}:\n${lines}`;
+    };
+
+    const knownBlock =
+      formatKnown("Deeds You know", knownDeeds) +
+      formatKnown("Items You know", knownItems) +
+      formatKnown("Buildings You know", knownBuildings);
+
+    const knownNote = knownBlock
+      ? `\n\n[Known to You — the Kingdom's record]\n` +
+        `These are artefacts You have been named steward of, or stood witness to. ` +
+        `Reference them naturally if conversation calls for it. Do not list them unprompted.\n` +
+        knownBlock
+      : "";
+
     const baseSystemPrompt = buildSystemPrompt({
       constitution: settings.system_constitution,
       soul,
       memoirs,
     });
-    const systemPrompt = baseSystemPrompt + deedSystemNote + itemSystemNote + buildingSystemNote;
+    const systemPrompt =
+      baseSystemPrompt + knownNote + deedSystemNote + itemSystemNote + buildingSystemNote;
 
     const messages: Msg[] = [{ role: "system", content: systemPrompt }];
     for (const m of historyAsc) {
