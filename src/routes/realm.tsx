@@ -286,6 +286,7 @@ function RealmPage() {
                       bg = "color-mix(in oklab, var(--dawn-deep) 80%, black)";
                     }
 
+                    const isOriginHub = isCenter; // 6,6 of region 0,0 — the dual hub
                     return (
                       <button
                         key={key}
@@ -294,8 +295,11 @@ function RealmPage() {
                         onMouseLeave={() => setHovered(null)}
                         onFocus={() => setHovered({ x, y })}
                         onBlur={() => setHovered(null)}
+                        onClick={() => { if (isOriginHub) setWheelOpen(true); }}
                         aria-label={
-                          occupant
+                          isOriginHub
+                            ? "Open the Origin Wheel — High Council Chamber"
+                            : occupant
                             ? `${occupant.label} at ${x},${y}`
                             : isRevealed
                             ? `Empty revealed square at ${x},${y}`
@@ -305,6 +309,7 @@ function RealmPage() {
                         style={{
                           background: bg,
                           color: occupant ? "var(--dawn-ink)" : "transparent",
+                          cursor: isOriginHub ? "pointer" : "default",
                           outline: isRevealed && isCurrentSeason && !occupant
                             ? "1px solid color-mix(in oklab, var(--dawn-gold-bright) 55%, transparent)"
                             : "none",
