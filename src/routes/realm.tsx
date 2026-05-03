@@ -436,8 +436,37 @@ function RealmPage() {
           <span className="opacity-70">Fog parts on assignment (1-square radius).</span>
         </div>
       </div>
+
+      {wheelOpen && (
+        <OriginWheel
+          souls={souls}
+          currentHouseSoulId={currentHouseSoulId()}
+          onClose={() => setWheelOpen(false)}
+        />
+      )}
     </div>
   );
+}
+
+/** The Zodiac House anchored at the top of the wheel, derived from today's date.
+ *  Roughly mapped to tropical sun-signs; refined later. */
+function currentHouseSoulId(): string {
+  const d = new Date();
+  const m = d.getMonth() + 1;
+  const day = d.getDate();
+  const v = m * 100 + day;
+  if (v >= 321 && v <= 419) return "aries";
+  if (v >= 420 && v <= 520) return "taurus";
+  if (v >= 521 && v <= 620) return "gemini";
+  if (v >= 621 && v <= 722) return "cancer";
+  if (v >= 723 && v <= 822) return "leo";
+  if (v >= 823 && v <= 922) return "virgo";
+  if (v >= 923 && v <= 1022) return "libra";
+  if (v >= 1023 && v <= 1121) return "scorpio";
+  if (v >= 1122 && v <= 1221) return "sagittarius";
+  if (v >= 1222 || v <= 119) return "capricorn";
+  if (v >= 120 && v <= 218) return "aquarius";
+  return "pisces";
 }
 
 function labelFor(q: ReturnType<typeof quadrantOf>) {
