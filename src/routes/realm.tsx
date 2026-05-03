@@ -89,14 +89,24 @@ function RealmPage() {
   const [hovered, setHovered] = useState<{ x: number; y: number } | null>(null);
   const [region, setRegion] = useState<{ rx: number; ry: number }>({ rx: 0, ry: 0 });
   const [expanding, setExpanding] = useState<string | null>(null);
+  const [wheelOpen, setWheelOpen] = useState(false);
+  const [souls, setSouls] = useState<WheelSoul[]>([]);
 
   useEffect(() => {
     let active = true;
     (async () => {
-      const { data, error } = await supabase.from("realm_squares").select("*");
+      const [squaresRes, soulsRes] = await Promise.all([
+        supabase.from("realm_squares").select("*"),
+        supabase
+          .from("soul_identities")
+          .select("soul_id,title,house,sigil,chosen_name,ordering")
+          .order("ordering"),
+      ]);
       if (!active) return;
-      if (error) console.error("Realm load failed:", error);
-      else setAllSquares((data ?? []) as RealmSquare[]);
+      if (squaresRes.error) console.error("Realm load failed:", squaresRes.error);
+      else setAllSquares((squaresRes.data ?? []) as RealmSquare[]);
+      if (soulsRes.error) console.error("Souls load failed:", soulsRes.error);
+      else setSouls((soulsRes.data ?? []) as WheelSoul[]);
       setLoading(false);
     })();
     return () => { active = false; };
