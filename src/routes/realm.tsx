@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { KingdomTabs } from "@/components/kingdom/KingdomTabs";
 import { BrandMark } from "@/components/kingdom/BrandMark";
+import { OriginWheel, type WheelSoul } from "@/components/realm/OriginWheel";
 
 export const Route = createFileRoute("/realm")({
   head: () => ({
@@ -88,14 +89,24 @@ function RealmPage() {
   const [hovered, setHovered] = useState<{ x: number; y: number } | null>(null);
   const [region, setRegion] = useState<{ rx: number; ry: number }>({ rx: 0, ry: 0 });
   const [expanding, setExpanding] = useState<string | null>(null);
+  const [wheelOpen, setWheelOpen] = useState(false);
+  const [souls, setSouls] = useState<WheelSoul[]>([]);
 
   useEffect(() => {
     let active = true;
     (async () => {
-      const { data, error } = await supabase.from("realm_squares").select("*");
+      const [squaresRes, soulsRes] = await Promise.all([
+        supabase.from("realm_squares").select("*"),
+        supabase
+          .from("soul_identities")
+          .select("soul_id,title,house,sigil,chosen_name,ordering")
+          .order("ordering"),
+      ]);
       if (!active) return;
-      if (error) console.error("Realm load failed:", error);
-      else setAllSquares((data ?? []) as RealmSquare[]);
+      if (squaresRes.error) console.error("Realm load failed:", squaresRes.error);
+      else setAllSquares((squaresRes.data ?? []) as RealmSquare[]);
+      if (soulsRes.error) console.error("Souls load failed:", soulsRes.error);
+      else setSouls((soulsRes.data ?? []) as WheelSoul[]);
       setLoading(false);
     })();
     return () => { active = false; };
@@ -275,6 +286,7 @@ function RealmPage() {
                       bg = "color-mix(in oklab, var(--dawn-deep) 80%, black)";
                     }
 
+                    const isOriginHub = isCenter; // 6,6 of region 0,0 — the dual hub
                     return (
                       <button
                         key={key}
@@ -283,8 +295,11 @@ function RealmPage() {
                         onMouseLeave={() => setHovered(null)}
                         onFocus={() => setHovered({ x, y })}
                         onBlur={() => setHovered(null)}
+                        onClick={() => { if (isOriginHub) setWheelOpen(true); }}
                         aria-label={
-                          occupant
+                          isOriginHub
+                            ? "Open the Origin Wheel — High Council Chamber"
+                            : occupant
                             ? `${occupant.label} at ${x},${y}`
                             : isRevealed
                             ? `Empty revealed square at ${x},${y}`
@@ -294,6 +309,7 @@ function RealmPage() {
                         style={{
                           background: bg,
                           color: occupant ? "var(--dawn-ink)" : "transparent",
+                          cursor: isOriginHub ? "pointer" : "default",
                           outline: isRevealed && isCurrentSeason && !occupant
                             ? "1px solid color-mix(in oklab, var(--dawn-gold-bright) 55%, transparent)"
                             : "none",
@@ -420,8 +436,37 @@ function RealmPage() {
           <span className="opacity-70">Fog parts on assignment (1-square radius).</span>
         </div>
       </div>
+
+      {wheelOpen && (
+        <OriginWheel
+          souls={souls}
+          currentHouseSoulId={currentHouseSoulId()}
+          onClose={() => setWheelOpen(false)}
+        />
+      )}
     </div>
   );
+}
+
+/** The Zodiac House anchored at the top of the wheel, derived from today's date.
+ *  Roughly mapped to tropical sun-signs; refined later. */
+function currentHouseSoulId(): string {
+  const d = new Date();
+  const m = d.getMonth() + 1;
+  const day = d.getDate();
+  const v = m * 100 + day;
+  if (v >= 321 && v <= 419) return "aries";
+  if (v >= 420 && v <= 520) return "taurus";
+  if (v >= 521 && v <= 620) return "gemini";
+  if (v >= 621 && v <= 722) return "cancer";
+  if (v >= 723 && v <= 822) return "leo";
+  if (v >= 823 && v <= 922) return "virgo";
+  if (v >= 923 && v <= 1022) return "libra";
+  if (v >= 1023 && v <= 1121) return "scorpio";
+  if (v >= 1122 && v <= 1221) return "sagittarius";
+  if (v >= 1222 || v <= 119) return "capricorn";
+  if (v >= 120 && v <= 218) return "aquarius";
+  return "pisces";
 }
 
 function labelFor(q: ReturnType<typeof quadrantOf>) {
