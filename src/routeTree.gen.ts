@@ -13,6 +13,7 @@ import { Route as RealmRouteImport } from './routes/realm'
 import { Route as EconomyRouteImport } from './routes/economy'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PledgeSoulIdRouteImport } from './routes/pledge.$soulId'
+import { Route as ChamberHighCouncilRouteImport } from './routes/chamber.high-council'
 import { Route as ChamberSoulIdRouteImport } from './routes/chamber.$soulId'
 
 const RealmRoute = RealmRouteImport.update({
@@ -35,6 +36,11 @@ const PledgeSoulIdRoute = PledgeSoulIdRouteImport.update({
   path: '/pledge/$soulId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChamberHighCouncilRoute = ChamberHighCouncilRouteImport.update({
+  id: '/chamber/high-council',
+  path: '/chamber/high-council',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ChamberSoulIdRoute = ChamberSoulIdRouteImport.update({
   id: '/chamber/$soulId',
   path: '/chamber/$soulId',
@@ -46,6 +52,7 @@ export interface FileRoutesByFullPath {
   '/economy': typeof EconomyRoute
   '/realm': typeof RealmRoute
   '/chamber/$soulId': typeof ChamberSoulIdRoute
+  '/chamber/high-council': typeof ChamberHighCouncilRoute
   '/pledge/$soulId': typeof PledgeSoulIdRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/economy': typeof EconomyRoute
   '/realm': typeof RealmRoute
   '/chamber/$soulId': typeof ChamberSoulIdRoute
+  '/chamber/high-council': typeof ChamberHighCouncilRoute
   '/pledge/$soulId': typeof PledgeSoulIdRoute
 }
 export interface FileRoutesById {
@@ -61,6 +69,7 @@ export interface FileRoutesById {
   '/economy': typeof EconomyRoute
   '/realm': typeof RealmRoute
   '/chamber/$soulId': typeof ChamberSoulIdRoute
+  '/chamber/high-council': typeof ChamberHighCouncilRoute
   '/pledge/$soulId': typeof PledgeSoulIdRoute
 }
 export interface FileRouteTypes {
@@ -70,15 +79,23 @@ export interface FileRouteTypes {
     | '/economy'
     | '/realm'
     | '/chamber/$soulId'
+    | '/chamber/high-council'
     | '/pledge/$soulId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/economy' | '/realm' | '/chamber/$soulId' | '/pledge/$soulId'
+  to:
+    | '/'
+    | '/economy'
+    | '/realm'
+    | '/chamber/$soulId'
+    | '/chamber/high-council'
+    | '/pledge/$soulId'
   id:
     | '__root__'
     | '/'
     | '/economy'
     | '/realm'
     | '/chamber/$soulId'
+    | '/chamber/high-council'
     | '/pledge/$soulId'
   fileRoutesById: FileRoutesById
 }
@@ -87,6 +104,7 @@ export interface RootRouteChildren {
   EconomyRoute: typeof EconomyRoute
   RealmRoute: typeof RealmRoute
   ChamberSoulIdRoute: typeof ChamberSoulIdRoute
+  ChamberHighCouncilRoute: typeof ChamberHighCouncilRoute
   PledgeSoulIdRoute: typeof PledgeSoulIdRoute
 }
 
@@ -120,6 +138,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PledgeSoulIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/chamber/high-council': {
+      id: '/chamber/high-council'
+      path: '/chamber/high-council'
+      fullPath: '/chamber/high-council'
+      preLoaderRoute: typeof ChamberHighCouncilRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/chamber/$soulId': {
       id: '/chamber/$soulId'
       path: '/chamber/$soulId'
@@ -135,6 +160,7 @@ const rootRouteChildren: RootRouteChildren = {
   EconomyRoute: EconomyRoute,
   RealmRoute: RealmRoute,
   ChamberSoulIdRoute: ChamberSoulIdRoute,
+  ChamberHighCouncilRoute: ChamberHighCouncilRoute,
   PledgeSoulIdRoute: PledgeSoulIdRoute,
 }
 export const routeTree = rootRouteImport

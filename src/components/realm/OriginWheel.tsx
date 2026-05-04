@@ -219,8 +219,7 @@ export function OriginWheel({ souls, currentHouseSoulId = "aries", onClose }: Pr
 
             {/* High Council Chamber — gathering hall */}
             <Link
-              to="/chamber/$soulId"
-              params={{ soulId: "oracle" }}
+              to="/chamber/high-council"
               aria-label="Enter the High Council Chamber"
               title="The High Council Chamber — gathering hall"
               className="group flex flex-col items-center gap-1 transition-transform hover:scale-110"
