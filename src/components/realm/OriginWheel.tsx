@@ -217,11 +217,11 @@ export function OriginWheel({ souls, currentHouseSoulId = "aries", onClose }: Pr
               </Link>
             )}
 
-            {/* High Council Chamber — gathering hall */}
+            {/* High Council — the round table itself (Registry) */}
             <Link
-              to="/chamber/high-council"
-              aria-label="Enter the High Council Chamber"
-              title="The High Council Chamber — gathering hall"
+              to="/"
+              aria-label="Enter the High Council — the Registry round table"
+              title="The High Council — the round table (Registry)"
               className="group flex flex-col items-center gap-1 transition-transform hover:scale-110"
             >
               <span
