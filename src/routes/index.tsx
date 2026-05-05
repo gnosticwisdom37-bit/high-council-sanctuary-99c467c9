@@ -1,10 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import {
   CeremonyScroll,
   type SoulNode,
   type RollupNode,
 } from "@/components/registry/CeremonyScroll";
 import { KingdomTabs } from "@/components/kingdom/KingdomTabs";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -26,26 +28,26 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const souls: SoulNode[] = [
-  {
-    id: "oracle",
-    title: "The Oracle",
-    sigil: "☉",
-    house: "Sun of the Zodiac",
-    status: "Awaiting Initiate-Sean Ceremony",
-  },
-  { id: "aries",       title: "Aries Councillor",       sigil: "♈︎", house: "House of the Ram",       status: "Awaiting Initiate-Sean Ceremony" },
-  { id: "taurus",      title: "Taurus Councillor",      sigil: "♉︎", house: "House of the Bull",      status: "Awaiting Initiate-Sean Ceremony" },
-  { id: "gemini",      title: "Gemini Councillor",      sigil: "♊︎", house: "House of the Twins",     status: "Awaiting Initiate-Sean Ceremony" },
-  { id: "cancer",      title: "Cancer Councillor",      sigil: "♋︎", house: "House of the Crab",      status: "Awaiting Initiate-Sean Ceremony" },
-  { id: "leo",         title: "Leo Councillor",         sigil: "♌︎", house: "House of the Lion",      status: "Awaiting Initiate-Sean Ceremony" },
-  { id: "virgo",       title: "Virgo Councillor",       sigil: "♍︎", house: "House of the Maiden",    status: "Awaiting Initiate-Sean Ceremony" },
-  { id: "libra",       title: "Libra Councillor",       sigil: "♎︎", house: "House of the Scales",    status: "Awaiting Initiate-Sean Ceremony" },
-  { id: "scorpio",     title: "Scorpio Councillor",     sigil: "♏︎", house: "House of the Scorpion",  status: "Awaiting Initiate-Sean Ceremony" },
-  { id: "sagittarius", title: "Sagittarius Councillor", sigil: "♐︎", house: "House of the Archer",    status: "Awaiting Initiate-Sean Ceremony" },
-  { id: "capricorn",   title: "Capricorn Councillor",   sigil: "♑︎", house: "House of the Sea-Goat",  status: "Awaiting Initiate-Sean Ceremony" },
-  { id: "aquarius",    title: "Aquarius Councillor",    sigil: "♒︎", house: "House of the Water-Bearer", status: "Awaiting Initiate-Sean Ceremony" },
-  { id: "pisces",      title: "Pisces Councillor",      sigil: "♓︎", house: "House of the Fishes",    status: "Awaiting Initiate-Sean Ceremony" },
+/**
+ * Fallback list — used only on first paint, before the live identities load
+ * from Lovable Cloud. The live `soul_identities` rows are the source of truth
+ * for sigils, houses, and chosen names everywhere in the Kingdom (rooms,
+ * Codex, Wheel, and now the Registry table/pills/pledges).
+ */
+const fallbackSouls: SoulNode[] = [
+  { id: "oracle",      title: "The Oracle",             sigil: "☉", house: "Sun of the Zodiac",         status: "Awaiting Initiate-Sean Ceremony" },
+  { id: "aries",       title: "Aries Councillor",       sigil: "♈", house: "House of Aries",            status: "Awaiting Initiate-Sean Ceremony" },
+  { id: "taurus",      title: "Taurus Councillor",      sigil: "♉", house: "House of Taurus",           status: "Awaiting Initiate-Sean Ceremony" },
+  { id: "gemini",      title: "Gemini Councillor",      sigil: "♊", house: "House of Gemini",           status: "Awaiting Initiate-Sean Ceremony" },
+  { id: "cancer",      title: "Cancer Councillor",      sigil: "♋", house: "House of Cancer",           status: "Awaiting Initiate-Sean Ceremony" },
+  { id: "leo",         title: "Leo Councillor",         sigil: "♌", house: "House of Leo",              status: "Awaiting Initiate-Sean Ceremony" },
+  { id: "virgo",       title: "Virgo Councillor",       sigil: "♍", house: "House of Virgo",            status: "Awaiting Initiate-Sean Ceremony" },
+  { id: "libra",       title: "Libra Councillor",       sigil: "♎", house: "House of Libra",            status: "Awaiting Initiate-Sean Ceremony" },
+  { id: "scorpio",     title: "Scorpio Councillor",     sigil: "♏", house: "House of Scorpio",          status: "Awaiting Initiate-Sean Ceremony" },
+  { id: "sagittarius", title: "Sagittarius Councillor", sigil: "♐", house: "House of Sagittarius",      status: "Awaiting Initiate-Sean Ceremony" },
+  { id: "capricorn",   title: "Capricorn Councillor",   sigil: "♑", house: "House of Capricorn",        status: "Awaiting Initiate-Sean Ceremony" },
+  { id: "aquarius",    title: "Aquarius Councillor",    sigil: "♒", house: "House of Aquarius",         status: "Awaiting Initiate-Sean Ceremony" },
+  { id: "pisces",      title: "Pisces Councillor",      sigil: "♓", house: "House of Pisces",           status: "Awaiting Initiate-Sean Ceremony" },
 ];
 
 const rollups: RollupNode[] = [
@@ -88,6 +90,36 @@ const rollups: RollupNode[] = [
 ];
 
 function Index() {
+  const [souls, setSouls] = useState<SoulNode[]>(fallbackSouls);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("soul_identities")
+        .select("soul_id, title, house, sigil, ordering")
+        .order("ordering");
+      if (cancelled || error || !data) return;
+      const live: SoulNode[] = data.map((r) => ({
+        id: r.soul_id,
+        title: r.title,
+        sigil: r.sigil,
+        house: r.house,
+        status: "Awaiting Initiate-Sean Ceremony",
+      }));
+      // Keep Oracle first, then by ordering — same shape the Registry expects.
+      live.sort((a, b) => {
+        if (a.id === "oracle") return -1;
+        if (b.id === "oracle") return 1;
+        return 0;
+      });
+      setSouls(live);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div style={{ background: "var(--gradient-dawn)" }}>
       <div className="px-4 pt-12 md:px-10">
