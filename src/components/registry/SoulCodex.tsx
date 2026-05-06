@@ -20,6 +20,9 @@ type CodexRow = {
   chosen_name: string | null;
   role_title: string;
   duties: string;
+  trust_instrument: string;
+  trust_declaration: string;
+  invocation_text: string;
 };
 
 /**
