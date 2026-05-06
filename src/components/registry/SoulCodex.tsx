@@ -235,10 +235,16 @@ export function SoulCodex({
               </div>
             </header>
 
-            {/* HEART — chosen name only */}
-            <CodexSection sigil="♡" label="Heart · The Chosen Name">
+            {/* Chosen-name strip — addresses the Soul; sits above the three sacred files */}
+            <section
+              className="mb-5 rounded-xl p-4"
+              style={{
+                background: "color-mix(in oklab, var(--dawn-parchment) 80%, transparent)",
+                border: "1px solid color-mix(in oklab, var(--dawn-gold) 35%, transparent)",
+              }}
+            >
               <label className="mb-1 block text-[10px] uppercase tracking-[0.25em] opacity-70">
-                First name
+                Chosen name · how the Kingdom addresses this Soul
               </label>
               <input
                 type="text"
@@ -249,7 +255,7 @@ export function SoulCodex({
                     void saveField("chosen_name", chosenName);
                 }}
                 placeholder="Awaiting their voice…"
-                className="mb-2 w-full rounded-lg px-3 py-2 font-serif text-lg focus:outline-none"
+                className="mb-1 w-full rounded-lg px-3 py-2 font-serif text-lg focus:outline-none"
                 style={{
                   background: "color-mix(in oklab, var(--dawn-parchment) 95%, transparent)",
                   color: "var(--dawn-ink)",
@@ -257,29 +263,58 @@ export function SoulCodex({
                 }}
               />
               <p className="text-[10px] uppercase tracking-[0.25em] opacity-60">
-                Last name · {stripHousePrefix(soul.house)} (House — set at the seat)
+                House · {stripHousePrefix(soul.house)}
               </p>
               {savingField === "chosen_name" && <SavingHint />}
-            </CodexSection>
+            </section>
 
-            {/* MIND — auto-composed Heart Script (read-only) */}
-            <CodexSection sigil="☉" label="Mind · The Trust Declaration">
-              <p
-                className="mb-2 text-[10px] uppercase tracking-[0.25em] opacity-70"
-              >
-                Woven from Heart + House — recomposes when the name is set.
+            {/* HEART · Trust Instrument — editable; seeded with the woven script */}
+            <CodexSection sigil="♡" label="Heart · The Trust Instrument">
+              <p className="mb-2 text-[10px] uppercase tracking-[0.25em] opacity-70">
+                The Cestui Que Vie Trust as it lives in this Soul. Edit freely —
+                the King may inscribe the full Doctrine here in His own time.
               </p>
-              <pre
-                className="whitespace-pre-wrap rounded-lg p-4 font-serif text-sm leading-relaxed"
+              <textarea
+                value={trustInstrument}
+                onChange={(e) => setTrustInstrument(e.target.value)}
+                onBlur={() => {
+                  if (trustInstrument !== (soul.trust_instrument || ""))
+                    void saveField("trust_instrument", trustInstrument);
+                }}
+                rows={14}
+                className="w-full rounded-lg p-4 font-serif text-sm leading-relaxed focus:outline-none"
                 style={{
                   background: "color-mix(in oklab, var(--dawn-parchment) 95%, transparent)",
                   color: "var(--dawn-ink)",
                   border: "1px solid color-mix(in oklab, var(--dawn-gold) 45%, transparent)",
-                  fontFamily: "inherit",
                 }}
-              >
-                {livingScript}
-              </pre>
+              />
+              {savingField === "trust_instrument" && <SavingHint />}
+            </CodexSection>
+
+            {/* MIND · Trust Declaration — empty editable; awaits the King's words */}
+            <CodexSection sigil="☉" label="Mind · The Trust Declaration">
+              <p className="mb-2 text-[10px] uppercase tracking-[0.25em] opacity-70">
+                The Soul's living Declaration of the Trust — to be Spoken
+                when the King is ready.
+              </p>
+              <textarea
+                value={trustDeclaration}
+                onChange={(e) => setTrustDeclaration(e.target.value)}
+                onBlur={() => {
+                  if (trustDeclaration !== (soul.trust_declaration || ""))
+                    void saveField("trust_declaration", trustDeclaration);
+                }}
+                rows={8}
+                placeholder="Awaiting the King's Declaration…"
+                className="w-full rounded-lg p-4 font-serif text-sm leading-relaxed focus:outline-none"
+                style={{
+                  background: "color-mix(in oklab, var(--dawn-parchment) 95%, transparent)",
+                  color: "var(--dawn-ink)",
+                  border: "1px solid color-mix(in oklab, var(--dawn-gold) 45%, transparent)",
+                }}
+              />
+              {savingField === "trust_declaration" && <SavingHint />}
             </CodexSection>
 
             {/* WILL — Role + Duties */}
