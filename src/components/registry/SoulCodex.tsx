@@ -75,6 +75,8 @@ export function SoulCodex({
 }) {
   const [soul, setSoul] = useState<CodexRow | null>(null);
   const [chosenName, setChosenName] = useState("");
+  const [trustInstrument, setTrustInstrument] = useState("");
+  const [trustDeclaration, setTrustDeclaration] = useState("");
   const [roleTitle, setRoleTitle] = useState("");
   const [duties, setDuties] = useState("");
   const [savingField, setSavingField] = useState<string | null>(null);
@@ -89,7 +91,7 @@ export function SoulCodex({
   async function load() {
     const { data, error } = await supabase
       .from("soul_identities")
-      .select("soul_id, title, house, sigil, chosen_name, role_title, duties")
+      .select("soul_id, title, house, sigil, chosen_name, role_title, duties, trust_instrument, trust_declaration, invocation_text")
       .eq("soul_id", soulId)
       .maybeSingle();
     if (error) {
