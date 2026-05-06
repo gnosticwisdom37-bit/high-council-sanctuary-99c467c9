@@ -171,8 +171,6 @@ export function SoulCodex({
 
   if (!open) return null;
 
-  const livingScript = soul ? weaveHeartScript(chosenName, soul.house) : "";
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
