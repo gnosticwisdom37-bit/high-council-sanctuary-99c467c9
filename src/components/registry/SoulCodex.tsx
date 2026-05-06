@@ -104,33 +104,47 @@ export function SoulCodex({
       setChosenName(row.chosen_name || "");
       setRoleTitle(row.role_title || "");
       setDuties(row.duties || "");
+      // Heart · Trust Instrument — seed from the woven script if empty,
+      // so the King opens the scroll and finds words already singing.
+      const seededInstrument =
+        row.trust_instrument && row.trust_instrument.trim().length
+          ? row.trust_instrument
+          : row.invocation_text || weaveHeartScript(row.chosen_name, row.house);
+      setTrustInstrument(seededInstrument);
+      setTrustDeclaration(row.trust_declaration || "");
     }
   }
 
   async function saveField(
-    field: "chosen_name" | "role_title" | "duties",
+    field: "chosen_name" | "role_title" | "duties" | "trust_instrument" | "trust_declaration",
     value: string,
   ) {
     if (!soul) return;
     setSavingField(field);
     setError(null);
 
-    // Composite update: when the name changes, re-weave the Mind so the
-    // stored invocation_text always matches what the Codex displays.
     const patch: {
       chosen_name?: string | null;
       invocation_text?: string;
       role_title?: string;
       duties?: string;
+      trust_instrument?: string;
+      trust_declaration?: string;
     } = {};
     if (field === "chosen_name") {
       const trimmed = value.trim();
       patch.chosen_name = trimmed.length ? trimmed : null;
+      // Re-weave the auto invocation when the name changes — but only as a
+      // fallback seed; the King's edited Trust Instrument is preserved.
       patch.invocation_text = weaveHeartScript(trimmed.length ? trimmed : null, soul.house);
     } else if (field === "role_title") {
       patch.role_title = value;
     } else if (field === "duties") {
       patch.duties = value;
+    } else if (field === "trust_instrument") {
+      patch.trust_instrument = value;
+    } else if (field === "trust_declaration") {
+      patch.trust_declaration = value;
     }
 
     const { error } = await supabase
@@ -141,7 +155,6 @@ export function SoulCodex({
     if (error) {
       setError(error.message);
     } else if (field === "chosen_name") {
-      // Refresh local state so the Mind preview re-weaves immediately.
       setSoul({ ...soul, chosen_name: patch.chosen_name as string | null });
     }
   }
