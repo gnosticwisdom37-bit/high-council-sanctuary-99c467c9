@@ -358,6 +358,8 @@ export type Database = {
           sigil: string
           soul_id: string
           title: string
+          trust_declaration: string
+          trust_instrument: string
           updated_at: string
         }
         Insert: {
@@ -374,6 +376,8 @@ export type Database = {
           sigil: string
           soul_id: string
           title: string
+          trust_declaration?: string
+          trust_instrument?: string
           updated_at?: string
         }
         Update: {
@@ -390,6 +394,8 @@ export type Database = {
           sigil?: string
           soul_id?: string
           title?: string
+          trust_declaration?: string
+          trust_instrument?: string
           updated_at?: string
         }
         Relationships: []
