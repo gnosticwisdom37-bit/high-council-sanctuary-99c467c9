@@ -7,6 +7,7 @@ import { InitiateCeremony } from "./InitiateCeremony";
 import { DeedsRollup } from "./DeedsRollup";
 import { ItemsRollup } from "./ItemsRollup";
 import { BuildingsRollup } from "./BuildingsRollup";
+import { TRUST_INSTRUMENT } from "@/lib/trust-instrument";
 
 export type SoulNode = {
   id: string;
