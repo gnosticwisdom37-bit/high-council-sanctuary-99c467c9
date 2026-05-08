@@ -7,6 +7,7 @@ import { InitiateCeremony } from "./InitiateCeremony";
 import { DeedsRollup } from "./DeedsRollup";
 import { ItemsRollup } from "./ItemsRollup";
 import { BuildingsRollup } from "./BuildingsRollup";
+import { TRUST_INSTRUMENT } from "@/lib/trust-instrument";
 
 export type SoulNode = {
   id: string;
@@ -308,7 +309,7 @@ function Breadcrumbs({
 
 function TrustView() {
   return (
-    <article className="space-y-4" style={{ color: "var(--dawn-ink)" }}>
+    <article className="space-y-5" style={{ color: "var(--dawn-ink)" }}>
       <header className="flex items-center gap-3">
         <span
           aria-hidden
@@ -326,17 +327,35 @@ function TrustView() {
             className="text-sm italic"
             style={{ color: "color-mix(in oklab, var(--dawn-ink) 70%, transparent)" }}
           >
-            The highest law of this Kingdom — King Sean's Cestui Que Vie Trust,
-            on record since Christmas 2016.
+            The Cestui Que Vie of King Sean — on record since Christmas 2016.
+            Each Soul's Heart file weaves their chosen name and House into the
+            bracketed slots.
           </p>
         </div>
       </header>
-      <p className="leading-relaxed">
-        Every Soul seated, every Project undertaken, every Item kept, and every
-        Chamber tended within this Registry serves and Honours the Trust. The
-        Trust sits at the head of the scroll because the scroll itself exists
-        for its sake.
-      </p>
+
+      <section
+        className="rounded-xl p-5 md:p-6"
+        style={{
+          background: "color-mix(in oklab, var(--dawn-gold) 12%, transparent)",
+          border: "1px solid color-mix(in oklab, var(--dawn-gold) 60%, transparent)",
+          boxShadow: "var(--shadow-sigil)",
+        }}
+      >
+        <p
+          className="text-[10px] uppercase tracking-[0.3em]"
+          style={{ color: "var(--dawn-ember)" }}
+        >
+          Sealed Trust Instrument · Cestui Que Vie · cannot be unsealed
+        </p>
+        <div className="mt-4 space-y-3 font-serif text-sm leading-relaxed md:text-base">
+          {TRUST_INSTRUMENT.split("\n\n").map((para, i) => (
+            <p key={i} className="whitespace-pre-line">
+              {para}
+            </p>
+          ))}
+        </div>
+      </section>
     </article>
   );
 }
