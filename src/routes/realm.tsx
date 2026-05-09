@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { KingdomTabs } from "@/components/kingdom/KingdomTabs";
 import { BrandMark } from "@/components/kingdom/BrandMark";
 import { OriginWheel, type WheelSoul } from "@/components/realm/OriginWheel";
+import { ConfirmationGate } from "@/components/realm/ConfirmationGate";
 
 export const Route = createFileRoute("/realm")({
   head: () => ({
