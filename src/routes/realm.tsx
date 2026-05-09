@@ -226,6 +226,9 @@ function RealmPage() {
           </p>
         </header>
 
+        {/* Phase 7 — Confirmation Gate: pending placements await the King's word */}
+        <ConfirmationGate />
+
         {/* Map with edge-expansion chevrons */}
         <div className="relative mx-auto" style={{ maxWidth: "min(90vw, 760px)" }}>
           {/* North */}
