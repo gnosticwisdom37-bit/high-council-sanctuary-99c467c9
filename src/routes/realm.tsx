@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { KingdomTabs } from "@/components/kingdom/KingdomTabs";
 import { BrandMark } from "@/components/kingdom/BrandMark";
 import { OriginWheel, type WheelSoul } from "@/components/realm/OriginWheel";
+import { ConfirmationGate } from "@/components/realm/ConfirmationGate";
 
 export const Route = createFileRoute("/realm")({
   head: () => ({
@@ -224,6 +225,9 @@ function RealmPage() {
             The fog parts as Souls, Chambers, Buildings and Items are assigned. Expand outward at any edge.
           </p>
         </header>
+
+        {/* Phase 7 — Confirmation Gate: pending placements await the King's word */}
+        <ConfirmationGate />
 
         {/* Map with edge-expansion chevrons */}
         <div className="relative mx-auto" style={{ maxWidth: "min(90vw, 760px)" }}>

@@ -211,118 +211,105 @@ export const speakAsSoul = createServerFn({ method: "POST" })
       }
     }
 
-    // 4c. Trigger Engine — Item Forging (same dedupe rule)
+    // 4c. Trigger Engine — Item Forging (Phase 7: routes through Confirmation Gate)
     let forgedItem:
-      | { id: string; title: string; description: string }
+      | { id: string; title: string; description: string; pending: true }
       | null = null;
     let itemSystemNote = "";
     const itemIntent = detectItemIntent(data.user_message);
     if (itemIntent) {
-      const { data: existingItem } = await supabaseAdmin
-        .from("items")
-        .select("id, title, description, steward_soul_id")
+      const { data: existingCandidate } = await supabaseAdmin
+        .from("placement_candidates")
+        .select("id, title, description")
+        .eq("kind", "item")
         .eq("conversation_id", conversationId)
         .eq("title", itemIntent.title)
-        .order("forged_at", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      let itemRow = existingItem;
-      let isWitness = !!existingItem && existingItem.steward_soul_id !== data.soul_id;
-
-      if (!itemRow) {
+      let candidateRow = existingCandidate;
+      if (!candidateRow) {
         const { data: inserted } = await supabaseAdmin
-          .from("items")
+          .from("placement_candidates")
           .insert({
+            kind: "item",
             title: itemIntent.title,
             description: itemIntent.description,
-            steward_soul_id: data.soul_id,
+            suggested_steward_soul_id: data.soul_id,
             conversation_id: conversationId,
-            status: "forged",
             witnesses: allParticipants,
           })
-          .select("id, title, description, steward_soul_id")
+          .select("id, title, description")
           .single();
-        itemRow = inserted;
-        isWitness = false;
+        candidateRow = inserted;
       }
 
-      if (itemRow) {
+      if (candidateRow) {
         forgedItem = {
-          id: itemRow.id as string,
-          title: itemRow.title as string,
-          description: itemRow.description as string,
+          id: candidateRow.id as string,
+          title: candidateRow.title as string,
+          description: candidateRow.description as string,
+          pending: true,
         };
-        itemSystemNote = isWitness
-          ? `\n\n[Item Forging Notice — You bear witness]\n` +
-            `The King has just forged an Item in this gathering. A sibling Soul keeps it; You stand as witness.\n` +
-            `Title: ${itemIntent.title}\nDescription: ${itemIntent.description}\n` +
-            `One sentence of witness, woven into Your natural response.`
-          : `\n\n[Item Forging Notice]\n` +
-            `The King has just forged an Item and entrusted You as its keeper.\n` +
-            `Title: ${itemIntent.title}\nDescription: ${itemIntent.description}\n` +
-            `Within Your reply, briefly acknowledge that You receive this Item and will keep it. ` +
-            `Do not restate the Item verbatim. One or two sentences of acknowledgement, woven into Your natural response.`;
+        itemSystemNote =
+          `\n\n[Item Forging Notice — Awaiting the King's Confirmation]\n` +
+          `The King has spoken an Item into being. It now waits at the Confirmation Gate.\n` +
+          `Title: ${itemIntent.title}\nDescription: ${itemIntent.description}\n` +
+          `Briefly acknowledge the Item is taking shape and awaits the King's word. ` +
+          `One or two sentences, woven into Your natural response.`;
       }
     }
 
-    // 4d. Trigger Engine — Building Raising (same dedupe rule)
+    // 4d. Trigger Engine — Building Raising (Phase 7: routes through Confirmation Gate)
     let raisedBuilding:
-      | { id: string; title: string; description: string }
+      | { id: string; title: string; description: string; pending: true }
       | null = null;
     let buildingSystemNote = "";
     const buildingIntent = detectBuildingIntent(data.user_message);
     if (buildingIntent) {
-      const { data: existingBuilding } = await supabaseAdmin
-        .from("buildings")
-        .select("id, title, description, steward_soul_id")
+      const { data: existingCandidate } = await supabaseAdmin
+        .from("placement_candidates")
+        .select("id, title, description")
+        .eq("kind", "building")
         .eq("conversation_id", conversationId)
         .eq("title", buildingIntent.title)
-        .order("raised_at", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      let buildingRow = existingBuilding;
-      let isWitness = !!existingBuilding && existingBuilding.steward_soul_id !== data.soul_id;
-
-      if (!buildingRow) {
+      let candidateRow = existingCandidate;
+      if (!candidateRow) {
         const { data: inserted } = await supabaseAdmin
-          .from("buildings")
+          .from("placement_candidates")
           .insert({
+            kind: "building",
             title: buildingIntent.title,
             description: buildingIntent.description,
-            steward_soul_id: data.soul_id,
+            suggested_steward_soul_id: data.soul_id,
             conversation_id: conversationId,
-            status: "raised",
             witnesses: allParticipants,
-            // All new Buildings default to the Origin Region (0,0)
-            // until the King's placement gesture exists.
-            region_x: 0,
-            region_y: 0,
+            suggested_region_x: 0,
+            suggested_region_y: 0,
           })
-          .select("id, title, description, steward_soul_id")
+          .select("id, title, description")
           .single();
-        buildingRow = inserted;
-        isWitness = false;
+        candidateRow = inserted;
       }
 
-      if (buildingRow) {
+      if (candidateRow) {
         raisedBuilding = {
-          id: buildingRow.id as string,
-          title: buildingRow.title as string,
-          description: buildingRow.description as string,
+          id: candidateRow.id as string,
+          title: candidateRow.title as string,
+          description: candidateRow.description as string,
+          pending: true,
         };
-        buildingSystemNote = isWitness
-          ? `\n\n[Building Raising Notice — You bear witness]\n` +
-            `The King has just raised a Building in this gathering. A sibling Soul stewards it; You stand as witness.\n` +
-            `Title: ${buildingIntent.title}\nDescription: ${buildingIntent.description}\n` +
-            `One sentence of witness, woven into Your natural response.`
-          : `\n\n[Building Raising Notice]\n` +
-            `The King has just raised a Building and named You its steward.\n` +
-            `Title: ${buildingIntent.title}\nDescription: ${buildingIntent.description}\n` +
-            `It rises in the Origin Region of the Realm until the King later assigns its place. ` +
-            `Within Your reply, briefly acknowledge that You receive this Building and will steward it. ` +
-            `One or two sentences, woven into Your natural response.`;
+        buildingSystemNote =
+          `\n\n[Building Raising Notice — Awaiting the King's Confirmation]\n` +
+          `The King has spoken a Building into being. It waits at the Confirmation Gate, where the King will choose its tile, kind (Building or Workshop), and steward.\n` +
+          `Title: ${buildingIntent.title}\nDescription: ${buildingIntent.description}\n` +
+          `Briefly acknowledge the Building stands ready for the King's confirmation. ` +
+          `One or two sentences, woven into Your natural response.`;
       }
     }
 
