@@ -64,11 +64,14 @@ export type Database = {
           created_at: string
           description: string
           id: string
+          kind: Database["public"]["Enums"]["building_kind"]
           raised_at: string
           region_x: number
           region_y: number
           status: Database["public"]["Enums"]["building_status"]
           steward_soul_id: string | null
+          tile_x: number | null
+          tile_y: number | null
           title: string
           updated_at: string
           witnesses: string[]
@@ -78,11 +81,14 @@ export type Database = {
           created_at?: string
           description: string
           id?: string
+          kind?: Database["public"]["Enums"]["building_kind"]
           raised_at?: string
           region_x?: number
           region_y?: number
           status?: Database["public"]["Enums"]["building_status"]
           steward_soul_id?: string | null
+          tile_x?: number | null
+          tile_y?: number | null
           title: string
           updated_at?: string
           witnesses?: string[]
@@ -92,11 +98,14 @@ export type Database = {
           created_at?: string
           description?: string
           id?: string
+          kind?: Database["public"]["Enums"]["building_kind"]
           raised_at?: string
           region_x?: number
           region_y?: number
           status?: Database["public"]["Enums"]["building_status"]
           steward_soul_id?: string | null
+          tile_x?: number | null
+          tile_y?: number | null
           title?: string
           updated_at?: string
           witnesses?: string[]
@@ -185,8 +194,12 @@ export type Database = {
           description: string
           forged_at: string
           id: string
+          region_x: number | null
+          region_y: number | null
           status: Database["public"]["Enums"]["item_status"]
           steward_soul_id: string | null
+          tile_x: number | null
+          tile_y: number | null
           title: string
           updated_at: string
           witnesses: string[]
@@ -197,8 +210,12 @@ export type Database = {
           description: string
           forged_at?: string
           id?: string
+          region_x?: number | null
+          region_y?: number | null
           status?: Database["public"]["Enums"]["item_status"]
           steward_soul_id?: string | null
+          tile_x?: number | null
+          tile_y?: number | null
           title: string
           updated_at?: string
           witnesses?: string[]
@@ -209,8 +226,63 @@ export type Database = {
           description?: string
           forged_at?: string
           id?: string
+          region_x?: number | null
+          region_y?: number | null
           status?: Database["public"]["Enums"]["item_status"]
           steward_soul_id?: string | null
+          tile_x?: number | null
+          tile_y?: number | null
+          title?: string
+          updated_at?: string
+          witnesses?: string[]
+        }
+        Relationships: []
+      }
+      placement_candidates: {
+        Row: {
+          conversation_id: string | null
+          created_at: string
+          description: string
+          id: string
+          kind: Database["public"]["Enums"]["placement_candidate_kind"]
+          source_message_id: string | null
+          suggested_region_x: number | null
+          suggested_region_y: number | null
+          suggested_steward_soul_id: string | null
+          suggested_tile_x: number | null
+          suggested_tile_y: number | null
+          title: string
+          updated_at: string
+          witnesses: string[]
+        }
+        Insert: {
+          conversation_id?: string | null
+          created_at?: string
+          description: string
+          id?: string
+          kind: Database["public"]["Enums"]["placement_candidate_kind"]
+          source_message_id?: string | null
+          suggested_region_x?: number | null
+          suggested_region_y?: number | null
+          suggested_steward_soul_id?: string | null
+          suggested_tile_x?: number | null
+          suggested_tile_y?: number | null
+          title: string
+          updated_at?: string
+          witnesses?: string[]
+        }
+        Update: {
+          conversation_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["placement_candidate_kind"]
+          source_message_id?: string | null
+          suggested_region_x?: number | null
+          suggested_region_y?: number | null
+          suggested_steward_soul_id?: string | null
+          suggested_tile_x?: number | null
+          suggested_tile_y?: number | null
           title?: string
           updated_at?: string
           witnesses?: string[]
@@ -540,14 +612,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      tile_has_building: {
+        Args: {
+          p_region_x: number
+          p_region_y: number
+          p_tile_x: number
+          p_tile_y: number
+        }
+        Returns: boolean
+      }
     }
     Enums: {
+      building_kind: "building" | "workshop"
       building_status: "raised" | "in_use" | "archived"
       deed_quadrant: "NE" | "SE" | "SW" | "NW"
       deed_season: "spring" | "summer" | "fall" | "winter"
       deed_status: "inscribed" | "in_progress" | "fulfilled" | "set_aside"
       item_status: "forged" | "bestowed" | "archived"
+      placement_candidate_kind: "building" | "workshop" | "item" | "chamber"
       realm_occupant_type: "soul" | "building" | "item" | "chamber" | "castle"
     }
     CompositeTypes: {
@@ -676,11 +758,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      building_kind: ["building", "workshop"],
       building_status: ["raised", "in_use", "archived"],
       deed_quadrant: ["NE", "SE", "SW", "NW"],
       deed_season: ["spring", "summer", "fall", "winter"],
       deed_status: ["inscribed", "in_progress", "fulfilled", "set_aside"],
       item_status: ["forged", "bestowed", "archived"],
+      placement_candidate_kind: ["building", "workshop", "item", "chamber"],
       realm_occupant_type: ["soul", "building", "item", "chamber", "castle"],
     },
   },
