@@ -37,17 +37,16 @@ export function ItemForgedBanner({ title, stewardName }: Props) {
             className="text-[10px] uppercase tracking-[0.3em]"
             style={{ color: "var(--dawn-gold-bright)" }}
           >
-            ❖ Item Forged
+            ❖ Item · Awaiting the King's Confirmation
           </p>
           <p className="mt-0.5 font-serif text-base leading-tight">{title}</p>
           {stewardName && (
-            <p className="mt-0.5 text-xs opacity-75">Keeper: {stewardName}</p>
+            <p className="mt-0.5 text-xs opacity-75">Suggested keeper: {stewardName}</p>
           )}
         </div>
       </div>
       <Link
-        to="/"
-        hash="items"
+        to="/realm"
         className="self-end whitespace-nowrap rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.25em] transition-all hover:scale-[1.04] sm:self-auto"
         style={{
           background: "linear-gradient(135deg, var(--dawn-gold) 0%, var(--dawn-gold-bright) 100%)",
@@ -55,7 +54,7 @@ export function ItemForgedBanner({ title, stewardName }: Props) {
           boxShadow: "var(--shadow-sigil)",
         }}
       >
-        View in Registry →
+        Open the Gate →
       </Link>
     </div>
   );
