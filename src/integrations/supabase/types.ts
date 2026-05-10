@@ -112,6 +112,47 @@ export type Database = {
         }
         Relationships: []
       }
+      csv_intakes: {
+        Row: {
+          created_at: string
+          id: string
+          origin: string
+          row_count: number
+          rows: Json
+          source: string
+          status: Database["public"]["Enums"]["intake_status"]
+          workshop_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          origin?: string
+          row_count?: number
+          rows?: Json
+          source?: string
+          status?: Database["public"]["Enums"]["intake_status"]
+          workshop_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          origin?: string
+          row_count?: number
+          rows?: Json
+          source?: string
+          status?: Database["public"]["Enums"]["intake_status"]
+          workshop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "csv_intakes_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deeds: {
         Row: {
           conversation_id: string | null
@@ -333,6 +374,72 @@ export type Database = {
           y?: number
         }
         Relationships: []
+      }
+      scheduled_posts: {
+        Row: {
+          body: string
+          channel: Database["public"]["Enums"]["post_channel"]
+          created_at: string
+          google_event_id: string | null
+          hashtags: string[]
+          id: string
+          scheduled_at: string | null
+          source_intake_id: string | null
+          source_row_index: number | null
+          status: Database["public"]["Enums"]["post_status"]
+          steward_soul_id: string | null
+          title: string
+          updated_at: string
+          workshop_id: string
+        }
+        Insert: {
+          body: string
+          channel?: Database["public"]["Enums"]["post_channel"]
+          created_at?: string
+          google_event_id?: string | null
+          hashtags?: string[]
+          id?: string
+          scheduled_at?: string | null
+          source_intake_id?: string | null
+          source_row_index?: number | null
+          status?: Database["public"]["Enums"]["post_status"]
+          steward_soul_id?: string | null
+          title: string
+          updated_at?: string
+          workshop_id: string
+        }
+        Update: {
+          body?: string
+          channel?: Database["public"]["Enums"]["post_channel"]
+          created_at?: string
+          google_event_id?: string | null
+          hashtags?: string[]
+          id?: string
+          scheduled_at?: string | null
+          source_intake_id?: string | null
+          source_row_index?: number | null
+          status?: Database["public"]["Enums"]["post_status"]
+          steward_soul_id?: string | null
+          title?: string
+          updated_at?: string
+          workshop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_posts_source_intake_id_fkey"
+            columns: ["source_intake_id"]
+            isOneToOne: false
+            referencedRelation: "csv_intakes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_posts_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       settings: {
         Row: {
@@ -607,6 +714,42 @@ export type Database = {
         }
         Relationships: []
       }
+      workshops: {
+        Row: {
+          building_id: string
+          created_at: string
+          google_calendar_id: string | null
+          google_sync_enabled: boolean
+          hashtag_presets: string[]
+          id: string
+          steward_soul_id: string | null
+          system_prompt: string
+          updated_at: string
+        }
+        Insert: {
+          building_id: string
+          created_at?: string
+          google_calendar_id?: string | null
+          google_sync_enabled?: boolean
+          hashtag_presets?: string[]
+          id?: string
+          steward_soul_id?: string | null
+          system_prompt?: string
+          updated_at?: string
+        }
+        Update: {
+          building_id?: string
+          created_at?: string
+          google_calendar_id?: string | null
+          google_sync_enabled?: boolean
+          hashtag_presets?: string[]
+          id?: string
+          steward_soul_id?: string | null
+          system_prompt?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -628,8 +771,11 @@ export type Database = {
       deed_quadrant: "NE" | "SE" | "SW" | "NW"
       deed_season: "spring" | "summer" | "fall" | "winter"
       deed_status: "inscribed" | "in_progress" | "fulfilled" | "set_aside"
+      intake_status: "pending" | "consumed"
       item_status: "forged" | "bestowed" | "archived"
       placement_candidate_kind: "building" | "workshop" | "item" | "chamber"
+      post_channel: "x" | "meta" | "both"
+      post_status: "draft" | "scheduled" | "published" | "cancelled"
       realm_occupant_type: "soul" | "building" | "item" | "chamber" | "castle"
     }
     CompositeTypes: {
@@ -763,8 +909,11 @@ export const Constants = {
       deed_quadrant: ["NE", "SE", "SW", "NW"],
       deed_season: ["spring", "summer", "fall", "winter"],
       deed_status: ["inscribed", "in_progress", "fulfilled", "set_aside"],
+      intake_status: ["pending", "consumed"],
       item_status: ["forged", "bestowed", "archived"],
       placement_candidate_kind: ["building", "workshop", "item", "chamber"],
+      post_channel: ["x", "meta", "both"],
+      post_status: ["draft", "scheduled", "published", "cancelled"],
       realm_occupant_type: ["soul", "building", "item", "chamber", "castle"],
     },
   },
