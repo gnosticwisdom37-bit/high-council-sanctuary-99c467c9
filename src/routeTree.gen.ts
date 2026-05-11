@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as RealmRouteImport } from './routes/realm'
 import { Route as EconomyRouteImport } from './routes/economy'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as WorkshopPublishingHouseRouteImport } from './routes/workshop.publishing-house'
 import { Route as PledgeSoulIdRouteImport } from './routes/pledge.$soulId'
 import { Route as ChamberHighCouncilRouteImport } from './routes/chamber.high-council'
 import { Route as ChamberSoulIdRouteImport } from './routes/chamber.$soulId'
@@ -29,6 +30,11 @@ const EconomyRoute = EconomyRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WorkshopPublishingHouseRoute = WorkshopPublishingHouseRouteImport.update({
+  id: '/workshop/publishing-house',
+  path: '/workshop/publishing-house',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PledgeSoulIdRoute = PledgeSoulIdRouteImport.update({
@@ -54,6 +60,7 @@ export interface FileRoutesByFullPath {
   '/chamber/$soulId': typeof ChamberSoulIdRoute
   '/chamber/high-council': typeof ChamberHighCouncilRoute
   '/pledge/$soulId': typeof PledgeSoulIdRoute
+  '/workshop/publishing-house': typeof WorkshopPublishingHouseRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +69,7 @@ export interface FileRoutesByTo {
   '/chamber/$soulId': typeof ChamberSoulIdRoute
   '/chamber/high-council': typeof ChamberHighCouncilRoute
   '/pledge/$soulId': typeof PledgeSoulIdRoute
+  '/workshop/publishing-house': typeof WorkshopPublishingHouseRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,6 +79,7 @@ export interface FileRoutesById {
   '/chamber/$soulId': typeof ChamberSoulIdRoute
   '/chamber/high-council': typeof ChamberHighCouncilRoute
   '/pledge/$soulId': typeof PledgeSoulIdRoute
+  '/workshop/publishing-house': typeof WorkshopPublishingHouseRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -81,6 +90,7 @@ export interface FileRouteTypes {
     | '/chamber/$soulId'
     | '/chamber/high-council'
     | '/pledge/$soulId'
+    | '/workshop/publishing-house'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -89,6 +99,7 @@ export interface FileRouteTypes {
     | '/chamber/$soulId'
     | '/chamber/high-council'
     | '/pledge/$soulId'
+    | '/workshop/publishing-house'
   id:
     | '__root__'
     | '/'
@@ -97,6 +108,7 @@ export interface FileRouteTypes {
     | '/chamber/$soulId'
     | '/chamber/high-council'
     | '/pledge/$soulId'
+    | '/workshop/publishing-house'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -106,6 +118,7 @@ export interface RootRouteChildren {
   ChamberSoulIdRoute: typeof ChamberSoulIdRoute
   ChamberHighCouncilRoute: typeof ChamberHighCouncilRoute
   PledgeSoulIdRoute: typeof PledgeSoulIdRoute
+  WorkshopPublishingHouseRoute: typeof WorkshopPublishingHouseRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -129,6 +142,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/workshop/publishing-house': {
+      id: '/workshop/publishing-house'
+      path: '/workshop/publishing-house'
+      fullPath: '/workshop/publishing-house'
+      preLoaderRoute: typeof WorkshopPublishingHouseRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pledge/$soulId': {
@@ -162,7 +182,17 @@ const rootRouteChildren: RootRouteChildren = {
   ChamberSoulIdRoute: ChamberSoulIdRoute,
   ChamberHighCouncilRoute: ChamberHighCouncilRoute,
   PledgeSoulIdRoute: PledgeSoulIdRoute,
+  WorkshopPublishingHouseRoute: WorkshopPublishingHouseRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
