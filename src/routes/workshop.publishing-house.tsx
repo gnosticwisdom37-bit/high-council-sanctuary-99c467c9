@@ -32,11 +32,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/workshop/publishing-house")({
@@ -246,42 +241,27 @@ function PublishingHousePage() {
         </div>
       </header>
 
-      {/* Main split: top row (two panes) + calendar pane below */}
-      <div className="mx-auto max-w-[1600px] px-4 py-4 md:px-8">
-        <ResizablePanelGroup direction="vertical" className="min-h-[calc(100vh-160px)]">
-          {/* TOP: two panes side-by-side */}
-          <ResizablePanel defaultSize={55} minSize={30}>
-            <ResizablePanelGroup direction="horizontal" className="gap-3">
-              <ResizablePanel defaultSize={50} minSize={30}>
-                <ProductionPane
-                  card={card}
-                  setCard={setCard}
-                  intake={DUMMY_INTAKE}
-                  onCurate={handleCurate}
-                  onClear={handleClear}
-                  onSchedule={handleSchedule}
-                />
-              </ResizablePanel>
-              <ResizableHandle withHandle />
-              <ResizablePanel defaultSize={50} minSize={30}>
-                <ScriptoriumPane stewardTitle={steward.title} stewardHouse={steward.house} />
-              </ResizablePanel>
-            </ResizablePanelGroup>
-          </ResizablePanel>
+      {/* Main: top row (two panes) + calendar pane below */}
+      <div className="mx-auto max-w-[1600px] space-y-3 px-4 py-4 md:px-8">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:[&>*]:min-h-[28rem]">
+          <ProductionPane
+            card={card}
+            setCard={setCard}
+            intake={DUMMY_INTAKE}
+            onCurate={handleCurate}
+            onClear={handleClear}
+            onSchedule={handleSchedule}
+          />
+          <ScriptoriumPane stewardTitle={steward.title} stewardHouse={steward.house} />
+        </div>
 
-          <ResizableHandle withHandle />
-
-          {/* BOTTOM: full-width calendar */}
-          <ResizablePanel defaultSize={45} minSize={25}>
-            <EventSparkCalendar
-              scheduled={scheduled}
-              googleSync={googleSync}
-              setGoogleSync={setGoogleSync}
-              googleTokenPresent={googleTokenPresent}
-              onChipClick={(c) => setCard({ ...c, id: "draft" })}
-            />
-          </ResizablePanel>
-        </ResizablePanelGroup>
+        <EventSparkCalendar
+          scheduled={scheduled}
+          googleSync={googleSync}
+          setGoogleSync={setGoogleSync}
+          googleTokenPresent={googleTokenPresent}
+          onChipClick={(c) => setCard({ ...c, id: "draft" })}
+        />
       </div>
     </div>
   );
