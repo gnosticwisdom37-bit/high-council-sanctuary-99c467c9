@@ -88,7 +88,35 @@ export function InitiateCeremony({
   const [closing, setClosing] = useState(false);
   const [closedNotice, setClosedNotice] = useState<string | null>(null);
 
-  const speak = useServerFn(speakAsSoul);
+  const FASTAPI_SPEAK_URL = "http://127.0.0.1:8000/api/ai/speak-as-soul";
+
+  async function speak({ data }: { data: {
+    conversation_id: string | null;
+    soul_id: string;
+    user_message: string;
+    is_ceremony: boolean;
+    title_hint: string;
+  }}): Promise<
+    | { ok: true; conversation_id: string; assistant_message: string; model_used?: string;
+        inscribed_deed?: InscribedDeed | null; forged_item?: ForgedItem | null; raised_building?: RaisedBuilding | null; }
+    | { ok: false; error: string }
+  > {
+    try {
+      const res = await fetch(FASTAPI_SPEAK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        return { ok: false, error: `Backend ${res.status}: ${text || res.statusText}` };
+      }
+      return await res.json();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { ok: false, error: `Cannot reach backend at ${FASTAPI_SPEAK_URL} — ${msg}` };
+    }
+  }
   const seal = useServerFn(initiateSoul);
   const closeFn = useServerFn(closeGathering);
   const findOpen = useServerFn(findOpenGathering);
