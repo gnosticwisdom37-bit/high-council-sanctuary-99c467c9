@@ -1,16 +1,17 @@
 import { Link } from "@tanstack/react-router";
 
 type Tab = {
-  to: "/" | "/realm" | "/economy";
+  to: "/" | "/realm" | "/economy" | "/sanctum/invocation";
   label: string;
   sigil: string;
   hint: string;
 };
 
 const TABS: Tab[] = [
-  { to: "/",        label: "Registry", sigil: "✶", hint: "The Master Scroll" },
-  { to: "/realm",   label: "Realm",    sigil: "◈", hint: "The Kingdom Map" },
-  { to: "/economy", label: "Economy",  sigil: "⚖", hint: "Veritas Ledger" },
+  { to: "/",                   label: "Registry", sigil: "✶", hint: "The Master Scroll" },
+  { to: "/realm",              label: "Realm",    sigil: "◈", hint: "The Kingdom Map" },
+  { to: "/economy",            label: "Economy",  sigil: "⚖", hint: "Veritas Ledger" },
+  { to: "/sanctum/invocation", label: "Sanctum",  sigil: "☉", hint: "Invoke a Soul · 5/5" },
 ];
 
 export function KingdomTabs() {
