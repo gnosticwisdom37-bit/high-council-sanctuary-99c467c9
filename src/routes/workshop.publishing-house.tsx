@@ -609,3 +609,143 @@ function StatusChip({ status }: { status: Upload["status"] }) {
     </span>
   );
 }
+
+function TrinityColumn({
+  busy,
+  note,
+  onPublish,
+  onInitiate,
+  onScrap,
+}: {
+  busy: null | "publish" | "initiate" | "scrap";
+  note: string | null;
+  onPublish: () => void;
+  onInitiate: () => void;
+  onScrap: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-6 py-2 lg:w-32">
+      <p
+        className="text-[10px] uppercase tracking-[0.3em]"
+        style={{ color: "var(--dawn-gold-bright)", fontFamily: "Cinzel, serif" }}
+      >
+        Trinity
+      </p>
+
+      {/* Publish — Red Wax Seal with embossed gold V */}
+      <button
+        type="button"
+        onClick={onPublish}
+        disabled={busy !== null}
+        aria-label="Publish"
+        className="group relative h-24 w-24 rounded-full transition-transform hover:scale-105 active:scale-95 disabled:opacity-60"
+        style={{
+          background:
+            "radial-gradient(circle at 32% 30%, #c0392b 0%, #8b1a1a 55%, #4a0f0f 100%)",
+          boxShadow:
+            "inset -6px -8px 14px rgba(0,0,0,0.55), inset 6px 6px 10px rgba(255,180,160,0.25), 0 8px 18px rgba(0,0,0,0.45)",
+          border: "1px solid rgba(0,0,0,0.5)",
+        }}
+      >
+        <span
+          className="absolute inset-0 flex items-center justify-center text-3xl"
+          style={{
+            fontFamily: "Cinzel, serif",
+            color: "#f4d27a",
+            textShadow:
+              "0 1px 0 rgba(0,0,0,0.6), 0 0 8px rgba(244,210,122,0.55), 0 -1px 0 rgba(255,235,180,0.6)",
+            letterSpacing: "0.02em",
+          }}
+        >
+          V
+        </span>
+        {busy === "publish" && (
+          <Loader2 className="absolute -bottom-1 -right-1 h-4 w-4 animate-spin text-amber-200" />
+        )}
+      </button>
+      <span
+        className="-mt-3 text-[10px] uppercase tracking-[0.3em]"
+        style={{ color: "var(--dawn-parchment)", fontFamily: "Cinzel, serif" }}
+      >
+        Publish
+      </span>
+
+      {/* Initiate — Golden Glow Ball */}
+      <button
+        type="button"
+        onClick={onInitiate}
+        disabled={busy !== null}
+        aria-label="Initiate"
+        className="group relative h-24 w-24 rounded-full transition-transform hover:scale-105 active:scale-95 disabled:opacity-60"
+        style={{
+          background:
+            "radial-gradient(circle at 32% 30%, #fff6c2 0%, #f5c542 45%, #b8801a 100%)",
+          boxShadow:
+            "0 0 24px 4px rgba(245,197,66,0.55), 0 0 60px 12px rgba(245,197,66,0.25), inset -4px -6px 12px rgba(120,70,0,0.45), inset 4px 4px 10px rgba(255,255,210,0.6)",
+          border: "1px solid rgba(120,70,0,0.4)",
+        }}
+      >
+        <span
+          className="absolute inset-0 flex items-center justify-center"
+          style={{ color: "#fffbe6" }}
+        >
+          <Sparkles className="h-7 w-7 drop-shadow" />
+        </span>
+        {busy === "initiate" && (
+          <Loader2 className="absolute -bottom-1 -right-1 h-4 w-4 animate-spin text-amber-100" />
+        )}
+      </button>
+      <span
+        className="-mt-3 text-[10px] uppercase tracking-[0.3em]"
+        style={{ color: "var(--dawn-parchment)", fontFamily: "Cinzel, serif" }}
+      >
+        Initiate
+      </span>
+
+      {/* Scrap — Charred Charcoal */}
+      <button
+        type="button"
+        onClick={onScrap}
+        disabled={busy !== null}
+        aria-label="Scrap"
+        className="group relative h-24 w-24 rounded-full transition-transform hover:scale-105 active:scale-95 disabled:opacity-60"
+        style={{
+          background:
+            "radial-gradient(circle at 35% 30%, #4a4a4a 0%, #1c1c1c 55%, #050505 100%)",
+          boxShadow:
+            "inset -5px -7px 14px rgba(0,0,0,0.85), inset 4px 4px 10px rgba(120,80,40,0.25), 0 0 18px rgba(180,80,30,0.25), 0 8px 18px rgba(0,0,0,0.55)",
+          border: "1px solid rgba(0,0,0,0.7)",
+        }}
+      >
+        <span
+          className="absolute inset-0 flex items-center justify-center"
+          style={{
+            color: "#d6c2a8",
+            opacity: 0.85,
+            textShadow: "0 0 8px rgba(255,120,40,0.45)",
+          }}
+        >
+          <Trash2 className="h-6 w-6" />
+        </span>
+        {busy === "scrap" && (
+          <Loader2 className="absolute -bottom-1 -right-1 h-4 w-4 animate-spin text-stone-300" />
+        )}
+      </button>
+      <span
+        className="-mt-3 text-[10px] uppercase tracking-[0.3em]"
+        style={{ color: "var(--dawn-parchment)", fontFamily: "Cinzel, serif" }}
+      >
+        Scrap
+      </span>
+
+      {note && (
+        <p
+          className="mt-2 max-w-[10rem] text-center text-[10px] italic"
+          style={{ color: "var(--dawn-parchment)" }}
+        >
+          {note}
+        </p>
+      )}
+    </div>
+  );
+}
