@@ -256,7 +256,7 @@ function PublishingHousePage() {
           </p>
         )}
 
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_auto_1fr] lg:items-stretch">
           {/* Intake Drawer */}
           <Pane title="Intake Drawer" subtitle="Offer CSVs to the Scribe">
             <div
