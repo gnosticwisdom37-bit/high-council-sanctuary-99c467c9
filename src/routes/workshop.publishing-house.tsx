@@ -54,7 +54,18 @@ function PublishingHousePage() {
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<Date | undefined>(new Date());
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const scheduledDays = useMemo(
+    () => uploads.map((u) => new Date(u.uploadedAt)),
+    [uploads],
+  );
+  const dayUploads = useMemo(() => {
+    if (!selectedDay) return [] as Upload[];
+    const key = selectedDay.toDateString();
+    return uploads.filter((u) => new Date(u.uploadedAt).toDateString() === key);
+  }, [uploads, selectedDay]);
 
   const handleFiles = useCallback(async (files: FileList | File[]) => {
     const list = Array.from(files).filter((f) => f.name.toLowerCase().endsWith(".csv"));
