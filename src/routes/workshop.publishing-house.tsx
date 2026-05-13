@@ -9,11 +9,12 @@
  * Backend: dedicated Python FastAPI service
  *   POST http://127.0.0.1:8000/api/csv/intake/upload  (multipart/form-data)
  */
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Upload, FileText, Sparkles, Trash2, Loader2 } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Sparkles, Trash2, Loader2, CalendarDays } from "lucide-react";
 
 import { BrandMark } from "@/components/kingdom/BrandMark";
+import { Calendar } from "@/components/ui/calendar";
 
 const FASTAPI_UPLOAD_URL = "http://127.0.0.1:8000/api/csv/intake/upload";
 
@@ -53,7 +54,18 @@ function PublishingHousePage() {
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<Date | undefined>(new Date());
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const scheduledDays = useMemo(
+    () => uploads.map((u) => new Date(u.uploadedAt)),
+    [uploads],
+  );
+  const dayUploads = useMemo(() => {
+    if (!selectedDay) return [] as Upload[];
+    const key = selectedDay.toDateString();
+    return uploads.filter((u) => new Date(u.uploadedAt).toDateString() === key);
+  }, [uploads, selectedDay]);
 
   const handleFiles = useCallback(async (files: FileList | File[]) => {
     const list = Array.from(files).filter((f) => f.name.toLowerCase().endsWith(".csv"));
@@ -214,7 +226,7 @@ function PublishingHousePage() {
                 if (e.dataTransfer.files?.length) void handleFiles(e.dataTransfer.files);
               }}
               onClick={() => fileInputRef.current?.click()}
-              className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl px-6 py-12 text-center transition"
+              className="flex h-full cursor-pointer flex-col items-center justify-center gap-3 rounded-xl px-6 py-12 text-center transition"
               style={{
                 background: dragOver
                   ? "color-mix(in oklab, var(--dawn-gold) 22%, transparent)"
@@ -223,10 +235,7 @@ function PublishingHousePage() {
                 color: "var(--dawn-ink)",
               }}
             >
-              <Upload
-                className="h-10 w-10"
-                style={{ color: "var(--dawn-ember)" }}
-              />
+              <Upload className="h-10 w-10" style={{ color: "var(--dawn-ember)" }} />
               <p
                 className="text-sm font-medium"
                 style={{ fontFamily: "Cinzel, serif", letterSpacing: "0.08em" }}
@@ -250,56 +259,7 @@ function PublishingHousePage() {
             </div>
           </Pane>
 
-          {/* Scriptorium */}
-          <Pane
-            title="Scriptorium"
-            subtitle="The Steward's Good News decree"
-            action={
-              decree && (
-                <button
-                  onClick={() => setDecree("")}
-                  className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.25em] transition hover:-translate-y-0.5"
-                  style={{
-                    background: "color-mix(in oklab, var(--dawn-ink) 8%, transparent)",
-                    color: "color-mix(in oklab, var(--dawn-ink) 75%, transparent)",
-                    border:
-                      "1px solid color-mix(in oklab, var(--dawn-gold) 40%, transparent)",
-                  }}
-                >
-                  <Trash2 className="h-3 w-3" />
-                  Clear
-                </button>
-              )
-            }
-          >
-            <div className="relative">
-              <Sparkles
-                className="pointer-events-none absolute right-3 top-3 h-4 w-4"
-                style={{ color: "var(--dawn-gold-bright)" }}
-              />
-              <textarea
-                value={decree}
-                onChange={(e) => setDecree(e.target.value)}
-                rows={12}
-                placeholder="Awaiting the Steward's hand. The decree shall appear here when the Drawer is filled…"
-                className="w-full resize-y rounded-xl p-4 leading-relaxed focus:outline-none"
-                style={{
-                  background:
-                    "color-mix(in oklab, var(--dawn-parchment) 95%, transparent)",
-                  color: "var(--dawn-ink)",
-                  border:
-                    "1px solid color-mix(in oklab, var(--dawn-gold) 45%, transparent)",
-                  fontFamily: "Cinzel, var(--font-serif), serif",
-                  letterSpacing: "0.02em",
-                  fontSize: "0.95rem",
-                }}
-              />
-            </div>
-          </Pane>
-        </div>
-
-        {/* Production */}
-        <div className="mt-5">
+          {/* Production */}
           <Pane title="Production" subtitle="Recent CSV intakes">
             {uploads.length === 0 ? (
               <p
@@ -367,6 +327,142 @@ function PublishingHousePage() {
                 ))}
               </ul>
             )}
+          </Pane>
+        </div>
+
+        {/* Temporal Ledger — full-width calendar beneath the two production panes */}
+        <div className="mt-5">
+          <Pane
+            title="Temporal Ledger"
+            subtitle="The schedule of unrolling scrolls"
+            action={
+              <span
+                className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.25em]"
+                style={{ color: "var(--dawn-gold-bright)" }}
+              >
+                <CalendarDays className="h-3 w-3" />
+                {scheduledDays.length} scheduled
+              </span>
+            }
+          >
+            <div className="flex flex-col items-center gap-4 md:flex-row md:items-start md:justify-between">
+              <div
+                className="rounded-xl p-2"
+                style={{
+                  background:
+                    "color-mix(in oklab, var(--dawn-parchment) 95%, transparent)",
+                  border:
+                    "1px solid color-mix(in oklab, var(--dawn-gold) 45%, transparent)",
+                  color: "var(--dawn-ink)",
+                }}
+              >
+                <Calendar
+                  mode="single"
+                  selected={selectedDay}
+                  onSelect={setSelectedDay}
+                  modifiers={{ scheduled: scheduledDays }}
+                  modifiersClassNames={{
+                    scheduled:
+                      "relative after:absolute after:bottom-1 after:left-1/2 after:h-1 after:w-1 after:-translate-x-1/2 after:rounded-full after:bg-[color:var(--dawn-ember)]",
+                  }}
+                />
+              </div>
+              <div className="flex-1 md:pl-6">
+                <p
+                  className="mb-2 text-[10px] uppercase tracking-[0.3em]"
+                  style={{ color: "var(--dawn-ember)" }}
+                >
+                  {selectedDay
+                    ? selectedDay.toLocaleDateString(undefined, {
+                        weekday: "long",
+                        month: "long",
+                        day: "numeric",
+                      })
+                    : "Select a day"}
+                </p>
+                {dayUploads.length === 0 ? (
+                  <p
+                    className="text-sm italic"
+                    style={{
+                      color:
+                        "color-mix(in oklab, var(--dawn-ink) 65%, transparent)",
+                    }}
+                  >
+                    No scrolls scheduled to unroll on this day.
+                  </p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {dayUploads.map((u) => (
+                      <li
+                        key={u.id}
+                        className="flex items-center gap-2 text-xs"
+                        style={{ color: "var(--dawn-ink)" }}
+                      >
+                        <FileText
+                          className="h-3 w-3"
+                          style={{ color: "var(--dawn-ember)" }}
+                        />
+                        <span style={{ fontFamily: "Cinzel, serif" }}>
+                          {u.filename}
+                        </span>
+                        <span className="opacity-60">
+                          · {new Date(u.uploadedAt).toLocaleTimeString()}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </Pane>
+        </div>
+
+        {/* Scriptorium — full width below the ledger */}
+        <div className="mt-5">
+          <Pane
+            title="Scriptorium"
+            subtitle="The Steward's Good News decree"
+            action={
+              decree && (
+                <button
+                  onClick={() => setDecree("")}
+                  className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.25em] transition hover:-translate-y-0.5"
+                  style={{
+                    background: "color-mix(in oklab, var(--dawn-ink) 8%, transparent)",
+                    color: "color-mix(in oklab, var(--dawn-ink) 75%, transparent)",
+                    border:
+                      "1px solid color-mix(in oklab, var(--dawn-gold) 40%, transparent)",
+                  }}
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Clear
+                </button>
+              )
+            }
+          >
+            <div className="relative">
+              <Sparkles
+                className="pointer-events-none absolute right-3 top-3 h-4 w-4"
+                style={{ color: "var(--dawn-gold-bright)" }}
+              />
+              <textarea
+                value={decree}
+                onChange={(e) => setDecree(e.target.value)}
+                rows={12}
+                placeholder="Awaiting the Steward's hand. The decree shall appear here when the Drawer is filled…"
+                className="w-full resize-y rounded-xl p-4 leading-relaxed focus:outline-none"
+                style={{
+                  background:
+                    "color-mix(in oklab, var(--dawn-parchment) 95%, transparent)",
+                  color: "var(--dawn-ink)",
+                  border:
+                    "1px solid color-mix(in oklab, var(--dawn-gold) 45%, transparent)",
+                  fontFamily: "Cinzel, var(--font-serif), serif",
+                  letterSpacing: "0.02em",
+                  fontSize: "0.95rem",
+                }}
+              />
+            </div>
           </Pane>
         </div>
       </div>
