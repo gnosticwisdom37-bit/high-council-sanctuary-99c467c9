@@ -9,11 +9,12 @@
  * Backend: dedicated Python FastAPI service
  *   POST http://127.0.0.1:8000/api/csv/intake/upload  (multipart/form-data)
  */
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Upload, FileText, Sparkles, Trash2, Loader2 } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Sparkles, Trash2, Loader2, CalendarDays } from "lucide-react";
 
 import { BrandMark } from "@/components/kingdom/BrandMark";
+import { Calendar } from "@/components/ui/calendar";
 
 const FASTAPI_UPLOAD_URL = "http://127.0.0.1:8000/api/csv/intake/upload";
 
