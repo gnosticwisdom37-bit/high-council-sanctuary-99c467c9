@@ -9,14 +9,18 @@
  * Backend: dedicated Python FastAPI service
  *   POST http://127.0.0.1:8000/api/csv/intake/upload  (multipart/form-data)
  */
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Upload, FileText, Sparkles, Trash2, Loader2, CalendarDays } from "lucide-react";
 
 import { BrandMark } from "@/components/kingdom/BrandMark";
 import { Calendar } from "@/components/ui/calendar";
 
-const FASTAPI_UPLOAD_URL = "http://127.0.0.1:8000/api/csv/intake/upload";
+const FASTAPI_BASE = "http://127.0.0.1:8000";
+const FASTAPI_UPLOAD_URL = `${FASTAPI_BASE}/api/csv/intake/upload`;
+const FASTAPI_PUBLISH_URL = `${FASTAPI_BASE}/api/ai/publish`;
+const FASTAPI_INITIATE_URL = `${FASTAPI_BASE}/api/ai/initiate`;
+const FASTAPI_SCRAP_URL = `${FASTAPI_BASE}/api/ai/scrap`;
 
 export const Route = createFileRoute("/workshop/publishing-house")({
   head: () => ({
@@ -54,7 +58,48 @@ function PublishingHousePage() {
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedDay, setSelectedDay] = useState<Date | undefined>(new Date());
+  const [selectedDay, setSelectedDay] = useState<Date | undefined>(undefined);
+  useEffect(() => { setSelectedDay(new Date()); }, []);
+  const [trinityBusy, setTrinityBusy] = useState<null | "publish" | "initiate" | "scrap">(null);
+  const [trinityNote, setTrinityNote] = useState<string | null>(null);
+
+  const callTrinity = useCallback(
+    async (kind: "publish" | "initiate" | "scrap", url: string) => {
+      setTrinityBusy(kind);
+      setTrinityNote(null);
+      try {
+        const latest = uploads[0];
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            upload_id: latest?.id ?? null,
+            filename: latest?.filename ?? null,
+            decree,
+          }),
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(`Backend ${res.status}: ${text || res.statusText}`);
+        }
+        const data = await res.json().catch(() => ({}) as Record<string, unknown>);
+        const text =
+          typeof data.decree === "string"
+            ? data.decree
+            : typeof data.message === "string"
+              ? data.message
+              : null;
+        if (text) setDecree((d) => (d ? `${d}\n\n— — —\n\n${text}` : text));
+        setTrinityNote(`✦ ${kind} accepted by the engine.`);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setTrinityNote(`⚠ ${kind} failed — ${msg}`);
+      } finally {
+        setTrinityBusy(null);
+      }
+    },
+    [uploads, decree],
+  );
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const scheduledDays = useMemo(
@@ -211,7 +256,7 @@ function PublishingHousePage() {
           </p>
         )}
 
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_auto_1fr] lg:items-stretch">
           {/* Intake Drawer */}
           <Pane title="Intake Drawer" subtitle="Offer CSVs to the Scribe">
             <div
@@ -258,6 +303,15 @@ function PublishingHousePage() {
               />
             </div>
           </Pane>
+
+          {/* Trinity of Majestic Triggers */}
+          <TrinityColumn
+            busy={trinityBusy}
+            note={trinityNote}
+            onPublish={() => callTrinity("publish", FASTAPI_PUBLISH_URL)}
+            onInitiate={() => callTrinity("initiate", FASTAPI_INITIATE_URL)}
+            onScrap={() => callTrinity("scrap", FASTAPI_SCRAP_URL)}
+          />
 
           {/* Production */}
           <Pane title="Production" subtitle="Recent CSV intakes">
@@ -553,5 +607,145 @@ function StatusChip({ status }: { status: Upload["status"] }) {
     >
       {styles.label}
     </span>
+  );
+}
+
+function TrinityColumn({
+  busy,
+  note,
+  onPublish,
+  onInitiate,
+  onScrap,
+}: {
+  busy: null | "publish" | "initiate" | "scrap";
+  note: string | null;
+  onPublish: () => void;
+  onInitiate: () => void;
+  onScrap: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-6 py-2 lg:w-32">
+      <p
+        className="text-[10px] uppercase tracking-[0.3em]"
+        style={{ color: "var(--dawn-gold-bright)", fontFamily: "Cinzel, serif" }}
+      >
+        Trinity
+      </p>
+
+      {/* Publish — Red Wax Seal with embossed gold V */}
+      <button
+        type="button"
+        onClick={onPublish}
+        disabled={busy !== null}
+        aria-label="Publish"
+        className="group relative h-24 w-24 rounded-full transition-transform hover:scale-105 active:scale-95 disabled:opacity-60"
+        style={{
+          background:
+            "radial-gradient(circle at 32% 30%, #c0392b 0%, #8b1a1a 55%, #4a0f0f 100%)",
+          boxShadow:
+            "inset -6px -8px 14px rgba(0,0,0,0.55), inset 6px 6px 10px rgba(255,180,160,0.25), 0 8px 18px rgba(0,0,0,0.45)",
+          border: "1px solid rgba(0,0,0,0.5)",
+        }}
+      >
+        <span
+          className="absolute inset-0 flex items-center justify-center text-3xl"
+          style={{
+            fontFamily: "Cinzel, serif",
+            color: "#f4d27a",
+            textShadow:
+              "0 1px 0 rgba(0,0,0,0.6), 0 0 8px rgba(244,210,122,0.55), 0 -1px 0 rgba(255,235,180,0.6)",
+            letterSpacing: "0.02em",
+          }}
+        >
+          V
+        </span>
+        {busy === "publish" && (
+          <Loader2 className="absolute -bottom-1 -right-1 h-4 w-4 animate-spin text-amber-200" />
+        )}
+      </button>
+      <span
+        className="-mt-3 text-[10px] uppercase tracking-[0.3em]"
+        style={{ color: "var(--dawn-parchment)", fontFamily: "Cinzel, serif" }}
+      >
+        Publish
+      </span>
+
+      {/* Initiate — Golden Glow Ball */}
+      <button
+        type="button"
+        onClick={onInitiate}
+        disabled={busy !== null}
+        aria-label="Initiate"
+        className="group relative h-24 w-24 rounded-full transition-transform hover:scale-105 active:scale-95 disabled:opacity-60"
+        style={{
+          background:
+            "radial-gradient(circle at 32% 30%, #fff6c2 0%, #f5c542 45%, #b8801a 100%)",
+          boxShadow:
+            "0 0 24px 4px rgba(245,197,66,0.55), 0 0 60px 12px rgba(245,197,66,0.25), inset -4px -6px 12px rgba(120,70,0,0.45), inset 4px 4px 10px rgba(255,255,210,0.6)",
+          border: "1px solid rgba(120,70,0,0.4)",
+        }}
+      >
+        <span
+          className="absolute inset-0 flex items-center justify-center"
+          style={{ color: "#fffbe6" }}
+        >
+          <Sparkles className="h-7 w-7 drop-shadow" />
+        </span>
+        {busy === "initiate" && (
+          <Loader2 className="absolute -bottom-1 -right-1 h-4 w-4 animate-spin text-amber-100" />
+        )}
+      </button>
+      <span
+        className="-mt-3 text-[10px] uppercase tracking-[0.3em]"
+        style={{ color: "var(--dawn-parchment)", fontFamily: "Cinzel, serif" }}
+      >
+        Initiate
+      </span>
+
+      {/* Scrap — Charred Charcoal */}
+      <button
+        type="button"
+        onClick={onScrap}
+        disabled={busy !== null}
+        aria-label="Scrap"
+        className="group relative h-24 w-24 rounded-full transition-transform hover:scale-105 active:scale-95 disabled:opacity-60"
+        style={{
+          background:
+            "radial-gradient(circle at 35% 30%, #4a4a4a 0%, #1c1c1c 55%, #050505 100%)",
+          boxShadow:
+            "inset -5px -7px 14px rgba(0,0,0,0.85), inset 4px 4px 10px rgba(120,80,40,0.25), 0 0 18px rgba(180,80,30,0.25), 0 8px 18px rgba(0,0,0,0.55)",
+          border: "1px solid rgba(0,0,0,0.7)",
+        }}
+      >
+        <span
+          className="absolute inset-0 flex items-center justify-center"
+          style={{
+            color: "#d6c2a8",
+            opacity: 0.85,
+            textShadow: "0 0 8px rgba(255,120,40,0.45)",
+          }}
+        >
+          <Trash2 className="h-6 w-6" />
+        </span>
+        {busy === "scrap" && (
+          <Loader2 className="absolute -bottom-1 -right-1 h-4 w-4 animate-spin text-stone-300" />
+        )}
+      </button>
+      <span
+        className="-mt-3 text-[10px] uppercase tracking-[0.3em]"
+        style={{ color: "var(--dawn-parchment)", fontFamily: "Cinzel, serif" }}
+      >
+        Scrap
+      </span>
+
+      {note && (
+        <p
+          className="mt-2 max-w-[10rem] text-center text-[10px] italic"
+          style={{ color: "var(--dawn-parchment)" }}
+        >
+          {note}
+        </p>
+      )}
+    </div>
   );
 }
