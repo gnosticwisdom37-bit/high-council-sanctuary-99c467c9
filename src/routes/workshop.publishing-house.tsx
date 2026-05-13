@@ -304,6 +304,15 @@ function PublishingHousePage() {
             </div>
           </Pane>
 
+          {/* Trinity of Majestic Triggers */}
+          <TrinityColumn
+            busy={trinityBusy}
+            note={trinityNote}
+            onPublish={() => callTrinity("publish", FASTAPI_PUBLISH_URL)}
+            onInitiate={() => callTrinity("initiate", FASTAPI_INITIATE_URL)}
+            onScrap={() => callTrinity("scrap", FASTAPI_SCRAP_URL)}
+          />
+
           {/* Production */}
           <Pane title="Production" subtitle="Recent CSV intakes">
             {uploads.length === 0 ? (
