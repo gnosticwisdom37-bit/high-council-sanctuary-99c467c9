@@ -58,7 +58,48 @@ function PublishingHousePage() {
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedDay, setSelectedDay] = useState<Date | undefined>(new Date());
+  const [selectedDay, setSelectedDay] = useState<Date | undefined>(undefined);
+  useEffect(() => { setSelectedDay(new Date()); }, []);
+  const [trinityBusy, setTrinityBusy] = useState<null | "publish" | "initiate" | "scrap">(null);
+  const [trinityNote, setTrinityNote] = useState<string | null>(null);
+
+  const callTrinity = useCallback(
+    async (kind: "publish" | "initiate" | "scrap", url: string) => {
+      setTrinityBusy(kind);
+      setTrinityNote(null);
+      try {
+        const latest = uploads[0];
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            upload_id: latest?.id ?? null,
+            filename: latest?.filename ?? null,
+            decree,
+          }),
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(`Backend ${res.status}: ${text || res.statusText}`);
+        }
+        const data = await res.json().catch(() => ({}) as Record<string, unknown>);
+        const text =
+          typeof data.decree === "string"
+            ? data.decree
+            : typeof data.message === "string"
+              ? data.message
+              : null;
+        if (text) setDecree((d) => (d ? `${d}\n\n— — —\n\n${text}` : text));
+        setTrinityNote(`✦ ${kind} accepted by the engine.`);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setTrinityNote(`⚠ ${kind} failed — ${msg}`);
+      } finally {
+        setTrinityBusy(null);
+      }
+    },
+    [uploads, decree],
+  );
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const scheduledDays = useMemo(
