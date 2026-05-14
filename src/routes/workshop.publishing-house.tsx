@@ -11,10 +11,14 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Upload, FileText, Sparkles, Trash2, Loader2, CalendarDays } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Sparkles, Trash2, Loader2, CalendarDays, UserPlus } from "lucide-react";
 
 import { BrandMark } from "@/components/kingdom/BrandMark";
 import { Calendar } from "@/components/ui/calendar";
+import { InviteWheel } from "@/components/workshop/InviteWheel";
+import { ALL_COUNCIL } from "@/lib/council-catalog";
+
+const INVITED_KEY = "workshop:publishing-house:invited";
 
 const FASTAPI_BASE = "http://127.0.0.1:8000";
 const FASTAPI_UPLOAD_URL = `${FASTAPI_BASE}/api/csv/intake/upload`;
