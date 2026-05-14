@@ -66,6 +66,32 @@ function PublishingHousePage() {
   useEffect(() => { setSelectedDay(new Date()); }, []);
   const [trinityBusy, setTrinityBusy] = useState<null | "publish" | "initiate" | "scrap">(null);
   const [trinityNote, setTrinityNote] = useState<string | null>(null);
+  const [wheelOpen, setWheelOpen] = useState(false);
+  const [invitedIds, setInvitedIds] = useState<string[]>([]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(INVITED_KEY);
+      if (raw) setInvitedIds(JSON.parse(raw) as string[]);
+    } catch { /* noop */ }
+  }, []);
+  const persistInvited = useCallback((next: string[]) => {
+    setInvitedIds(next);
+    try { window.localStorage.setItem(INVITED_KEY, JSON.stringify(next)); } catch { /* noop */ }
+  }, []);
+  const toggleInvite = useCallback((soulId: string) => {
+    persistInvited(
+      invitedIds.includes(soulId)
+        ? invitedIds.filter((id) => id !== soulId)
+        : [...invitedIds, soulId],
+    );
+  }, [invitedIds, persistInvited]);
+  const invitedMembers = useMemo(
+    () => invitedIds
+      .map((id) => ALL_COUNCIL.find((s) => s.soul_id === id))
+      .filter((s): s is (typeof ALL_COUNCIL)[number] => Boolean(s)),
+    [invitedIds],
+  );
 
   const callTrinity = useCallback(
     async (kind: "publish" | "initiate" | "scrap", url: string) => {
