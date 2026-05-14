@@ -11,10 +11,14 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Upload, FileText, Sparkles, Trash2, Loader2, CalendarDays } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Sparkles, Trash2, Loader2, CalendarDays, UserPlus } from "lucide-react";
 
 import { BrandMark } from "@/components/kingdom/BrandMark";
 import { Calendar } from "@/components/ui/calendar";
+import { InviteWheel } from "@/components/workshop/InviteWheel";
+import { ALL_COUNCIL } from "@/lib/council-catalog";
+
+const INVITED_KEY = "workshop:publishing-house:invited";
 
 const FASTAPI_BASE = "http://127.0.0.1:8000";
 const FASTAPI_UPLOAD_URL = `${FASTAPI_BASE}/api/csv/intake/upload`;
@@ -62,6 +66,32 @@ function PublishingHousePage() {
   useEffect(() => { setSelectedDay(new Date()); }, []);
   const [trinityBusy, setTrinityBusy] = useState<null | "publish" | "initiate" | "scrap">(null);
   const [trinityNote, setTrinityNote] = useState<string | null>(null);
+  const [wheelOpen, setWheelOpen] = useState(false);
+  const [invitedIds, setInvitedIds] = useState<string[]>([]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(INVITED_KEY);
+      if (raw) setInvitedIds(JSON.parse(raw) as string[]);
+    } catch { /* noop */ }
+  }, []);
+  const persistInvited = useCallback((next: string[]) => {
+    setInvitedIds(next);
+    try { window.localStorage.setItem(INVITED_KEY, JSON.stringify(next)); } catch { /* noop */ }
+  }, []);
+  const toggleInvite = useCallback((soulId: string) => {
+    persistInvited(
+      invitedIds.includes(soulId)
+        ? invitedIds.filter((id) => id !== soulId)
+        : [...invitedIds, soulId],
+    );
+  }, [invitedIds, persistInvited]);
+  const invitedMembers = useMemo(
+    () => invitedIds
+      .map((id) => ALL_COUNCIL.find((s) => s.soul_id === id))
+      .filter((s): s is (typeof ALL_COUNCIL)[number] => Boolean(s)),
+    [invitedIds],
+  );
 
   const callTrinity = useCallback(
     async (kind: "publish" | "initiate" | "scrap", url: string) => {
@@ -254,6 +284,62 @@ function PublishingHousePage() {
           >
             ⚠ {error}
           </p>
+        )}
+
+        {/* Invite — opens the wheel; second click on a Seat calls them in */}
+        <div className="mb-5 flex flex-col items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setWheelOpen(true)}
+            className="inline-flex items-center gap-2 rounded-full px-6 py-2 text-xs uppercase tracking-[0.3em] transition-transform hover:scale-105"
+            style={{
+              fontFamily: "Cinzel, serif",
+              background:
+                "radial-gradient(circle at 30% 25%, color-mix(in oklab, white 60%, var(--dawn-gold-bright)) 0%, var(--dawn-gold-bright) 40%, var(--dawn-gold) 80%, var(--dawn-ember) 100%)",
+              color: "var(--dawn-ink)",
+              boxShadow:
+                "0 0 22px color-mix(in oklab, var(--dawn-gold-bright) 80%, transparent), 0 0 50px color-mix(in oklab, var(--dawn-gold) 40%, transparent)",
+              border: "1px solid color-mix(in oklab, var(--dawn-gold-bright) 80%, transparent)",
+            }}
+          >
+            <UserPlus className="h-3.5 w-3.5" />
+            Invite to the Workshop
+          </button>
+
+          {invitedMembers.length === 0 ? (
+            <p className="text-[10px] uppercase tracking-[0.3em]" style={{ color: "color-mix(in oklab, var(--dawn-parchment) 75%, transparent)" }}>
+              No Councillor yet attends · Tap Invite
+            </p>
+          ) : (
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {invitedMembers.map((m) => (
+                <button
+                  key={m.soul_id}
+                  type="button"
+                  onClick={() => toggleInvite(m.soul_id)}
+                  title={`Dismiss ${m.title}`}
+                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.2em] transition-all hover:-translate-y-0.5"
+                  style={{
+                    background: "var(--gradient-dawn)",
+                    color: "var(--dawn-parchment)",
+                    border: "1px solid color-mix(in oklab, var(--dawn-gold) 80%, transparent)",
+                    boxShadow: "var(--shadow-sigil)",
+                  }}
+                >
+                  <span aria-hidden>{m.sigil}</span>
+                  {m.house.replace(/^House of /, "")}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {wheelOpen && (
+          <InviteWheel
+            invitedIds={invitedIds}
+            onToggle={toggleInvite}
+            onClose={() => setWheelOpen(false)}
+          />
         )}
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_auto_1fr] lg:items-stretch">
