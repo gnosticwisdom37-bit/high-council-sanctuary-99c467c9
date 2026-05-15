@@ -371,33 +371,6 @@ function SanctumInvocationPage() {
               </Field>
             </div>
 
-            <Field label="Chamber Kind">
-              <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-                {(["chat", "chamber", "building", "workshop"] as ChamberKind[]).map((k) => {
-                  const active = chamberKind === k;
-                  return (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => setChamberKind(k)}
-                      className="rounded-full px-3 py-2 text-[10px] uppercase tracking-[0.25em] transition-all hover:-translate-y-0.5"
-                      style={{
-                        fontFamily: "Cinzel, serif",
-                        background: active
-                          ? "var(--gradient-dawn)"
-                          : "color-mix(in oklab, var(--dawn-parchment) 18%, transparent)",
-                        color: active ? "var(--dawn-parchment)" : "color-mix(in oklab, var(--dawn-parchment) 85%, transparent)",
-                        border: `1px solid color-mix(in oklab, var(--dawn-gold) ${active ? 80 : 40}%, transparent)`,
-                        boxShadow: active ? "var(--shadow-sigil)" : "none",
-                      }}
-                    >
-                      {k}
-                    </button>
-                  );
-                })}
-              </div>
-            </Field>
-
             <div
               className="mt-4 rounded-xl p-4 text-sm"
               style={{
@@ -407,7 +380,7 @@ function SanctumInvocationPage() {
             >
               <p className="text-[10px] uppercase tracking-[0.25em] opacity-70">Inscription</p>
               <p className="mt-1 font-serif" style={{ fontFamily: "Cinzel, serif" }}>
-                {fullName || "—"} · {role || "Role pending"} · Region ({regionX},{regionY}) Tile ({tileX},{tileY}) · {chamberKind}
+                {fullName || "—"} · {role || "Role pending"} · Region ({regionX},{regionY}) Tile ({tileX},{tileY})
               </p>
             </div>
 
