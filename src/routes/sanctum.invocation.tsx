@@ -141,12 +141,8 @@ function SanctumInvocationPage() {
     };
     const next = [entry, ...loadRegistry()];
     saveRegistry(next);
-    // The screen opens to the newly created chat / chamber / workshop.
-    if (chamberKind === "workshop") {
-      void navigate({ to: "/workshop/publishing-house" });
-    } else {
-      void navigate({ to: "/chamber/$soulId", params: { soulId: soul_id } });
-    }
+    // Every invocation opens the basic Sanctum Chamber, named per entry.
+    void navigate({ to: "/sanctum/chamber/$soulId", params: { soulId: soul_id } });
   }
 
   return (
