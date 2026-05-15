@@ -17,6 +17,7 @@ import { Route as SanctumInvocationRouteImport } from './routes/sanctum.invocati
 import { Route as PledgeSoulIdRouteImport } from './routes/pledge.$soulId'
 import { Route as ChamberHighCouncilRouteImport } from './routes/chamber.high-council'
 import { Route as ChamberSoulIdRouteImport } from './routes/chamber.$soulId'
+import { Route as SanctumChamberSoulIdRouteImport } from './routes/sanctum.chamber.$soulId'
 
 const RealmRoute = RealmRouteImport.update({
   id: '/realm',
@@ -58,6 +59,11 @@ const ChamberSoulIdRoute = ChamberSoulIdRouteImport.update({
   path: '/chamber/$soulId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SanctumChamberSoulIdRoute = SanctumChamberSoulIdRouteImport.update({
+  id: '/sanctum/chamber/$soulId',
+  path: '/sanctum/chamber/$soulId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -68,6 +74,7 @@ export interface FileRoutesByFullPath {
   '/pledge/$soulId': typeof PledgeSoulIdRoute
   '/sanctum/invocation': typeof SanctumInvocationRoute
   '/workshop/publishing-house': typeof WorkshopPublishingHouseRoute
+  '/sanctum/chamber/$soulId': typeof SanctumChamberSoulIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -78,6 +85,7 @@ export interface FileRoutesByTo {
   '/pledge/$soulId': typeof PledgeSoulIdRoute
   '/sanctum/invocation': typeof SanctumInvocationRoute
   '/workshop/publishing-house': typeof WorkshopPublishingHouseRoute
+  '/sanctum/chamber/$soulId': typeof SanctumChamberSoulIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -89,6 +97,7 @@ export interface FileRoutesById {
   '/pledge/$soulId': typeof PledgeSoulIdRoute
   '/sanctum/invocation': typeof SanctumInvocationRoute
   '/workshop/publishing-house': typeof WorkshopPublishingHouseRoute
+  '/sanctum/chamber/$soulId': typeof SanctumChamberSoulIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -101,6 +110,7 @@ export interface FileRouteTypes {
     | '/pledge/$soulId'
     | '/sanctum/invocation'
     | '/workshop/publishing-house'
+    | '/sanctum/chamber/$soulId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -111,6 +121,7 @@ export interface FileRouteTypes {
     | '/pledge/$soulId'
     | '/sanctum/invocation'
     | '/workshop/publishing-house'
+    | '/sanctum/chamber/$soulId'
   id:
     | '__root__'
     | '/'
@@ -121,6 +132,7 @@ export interface FileRouteTypes {
     | '/pledge/$soulId'
     | '/sanctum/invocation'
     | '/workshop/publishing-house'
+    | '/sanctum/chamber/$soulId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -132,6 +144,7 @@ export interface RootRouteChildren {
   PledgeSoulIdRoute: typeof PledgeSoulIdRoute
   SanctumInvocationRoute: typeof SanctumInvocationRoute
   WorkshopPublishingHouseRoute: typeof WorkshopPublishingHouseRoute
+  SanctumChamberSoulIdRoute: typeof SanctumChamberSoulIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -192,6 +205,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChamberSoulIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sanctum/chamber/$soulId': {
+      id: '/sanctum/chamber/$soulId'
+      path: '/sanctum/chamber/$soulId'
+      fullPath: '/sanctum/chamber/$soulId'
+      preLoaderRoute: typeof SanctumChamberSoulIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -204,16 +224,8 @@ const rootRouteChildren: RootRouteChildren = {
   PledgeSoulIdRoute: PledgeSoulIdRoute,
   SanctumInvocationRoute: SanctumInvocationRoute,
   WorkshopPublishingHouseRoute: WorkshopPublishingHouseRoute,
+  SanctumChamberSoulIdRoute: SanctumChamberSoulIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
