@@ -312,10 +312,19 @@ function SanctumChamberPage() {
                   border: "1px solid color-mix(in oklab, var(--dawn-gold) 45%, transparent)",
                 }}
               />
-              <div className="mt-3 flex justify-end">
+              <div className="mt-3 flex items-center justify-between gap-3">
+                {error ? (
+                  <p className="text-[10px] italic" style={{ color: "var(--dawn-ember)" }}>
+                    {error}
+                  </p>
+                ) : pending ? (
+                  <p className="text-[10px] italic opacity-70">{entry.first_name} is listening…</p>
+                ) : (
+                  <span />
+                )}
                 <button
                   onClick={send}
-                  disabled={!kingMessage.trim()}
+                  disabled={!kingMessage.trim() || pending}
                   className="rounded-full px-5 py-2 text-xs uppercase tracking-[0.3em] transition-all hover:-translate-y-0.5 disabled:opacity-50"
                   style={{
                     background: "var(--gradient-dawn)",
@@ -324,7 +333,7 @@ function SanctumChamberPage() {
                     boxShadow: "var(--shadow-sigil)",
                   }}
                 >
-                  ✶ Speak
+                  {pending ? "…" : "✶ Speak"}
                 </button>
               </div>
             </div>
