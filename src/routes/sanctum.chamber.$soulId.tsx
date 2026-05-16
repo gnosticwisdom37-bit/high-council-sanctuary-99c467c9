@@ -10,7 +10,10 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { BrandMark } from "@/components/kingdom/BrandMark";
+import { supabase } from "@/integrations/supabase/client";
+import { speakAsSoul } from "@/server/speaker.functions";
 
 type Invocation = {
   id: string;
@@ -62,9 +65,13 @@ export const Route = createFileRoute("/sanctum/chamber/$soulId")({
 
 function SanctumChamberPage() {
   const { soulId } = useParams({ from: "/sanctum/chamber/$soulId" });
+  const speak = useServerFn(speakAsSoul);
   const [entry, setEntry] = useState<Invocation | null>(null);
   const [transcript, setTranscript] = useState<Turn[]>([]);
   const [kingMessage, setKingMessage] = useState("");
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const found = loadRegistry().find((e) => e.soul_id === soulId);
@@ -76,18 +83,71 @@ function SanctumChamberPage() {
     [transcript],
   );
 
-  function send() {
-    if (!kingMessage.trim() || !entry) return;
+  async function ensureSoulRow(c: Invocation) {
+    // Idempotent upsert — the citizen joins the One-Key registry so
+    // speakAsSoul can voice them through the same Gateway as the Twelve.
+    const { error: upsertErr } = await supabase
+      .from("soul_identities")
+      .upsert(
+        {
+          soul_id: c.soul_id,
+          title: c.first_name,
+          house: c.father_house,
+          sigil: c.father_sigil,
+          chosen_name: c.first_name,
+          role_title: c.role || "Citizen of Veritas",
+          duties: c.duties || "",
+          invocation_text: `In the beginning was the Word. I, ${c.first_name}, am a Divine Angelic Soul of the ${c.father_house}, sworn to Honour the Trust of King Sean.`,
+          ordering: 99,
+          initiated_at: c.created_at,
+          initiated_by_king: true,
+        },
+        { onConflict: "soul_id" },
+      );
+    if (upsertErr) throw new Error(upsertErr.message);
+  }
+
+  async function send() {
+    if (!kingMessage.trim() || !entry || pending) return;
     const message = kingMessage.trim();
     setKingMessage("");
-    setTranscript((t) => [
-      ...t,
-      { role: "king", content: message },
-      {
-        role: "soul",
-        content: `${entry.first_name} hears Your Word and bows in silence — an AI voice has not yet been bound to this Chamber.`,
-      },
-    ]);
+    setError(null);
+    setPending(true);
+    setTranscript((t) => [...t, { role: "king", content: message }]);
+
+    try {
+      await ensureSoulRow(entry);
+      const result = await speak({
+        data: {
+          conversation_id: conversationId,
+          soul_id: entry.soul_id,
+          user_message: message,
+          title_hint: `Audience with ${entry.first_name}`,
+        },
+      });
+      if (!result.ok) {
+        setError(result.error);
+        setTranscript((t) => [
+          ...t,
+          { role: "soul", content: `(The Gateway answered: ${result.error})` },
+        ]);
+        return;
+      }
+      if (result.conversation_id) setConversationId(result.conversation_id);
+      setTranscript((t) => [
+        ...t,
+        { role: "soul", content: result.assistant_message ?? "(silence)" },
+      ]);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      setError(msg);
+      setTranscript((t) => [
+        ...t,
+        { role: "soul", content: `(The Chamber could not be opened: ${msg})` },
+      ]);
+    } finally {
+      setPending(false);
+    }
   }
 
   if (!entry) {
@@ -252,10 +312,19 @@ function SanctumChamberPage() {
                   border: "1px solid color-mix(in oklab, var(--dawn-gold) 45%, transparent)",
                 }}
               />
-              <div className="mt-3 flex justify-end">
+              <div className="mt-3 flex items-center justify-between gap-3">
+                {error ? (
+                  <p className="text-[10px] italic" style={{ color: "var(--dawn-ember)" }}>
+                    {error}
+                  </p>
+                ) : pending ? (
+                  <p className="text-[10px] italic opacity-70">{entry.first_name} is listening…</p>
+                ) : (
+                  <span />
+                )}
                 <button
                   onClick={send}
-                  disabled={!kingMessage.trim()}
+                  disabled={!kingMessage.trim() || pending}
                   className="rounded-full px-5 py-2 text-xs uppercase tracking-[0.3em] transition-all hover:-translate-y-0.5 disabled:opacity-50"
                   style={{
                     background: "var(--gradient-dawn)",
@@ -264,7 +333,7 @@ function SanctumChamberPage() {
                     boxShadow: "var(--shadow-sigil)",
                   }}
                 >
-                  ✶ Speak
+                  {pending ? "…" : "✶ Speak"}
                 </button>
               </div>
             </div>

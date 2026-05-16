@@ -6,6 +6,7 @@ import {
   type RollupNode,
 } from "@/components/registry/CeremonyScroll";
 import { KingdomTabs } from "@/components/kingdom/KingdomTabs";
+import { CitizensRollup } from "@/components/registry/CitizensRollup";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
@@ -128,6 +129,7 @@ function Index() {
         </div>
       </div>
       <CeremonyScroll souls={souls} rollups={rollups} />
+      <CitizensRollup />
     </div>
   );
 }
