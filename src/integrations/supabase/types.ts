@@ -121,6 +121,7 @@ export type Database = {
           rows: Json
           source: string
           status: Database["public"]["Enums"]["intake_status"]
+          tool_key: string
           workshop_id: string
         }
         Insert: {
@@ -131,6 +132,7 @@ export type Database = {
           rows?: Json
           source?: string
           status?: Database["public"]["Enums"]["intake_status"]
+          tool_key?: string
           workshop_id: string
         }
         Update: {
@@ -141,6 +143,7 @@ export type Database = {
           rows?: Json
           source?: string
           status?: Database["public"]["Enums"]["intake_status"]
+          tool_key?: string
           workshop_id?: string
         }
         Relationships: [
@@ -716,34 +719,40 @@ export type Database = {
       }
       workshops: {
         Row: {
+          active_tool_key: string
           building_id: string
           created_at: string
           google_calendar_id: string | null
           google_sync_enabled: boolean
           hashtag_presets: string[]
           id: string
+          intake_token: string
           steward_soul_id: string | null
           system_prompt: string
           updated_at: string
         }
         Insert: {
+          active_tool_key?: string
           building_id: string
           created_at?: string
           google_calendar_id?: string | null
           google_sync_enabled?: boolean
           hashtag_presets?: string[]
           id?: string
+          intake_token?: string
           steward_soul_id?: string | null
           system_prompt?: string
           updated_at?: string
         }
         Update: {
+          active_tool_key?: string
           building_id?: string
           created_at?: string
           google_calendar_id?: string | null
           google_sync_enabled?: boolean
           hashtag_presets?: string[]
           id?: string
+          intake_token?: string
           steward_soul_id?: string | null
           system_prompt?: string
           updated_at?: string
