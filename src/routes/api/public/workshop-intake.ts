@@ -78,11 +78,11 @@ export const Route = createFileRoute("/api/public/workshop-intake")({
             workshop_id,
             tool_key,
             source,
-            rows,
+            rows: rows as unknown as never,
             row_count: rows.length,
             status: "pending",
             origin: "courier",
-          })
+          } as never)
           .select("id")
           .single();
 
