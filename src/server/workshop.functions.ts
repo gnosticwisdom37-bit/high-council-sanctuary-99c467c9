@@ -65,7 +65,7 @@ export const getWorkshop = createServerFn({ method: "POST" })
         .select("soul_id, title, house, chosen_name")
         .eq("soul_id", workshop.steward_soul_id)
         .maybeSingle();
-      if (s) steward = s as typeof steward;
+      if (s) steward = s;
     }
 
     return {
