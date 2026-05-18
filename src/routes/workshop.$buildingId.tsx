@@ -38,6 +38,7 @@ import {
   listScheduled,
   rotateWorkshopToken,
 } from "@/server/workshop.functions";
+import { listUnrecognized } from "@/server/dropzone.functions";
 
 export const Route = createFileRoute("/workshop/$buildingId")({
   head: () => ({
