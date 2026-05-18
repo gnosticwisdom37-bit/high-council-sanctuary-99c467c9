@@ -221,7 +221,7 @@ export const processDroppedFile = createServerFn({ method: "POST" })
           kind: "blog-archive",
           source_filename: filename,
           source_bytes: bytes.byteLength,
-          payload: { posts, raw_headers } as unknown as Record<string, unknown>,
+          payload: { posts, raw_headers } as never,
           summary,
         })
         .select("id")
@@ -239,7 +239,7 @@ export const processDroppedFile = createServerFn({ method: "POST" })
           url: p.url ?? undefined,
           excerpt: p.excerpt || undefined,
           tags: p.tags,
-        })) as unknown as Record<string, unknown>[],
+        })) as never,
         row_count: posts.length,
       });
 
@@ -270,7 +270,7 @@ export const processDroppedFile = createServerFn({ method: "POST" })
           kind: "legal-document",
           source_filename: filename,
           source_bytes: bytes.byteLength,
-          payload: doc as unknown as Record<string, unknown>,
+          payload: doc as never,
           summary,
         })
         .select("id")
@@ -297,7 +297,7 @@ export const processDroppedFile = createServerFn({ method: "POST" })
           extension: ext || "(none)",
           size_bytes: bytes.byteLength,
         },
-      ] as unknown as Record<string, unknown>[],
+      ] as never,
       row_count: 1,
     });
 
