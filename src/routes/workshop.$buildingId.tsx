@@ -25,6 +25,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { BrandMark } from "@/components/kingdom/BrandMark";
+import { DropZone } from "@/components/workshop/DropZone";
 import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -77,6 +78,13 @@ type IntakeRow = {
   row_count: number;
   status: string;
   created_at: string;
+};
+
+type UnrecognizedRow = {
+  id: string;
+  source: string;
+  created_at: string;
+  rows: Array<{ filename?: string; extension?: string; size_bytes?: number }>;
 };
 
 type Card = {
