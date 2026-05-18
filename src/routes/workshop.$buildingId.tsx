@@ -202,6 +202,7 @@ function WorkshopPage() {
         },
         () => {
           void refreshIntakes();
+          void refreshUnrecognized();
         },
       )
       .subscribe();
