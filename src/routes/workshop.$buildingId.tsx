@@ -124,6 +124,7 @@ function WorkshopPage() {
   const cancelPostFn = useServerFn(cancelPost);
   const listScheduledFn = useServerFn(listScheduled);
   const rotateTokenFn = useServerFn(rotateWorkshopToken);
+  const listUnrecognizedFn = useServerFn(listUnrecognized);
 
   const [workshop, setWorkshop] = useState<WorkshopRow | null>(null);
   const [steward, setSteward] = useState<StewardRow | null>(null);
@@ -139,6 +140,7 @@ function WorkshopPage() {
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
   const [activeIntake, setActiveIntake] = useState<{ id: string; rowIndex: number } | null>(null);
   const [tokenVisible, setTokenVisible] = useState(false);
+  const [unrecognized, setUnrecognized] = useState<UnrecognizedRow[]>([]);
 
   // ─── load workshop + steward
   const refresh = useCallback(async () => {
@@ -173,10 +175,17 @@ function WorkshopPage() {
     if (res.ok) setPosts(res.posts as ScheduledPost[]);
   }, [workshop, listScheduledFn]);
 
+  const refreshUnrecognized = useCallback(async () => {
+    if (!workshop) return;
+    const res = await listUnrecognizedFn({ data: { workshop_id: workshop.id } });
+    if (res.ok) setUnrecognized(res.items as UnrecognizedRow[]);
+  }, [workshop, listUnrecognizedFn]);
+
   useEffect(() => {
     void refreshIntakes();
     void refreshScheduled();
-  }, [refreshIntakes, refreshScheduled]);
+    void refreshUnrecognized();
+  }, [refreshIntakes, refreshScheduled, refreshUnrecognized]);
 
   // ─── realtime intake drawer
   useEffect(() => {
