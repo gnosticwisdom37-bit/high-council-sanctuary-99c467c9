@@ -209,7 +209,7 @@ function WorkshopPage() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [workshop, refreshIntakes]);
+  }, [workshop, refreshIntakes, refreshUnrecognized]);
 
   // ─── set today (client-only)
   useEffect(() => {
