@@ -218,7 +218,7 @@ export const processDroppedFile = createServerFn({ method: "POST" })
         .from("curated_outputs")
         .insert({
           workshop_id,
-          kind: "blog-archive" satisfies CuratedKind,
+          kind: "blog-archive",
           source_filename: filename,
           source_bytes: bytes.byteLength,
           payload: { posts, raw_headers } as unknown as Record<string, unknown>,
@@ -267,7 +267,7 @@ export const processDroppedFile = createServerFn({ method: "POST" })
         .from("curated_outputs")
         .insert({
           workshop_id,
-          kind: "legal-document" satisfies CuratedKind,
+          kind: "legal-document",
           source_filename: filename,
           source_bytes: bytes.byteLength,
           payload: doc as unknown as Record<string, unknown>,
