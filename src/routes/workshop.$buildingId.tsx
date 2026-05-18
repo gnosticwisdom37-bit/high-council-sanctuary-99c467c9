@@ -431,6 +431,19 @@ function WorkshopPage() {
           />
         </div>
 
+        {/* Universal Drop Zone */}
+        <div className="mb-5">
+          <Pane title="Universal Drop Zone" subtitle="Drop any file — the Workshop routes it">
+            <DropZone
+              workshopId={workshop.id}
+              onProcessed={() => {
+                void refreshIntakes();
+                void refreshUnrecognized();
+              }}
+            />
+          </Pane>
+        </div>
+
         {/* Production + Scriptorium */}
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <Pane title="Production" subtitle="Parchment card preview">
@@ -456,11 +469,50 @@ function WorkshopPage() {
             )}
           </Pane>
 
-          <Pane title="Scriptorium · Intake Drawer" subtitle={`${intakes.length} delivery${intakes.length === 1 ? "" : "s"}`}>
+          <Pane title="Scriptorium · Intake Drawer" subtitle={`${intakes.length} delivery${intakes.length === 1 ? "" : "s"} · ${unrecognized.length} unrecognized`}>
+            {unrecognized.length > 0 && (
+              <div className="mb-3 space-y-1.5">
+                <p
+                  className="text-[10px] uppercase tracking-[0.3em]"
+                  style={{ color: "var(--dawn-gold-bright)" }}
+                >
+                  Unrecognized — awaiting Your direction
+                </p>
+                <ul className="space-y-1">
+                  {unrecognized.map((u) => (
+                    <li
+                      key={u.id}
+                      className="rounded-md px-2 py-1.5 text-xs"
+                      style={{
+                        background:
+                          "color-mix(in oklab, var(--dawn-gold) 14%, transparent)",
+                        color: "var(--dawn-parchment)",
+                        border:
+                          "1px solid color-mix(in oklab, var(--dawn-gold) 40%, transparent)",
+                      }}
+                    >
+                      <span style={{ color: "var(--dawn-gold-bright)" }}>⌽</span>{" "}
+                      {u.source}
+                      {u.rows?.[0]?.extension ? (
+                        <span
+                          className="ml-2 text-[10px] uppercase tracking-[0.2em]"
+                          style={{
+                            color:
+                              "color-mix(in oklab, var(--dawn-parchment) 70%, transparent)",
+                          }}
+                        >
+                          .{u.rows[0].extension}
+                        </span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {intakes.length === 0 ? (
               <EmptyPane
                 icon={<Wand2 className="h-8 w-8" style={{ color: "var(--dawn-ember)" }} />}
-                text="No rows yet. Run Your courier script to deliver a CSV."
+                text="No rows yet. Drop a CSV above or run Your courier script."
               />
             ) : (
               <ul className="space-y-3">
