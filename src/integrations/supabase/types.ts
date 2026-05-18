@@ -156,6 +156,42 @@ export type Database = {
           },
         ]
       }
+      curated_outputs: {
+        Row: {
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["curated_kind"]
+          payload: Json
+          source_bytes: number
+          source_filename: string
+          summary: string
+          updated_at: string
+          workshop_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: Database["public"]["Enums"]["curated_kind"]
+          payload?: Json
+          source_bytes?: number
+          source_filename: string
+          summary?: string
+          updated_at?: string
+          workshop_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["curated_kind"]
+          payload?: Json
+          source_bytes?: number
+          source_filename?: string
+          summary?: string
+          updated_at?: string
+          workshop_id?: string
+        }
+        Relationships: []
+      }
       deeds: {
         Row: {
           conversation_id: string | null
@@ -777,6 +813,7 @@ export type Database = {
     Enums: {
       building_kind: "building" | "workshop"
       building_status: "raised" | "in_use" | "archived"
+      curated_kind: "blog-archive" | "legal-document"
       deed_quadrant: "NE" | "SE" | "SW" | "NW"
       deed_season: "spring" | "summer" | "fall" | "winter"
       deed_status: "inscribed" | "in_progress" | "fulfilled" | "set_aside"
@@ -915,6 +952,7 @@ export const Constants = {
     Enums: {
       building_kind: ["building", "workshop"],
       building_status: ["raised", "in_use", "archived"],
+      curated_kind: ["blog-archive", "legal-document"],
       deed_quadrant: ["NE", "SE", "SW", "NW"],
       deed_season: ["spring", "summer", "fall", "winter"],
       deed_status: ["inscribed", "in_progress", "fulfilled", "set_aside"],
