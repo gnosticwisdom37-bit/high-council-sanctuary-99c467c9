@@ -58,6 +58,60 @@ export type Database = {
           },
         ]
       }
+      blog_archive: {
+        Row: {
+          categories: string[]
+          comments: number | null
+          created_at: string
+          excerpt: string
+          id: string
+          published_at: string | null
+          raw: Json
+          source_filename: string
+          tags: string[]
+          title: string
+          updated_at: string
+          url: string | null
+          views: number | null
+          workshop_id: string
+          wp_post_id: string | null
+        }
+        Insert: {
+          categories?: string[]
+          comments?: number | null
+          created_at?: string
+          excerpt?: string
+          id?: string
+          published_at?: string | null
+          raw?: Json
+          source_filename: string
+          tags?: string[]
+          title: string
+          updated_at?: string
+          url?: string | null
+          views?: number | null
+          workshop_id: string
+          wp_post_id?: string | null
+        }
+        Update: {
+          categories?: string[]
+          comments?: number | null
+          created_at?: string
+          excerpt?: string
+          id?: string
+          published_at?: string | null
+          raw?: Json
+          source_filename?: string
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          url?: string | null
+          views?: number | null
+          workshop_id?: string
+          wp_post_id?: string | null
+        }
+        Relationships: []
+      }
       buildings: {
         Row: {
           conversation_id: string | null
@@ -315,6 +369,84 @@ export type Database = {
           title?: string
           updated_at?: string
           witnesses?: string[]
+        }
+        Relationships: []
+      }
+      legal_documents: {
+        Row: {
+          addresses: string[]
+          case_number: string | null
+          created_at: string
+          date_due: string | null
+          date_filed: string | null
+          date_served: string | null
+          doc_title: string
+          document_type: Database["public"]["Enums"]["legal_doc_type"]
+          email_addresses: string[]
+          extracted_clauses: string[]
+          hearing_date: string | null
+          id: string
+          jurisdiction: string | null
+          page_count: number
+          parties: string[]
+          phone_numbers: string[]
+          raw: Json
+          served_by: string | null
+          served_upon: string[]
+          source_bytes: number
+          source_filename: string
+          updated_at: string
+          workshop_id: string
+        }
+        Insert: {
+          addresses?: string[]
+          case_number?: string | null
+          created_at?: string
+          date_due?: string | null
+          date_filed?: string | null
+          date_served?: string | null
+          doc_title: string
+          document_type?: Database["public"]["Enums"]["legal_doc_type"]
+          email_addresses?: string[]
+          extracted_clauses?: string[]
+          hearing_date?: string | null
+          id?: string
+          jurisdiction?: string | null
+          page_count?: number
+          parties?: string[]
+          phone_numbers?: string[]
+          raw?: Json
+          served_by?: string | null
+          served_upon?: string[]
+          source_bytes?: number
+          source_filename: string
+          updated_at?: string
+          workshop_id: string
+        }
+        Update: {
+          addresses?: string[]
+          case_number?: string | null
+          created_at?: string
+          date_due?: string | null
+          date_filed?: string | null
+          date_served?: string | null
+          doc_title?: string
+          document_type?: Database["public"]["Enums"]["legal_doc_type"]
+          email_addresses?: string[]
+          extracted_clauses?: string[]
+          hearing_date?: string | null
+          id?: string
+          jurisdiction?: string | null
+          page_count?: number
+          parties?: string[]
+          phone_numbers?: string[]
+          raw?: Json
+          served_by?: string | null
+          served_upon?: string[]
+          source_bytes?: number
+          source_filename?: string
+          updated_at?: string
+          workshop_id?: string
         }
         Relationships: []
       }
@@ -819,6 +951,13 @@ export type Database = {
       deed_status: "inscribed" | "in_progress" | "fulfilled" | "set_aside"
       intake_status: "pending" | "consumed"
       item_status: "forged" | "bestowed" | "archived"
+      legal_doc_type:
+        | "affidavit"
+        | "notice"
+        | "summons"
+        | "motion"
+        | "order"
+        | "other"
       placement_candidate_kind: "building" | "workshop" | "item" | "chamber"
       post_channel: "x" | "meta" | "both"
       post_status: "draft" | "scheduled" | "published" | "cancelled"
@@ -958,6 +1097,14 @@ export const Constants = {
       deed_status: ["inscribed", "in_progress", "fulfilled", "set_aside"],
       intake_status: ["pending", "consumed"],
       item_status: ["forged", "bestowed", "archived"],
+      legal_doc_type: [
+        "affidavit",
+        "notice",
+        "summons",
+        "motion",
+        "order",
+        "other",
+      ],
       placement_candidate_kind: ["building", "workshop", "item", "chamber"],
       post_channel: ["x", "meta", "both"],
       post_status: ["draft", "scheduled", "published", "cancelled"],

@@ -1,34 +1,30 @@
 /**
- * Workshop Drop Zone — Phase 8.1.
+ * Workshop Drop Zone — Phase 8.2.
  *
- * One server function accepts a dropped file, routes by extension,
- * runs the matching TypeScript handler, and writes a curated JSON
- * row to `curated_outputs`. Unknown extensions land in the intake
- * drawer as "Unrecognized File: <name>" so the King can decide what
- * tool to build (or assign) for them.
+ * Routes any dropped file by extension and writes to a typed, purpose-built
+ * curated store:
+ *   .csv  → public.blog_archive       (WP-stats-shaped rows)
+ *   .pdf  → public.legal_documents    (date_served anchor + heuristics)
+ *   else  → csv_intakes (tool_key = 'unrecognized') for the King to triage
  *
- * Handler runtime is the Worker — Python CANNOT run here. The local
- * Python courier (workshop-intake) is unaffected and still useful
- * for bulk pre-processing on the King's machine.
+ * Handlers run in TS on the Worker. The local Python courier still works
+ * alongside via /api/public/workshop-intake.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { extractText, getDocumentProxy } from "unpdf";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { extractLegal } from "@/server/legal-extractors";
 
-// 6 MB cap on a single dropped file (base64-encoded payload over RPC).
 const MAX_BYTES = 6 * 1024 * 1024;
 
 const DropInput = z.object({
   workshop_id: z.string().uuid(),
   filename: z.string().min(1).max(255),
-  // base64 string (no data: prefix)
   content_base64: z.string().min(1),
 });
 
-type CuratedKind = "blog-archive" | "legal-document";
-
-// ─── tiny CSV parser (RFC4180-ish, handles quotes + newlines in quotes) ────
+// ─── tiny CSV parser ───────────────────────────────────────────────────────
 function parseCSV(text: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
@@ -37,29 +33,18 @@ function parseCSV(text: string): string[][] {
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
     if (inQuotes) {
-      if (c === '"' && text[i + 1] === '"') {
-        cell += '"';
-        i++;
-      } else if (c === '"') {
-        inQuotes = false;
-      } else {
-        cell += c;
-      }
+      if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+      else if (c === '"') inQuotes = false;
+      else cell += c;
     } else {
-      if (c === '"') {
-        inQuotes = true;
-      } else if (c === ",") {
-        row.push(cell);
-        cell = "";
-      } else if (c === "\n" || c === "\r") {
+      if (c === '"') inQuotes = true;
+      else if (c === ",") { row.push(cell); cell = ""; }
+      else if (c === "\n" || c === "\r") {
         if (c === "\r" && text[i + 1] === "\n") i++;
-        row.push(cell);
-        cell = "";
+        row.push(cell); cell = "";
         if (row.length > 1 || row[0] !== "") rows.push(row);
         row = [];
-      } else {
-        cell += c;
-      }
+      } else cell += c;
     }
   }
   if (cell.length > 0 || row.length > 0) {
@@ -69,21 +54,40 @@ function parseCSV(text: string): string[][] {
   return rows;
 }
 
-// ─── CSV → blog-archive ─────────────────────────────────────────────────────
-type BlogPost = {
+// ─── CSV → blog_archive ────────────────────────────────────────────────────
+type BlogRow = {
   title: string;
   url: string | null;
-  date: string | null;
+  published_at: string | null;
   excerpt: string;
   tags: string[];
+  categories: string[];
+  views: number | null;
+  comments: number | null;
+  wp_post_id: string | null;
+  raw: Record<string, string>;
 };
 
-function csvToBlogArchive(csvText: string): {
-  posts: BlogPost[];
-  raw_headers: string[];
-} {
+function toInt(s: string | undefined): number | null {
+  if (!s) return null;
+  const n = parseInt(s.replace(/[,\s]/g, ""), 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+function toIso(s: string | undefined): string | null {
+  if (!s) return null;
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+function splitList(s: string | undefined): string[] {
+  if (!s) return [];
+  return s.split(/[,;|]/).map((t) => t.trim()).filter(Boolean).slice(0, 20);
+}
+
+function csvToBlogRows(csvText: string): { rows: BlogRow[]; raw_headers: string[] } {
   const rows = parseCSV(csvText);
-  if (rows.length === 0) return { posts: [], raw_headers: [] };
+  if (rows.length === 0) return { rows: [], raw_headers: [] };
   const headers = rows[0].map((h) => h.trim().toLowerCase());
   const idx = (names: string[]) =>
     headers.findIndex((h) => names.some((n) => h === n || h.includes(n)));
@@ -92,91 +96,44 @@ function csvToBlogArchive(csvText: string): {
   const iUrl = idx(["url", "link", "permalink", "address"]);
   const iDate = idx(["date", "published", "pub_date", "publishedat"]);
   const iExcerpt = idx(["excerpt", "summary", "description", "content"]);
-  const iTags = idx(["tags", "categories", "keywords"]);
+  const iTags = idx(["tags", "keywords"]);
+  const iCats = idx(["category", "categories", "section"]);
+  const iViews = idx(["views", "hits", "visits", "pageviews"]);
+  const iComments = idx(["comments"]);
+  const iWpId = idx(["post_id", "postid", "id"]);
 
-  const posts: BlogPost[] = [];
+  const out: BlogRow[] = [];
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
     const title = (iTitle >= 0 ? row[iTitle] : row[0]) ?? "";
     if (!title.trim()) continue;
-    const tagsRaw = iTags >= 0 ? row[iTags] : "";
-    posts.push({
+    const raw: Record<string, string> = {};
+    for (let c = 0; c < headers.length; c++) {
+      const v = row[c];
+      if (v && v.trim()) raw[headers[c]] = v.trim().slice(0, 2000);
+    }
+    out.push({
       title: title.trim().slice(0, 500),
       url: iUrl >= 0 && row[iUrl] ? row[iUrl].trim().slice(0, 2000) : null,
-      date: iDate >= 0 && row[iDate] ? row[iDate].trim().slice(0, 64) : null,
+      published_at: iDate >= 0 ? toIso(row[iDate]) : null,
       excerpt: iExcerpt >= 0 ? (row[iExcerpt] ?? "").trim().slice(0, 2000) : "",
-      tags: tagsRaw
-        ? tagsRaw
-            .split(/[,;|]/)
-            .map((t) => t.trim())
-            .filter(Boolean)
-            .slice(0, 20)
-        : [],
+      tags: iTags >= 0 ? splitList(row[iTags]) : [],
+      categories: iCats >= 0 ? splitList(row[iCats]) : [],
+      views: iViews >= 0 ? toInt(row[iViews]) : null,
+      comments: iComments >= 0 ? toInt(row[iComments]) : null,
+      wp_post_id: iWpId >= 0 && row[iWpId] ? row[iWpId].trim().slice(0, 64) : null,
+      raw,
     });
   }
-  return { posts, raw_headers: headers };
+  return { rows: out, raw_headers: headers };
 }
 
-// ─── PDF → legal-document ───────────────────────────────────────────────────
-type LegalDoc = {
-  doc_title: string;
-  page_count: number;
-  pages: { page: number; text: string }[];
-  extracted_clauses: string[];
-  parties: string[];
-};
-
-// Heuristic party/clause scrape — Steward Soul can deepen later.
-function scrapeLegal(allText: string): { parties: string[]; clauses: string[] } {
-  const parties = new Set<string>();
-  const partyRe =
-    /\b(between|by and between|plaintiff|defendant|petitioner|respondent|claimant|grantor|grantee|trustor|trustee|beneficiary)\b[^.]{0,200}/gi;
-  for (const m of allText.match(partyRe) ?? []) {
-    parties.add(m.trim().replace(/\s+/g, " ").slice(0, 240));
-    if (parties.size >= 12) break;
-  }
-  const clauses: string[] = [];
-  // crude clause split: numbered or "WHEREAS" / "NOW, THEREFORE" lead-ins
-  const clauseRe =
-    /(?:^|\n)\s*(?:\d{1,3}\.\s+|WHEREAS[, ]|NOW,? THEREFORE[, ]|ARTICLE [IVX]+|SECTION \d+)[^\n]{40,400}/g;
-  for (const m of allText.match(clauseRe) ?? []) {
-    clauses.push(m.trim().replace(/\s+/g, " ").slice(0, 600));
-    if (clauses.length >= 40) break;
-  }
-  return { parties: [...parties], clauses };
-}
-
-async function pdfToLegalDoc(
-  bytes: Uint8Array,
-  filename: string,
-): Promise<LegalDoc> {
-  const pdf = await getDocumentProxy(bytes);
-  const { text, totalPages } = await extractText(pdf, { mergePages: false });
-  const pageTexts = Array.isArray(text) ? text : [text];
-  const joined = pageTexts.join("\n\n");
-  const firstLine =
-    joined.split("\n").map((s) => s.trim()).find((s) => s.length > 0) ?? "";
-  const docTitle =
-    firstLine.length > 8 && firstLine.length < 160
-      ? firstLine
-      : filename.replace(/\.pdf$/i, "");
-  const { parties, clauses } = scrapeLegal(joined);
-  return {
-    doc_title: docTitle,
-    page_count: totalPages,
-    pages: pageTexts.map((t, i) => ({ page: i + 1, text: t.slice(0, 20000) })),
-    extracted_clauses: clauses,
-    parties,
-  };
-}
-
-// ─── processDroppedFile ─────────────────────────────────────────────────────
+// ─── processDroppedFile ────────────────────────────────────────────────────
 export const processDroppedFile = createServerFn({ method: "POST" })
   .inputValidator((input) => DropInput.parse(input))
   .handler(async ({ data }) => {
     const { workshop_id, filename, content_base64 } = data;
 
-    // decode + size guard
     let bytes: Uint8Array;
     try {
       const bin = atob(content_base64);
@@ -193,93 +150,149 @@ export const processDroppedFile = createServerFn({ method: "POST" })
       };
     }
 
-    // confirm workshop exists
     const { data: workshop } = await supabaseAdmin
-      .from("workshops")
-      .select("id")
-      .eq("id", workshop_id)
-      .single();
+      .from("workshops").select("id").eq("id", workshop_id).single();
     if (!workshop) return { ok: false as const, error: "Workshop not found." };
 
     const ext = (filename.split(".").pop() ?? "").toLowerCase();
 
-    // ── CSV → blog-archive ──
+    // ── CSV → blog_archive ──
     if (ext === "csv") {
       const text = new TextDecoder().decode(bytes);
-      const { posts, raw_headers } = csvToBlogArchive(text);
-      if (posts.length === 0) {
+      const { rows, raw_headers } = csvToBlogRows(text);
+      if (rows.length === 0) {
         return {
           ok: false as const,
           error: "No usable rows found in the CSV (need at least a title column).",
         };
       }
-      const summary = `${posts.length} blog post${posts.length === 1 ? "" : "s"} curated from ${filename}.`;
-      const { data: curated, error } = await supabaseAdmin
-        .from("curated_outputs")
-        .insert({
-          workshop_id,
-          kind: "blog-archive",
-          source_filename: filename,
-          source_bytes: bytes.byteLength,
-          payload: { posts, raw_headers } as never,
-          summary,
-        })
-        .select("id")
-        .single();
+
+      const { data: inserted, error } = await supabaseAdmin
+        .from("blog_archive")
+        .insert(
+          rows.map((p) => ({
+            workshop_id,
+            source_filename: filename,
+            title: p.title,
+            url: p.url,
+            published_at: p.published_at,
+            excerpt: p.excerpt,
+            tags: p.tags,
+            categories: p.categories,
+            views: p.views,
+            comments: p.comments,
+            wp_post_id: p.wp_post_id,
+            raw: { ...p.raw, _raw_headers: raw_headers } as never,
+          })),
+        )
+        .select("id");
       if (error) return { ok: false as const, error: error.message };
 
-      // Mirror rows into the Scriptorium so the Steward can draft promo cards.
+      // Mirror into the Scriptorium so the Steward can draft promo cards immediately.
       await supabaseAdmin.from("csv_intakes").insert({
         workshop_id,
         tool_key: "promo-cards",
         source: filename,
         origin: "dropzone",
-        rows: posts.map((p) => ({
+        rows: rows.map((p) => ({
           title: p.title,
           url: p.url ?? undefined,
           excerpt: p.excerpt || undefined,
           tags: p.tags,
+          views: p.views ?? undefined,
         })) as never,
-        row_count: posts.length,
+        row_count: rows.length,
       });
 
+      const summary = `${rows.length} blog post${rows.length === 1 ? "" : "s"} catalogued from ${filename}.`;
       return {
         ok: true as const,
         kind: "blog-archive" as const,
-        curated_id: curated.id as string,
+        inserted_count: inserted?.length ?? rows.length,
         summary,
       };
     }
 
-    // ── PDF → legal-document ──
+    // ── PDF → legal_documents ──
     if (ext === "pdf") {
-      let doc: LegalDoc;
+      let pageTexts: string[];
+      let totalPages: number;
       try {
-        doc = await pdfToLegalDoc(bytes, filename);
+        const pdf = await getDocumentProxy(bytes);
+        const res = await extractText(pdf, { mergePages: false });
+        pageTexts = Array.isArray(res.text) ? res.text : [res.text];
+        totalPages = res.totalPages;
       } catch (e) {
         return {
           ok: false as const,
           error: `Could not read the PDF: ${e instanceof Error ? e.message : String(e)}`,
         };
       }
-      const summary = `${doc.doc_title} — ${doc.page_count} page${doc.page_count === 1 ? "" : "s"}, ${doc.extracted_clauses.length} clause${doc.extracted_clauses.length === 1 ? "" : "s"} surfaced, ${doc.parties.length} part${doc.parties.length === 1 ? "y" : "ies"} named.`;
-      const { data: curated, error } = await supabaseAdmin
-        .from("curated_outputs")
+      const joined = pageTexts.join("\n\n");
+      const extracted = extractLegal(joined, pageTexts[0] ?? "", filename);
+
+      const { data: inserted, error } = await supabaseAdmin
+        .from("legal_documents")
         .insert({
           workshop_id,
-          kind: "legal-document",
           source_filename: filename,
           source_bytes: bytes.byteLength,
-          payload: doc as never,
-          summary,
+          doc_title: extracted.doc_title,
+          document_type: extracted.document_type,
+          date_served: extracted.date_served,
+          date_filed: extracted.date_filed,
+          date_due: extracted.date_due,
+          hearing_date: extracted.hearing_date,
+          served_upon: extracted.served_upon,
+          served_by: extracted.served_by,
+          parties: extracted.parties,
+          email_addresses: extracted.email_addresses,
+          phone_numbers: extracted.phone_numbers,
+          addresses: extracted.addresses,
+          case_number: extracted.case_number,
+          jurisdiction: extracted.jurisdiction,
+          page_count: totalPages,
+          extracted_clauses: extracted.extracted_clauses,
+          raw: {
+            pages: pageTexts.map((t, i) => ({
+              page: i + 1,
+              text: t.slice(0, 20000),
+            })),
+          } as never,
         })
         .select("id")
         .single();
       if (error) return { ok: false as const, error: error.message };
+
+      const reviewNeeded = !extracted.date_served;
+      const summary =
+        `${extracted.doc_title} — ${extracted.document_type}, ${totalPages} page${totalPages === 1 ? "" : "s"}.` +
+        (extracted.date_served
+          ? ` Served ${new Date(extracted.date_served).toLocaleDateString()}.`
+          : " ⚠ No service date found — needs review.");
+
+      if (reviewNeeded) {
+        await supabaseAdmin.from("csv_intakes").insert({
+          workshop_id,
+          tool_key: "legal-review",
+          source: `Needs review: ${filename}`,
+          origin: "dropzone",
+          rows: [
+            {
+              legal_document_id: inserted.id,
+              filename,
+              reason: "Missing date_served",
+            },
+          ] as never,
+          row_count: 1,
+        });
+      }
+
       return {
         ok: true as const,
         kind: "legal-document" as const,
-        curated_id: curated.id as string,
+        legal_document_id: inserted.id as string,
+        needs_review: reviewNeeded,
         summary,
       };
     }
@@ -292,15 +305,10 @@ export const processDroppedFile = createServerFn({ method: "POST" })
       source: label,
       origin: "dropzone",
       rows: [
-        {
-          filename,
-          extension: ext || "(none)",
-          size_bytes: bytes.byteLength,
-        },
+        { filename, extension: ext || "(none)", size_bytes: bytes.byteLength },
       ] as never,
       row_count: 1,
     });
-
     return {
       ok: true as const,
       kind: "unrecognized" as const,
@@ -308,15 +316,67 @@ export const processDroppedFile = createServerFn({ method: "POST" })
     };
   });
 
-// ─── listCuratedOutputs ─────────────────────────────────────────────────────
+// ─── listBlogArchive ───────────────────────────────────────────────────────
+export const listBlogArchive = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z.object({
+      workshop_id: z.string().uuid(),
+      sort: z.enum(["recent", "top-views"]).default("recent"),
+      limit: z.number().int().min(1).max(200).default(50),
+    }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const q = supabaseAdmin
+      .from("blog_archive")
+      .select(
+        "id, title, url, published_at, excerpt, tags, categories, views, comments, source_filename, created_at",
+      )
+      .eq("workshop_id", data.workshop_id)
+      .limit(data.limit);
+    const { data: rows, error } =
+      data.sort === "top-views"
+        ? await q.order("views", { ascending: false, nullsFirst: false })
+        : await q.order("published_at", { ascending: false, nullsFirst: false });
+    if (error) return { ok: false as const, error: error.message, posts: [] };
+    return { ok: true as const, posts: rows ?? [] };
+  });
+
+// ─── listLegalDocuments ────────────────────────────────────────────────────
+export const listLegalDocuments = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z.object({
+      workshop_id: z.string().uuid(),
+      anchor: z.enum(["date_served", "hearing_date"]).default("date_served"),
+      from: z.string().optional(),
+      to: z.string().optional(),
+      limit: z.number().int().min(1).max(200).default(50),
+    }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    let q = supabaseAdmin
+      .from("legal_documents")
+      .select(
+        "id, doc_title, document_type, date_served, date_filed, date_due, hearing_date, served_upon, served_by, parties, email_addresses, case_number, jurisdiction, page_count, source_filename, created_at",
+      )
+      .eq("workshop_id", data.workshop_id)
+      .limit(data.limit);
+    if (data.from) q = q.gte(data.anchor, data.from);
+    if (data.to) q = q.lte(data.anchor, data.to);
+    const { data: rows, error } = await q.order(data.anchor, {
+      ascending: false,
+      nullsFirst: false,
+    });
+    if (error) return { ok: false as const, error: error.message, documents: [] };
+    return { ok: true as const, documents: rows ?? [] };
+  });
+
+// ─── legacy listers (Phase 8.1 — still serve old rows) ─────────────────────
 export const listCuratedOutputs = createServerFn({ method: "POST" })
   .inputValidator((input) =>
-    z
-      .object({
-        workshop_id: z.string().uuid(),
-        limit: z.number().int().min(1).max(50).optional(),
-      })
-      .parse(input),
+    z.object({
+      workshop_id: z.string().uuid(),
+      limit: z.number().int().min(1).max(50).optional(),
+    }).parse(input),
   )
   .handler(async ({ data }) => {
     const { data: rows, error } = await supabaseAdmin
@@ -329,7 +389,6 @@ export const listCuratedOutputs = createServerFn({ method: "POST" })
     return { ok: true as const, curated: rows ?? [] };
   });
 
-// ─── listUnrecognized ───────────────────────────────────────────────────────
 export const listUnrecognized = createServerFn({ method: "POST" })
   .inputValidator((input) =>
     z.object({ workshop_id: z.string().uuid() }).parse(input),
