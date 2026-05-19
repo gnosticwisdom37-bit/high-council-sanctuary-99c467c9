@@ -1,119 +1,87 @@
+## Phase 8.2 — Two Curated Stores for Event-Spark
 
-# The Workshop, Made Universal — locked plan
-
-You confirmed both forks:
-- **Local script = courier only.** No Venice call, no local JSON registry. The Steward Soul in the Workshop drafts every card, in their voice, through the app's gateway, counted in the Bank, landing in the calendar.
-- **Per-Workshop intake token.** Each Workshop, when raised, mints its own `intake_token`. You copy it once into Your local `.env`. If one ever leaks, only that Workshop is exposed.
-
-I noticed `VENICE_API_KEY` is already a secret in Cloud — swap day is closer than I thought, but that's not for this turn.
+Split the single `curated_outputs` table into two purpose-built stores with typed columns, so the Studio and the Google-integrated Event-Spark calendar can filter, rank, and schedule directly from the database — no JSON spelunking.
 
 ---
 
-## What ships today
+### 1. New tables
 
-### 1. Database (single migration)
+**`blog_archive`** — one row per WordPress post (from `.csv`)
 
-Existing tables already cover most of this — small additions only:
+Typed columns: `title`, `url`, `published_at`, `excerpt`, `tags[]`, `categories[]`, `views`, `comments`, `wp_post_id`, plus `workshop_id`, `source_filename`, `raw` (jsonb for any extra WP columns we don't promote).
 
-- `workshops` → add `intake_token text not null default encode(gen_random_bytes(24),'base64')` + `unique` + `tool_key text default 'promo-cards'` placeholder for the active Implement.
-- `csv_intakes` → rename intent to "tool intakes" by adding `tool_key text not null default 'promo-cards'`. Same table, now routed by tool_key. (No data migration needed.)
-- `scheduled_posts` → already correct shape.
+Index: `(workshop_id, published_at desc)`, `(views desc)`.
 
-No new tables. No RLS rewrites.
+**`legal_documents`** — one row per PDF
 
-### 2. Server functions (`src/server/workshop.functions.ts`)
+Typed columns:
+- `doc_title`, `document_type` (affidavit / notice / summons / motion / order / other — enum, Soul-corrigible)
+- **`date_served`** ← calendar anchor (your choice)
+- `date_filed`, `date_due`, `hearing_date` (all nullable)
+- `served_upon` (text[] — recipients), `served_by` (text), `parties` (text[])
+- `email_addresses` (text[]), `phone_numbers` (text[]), `addresses` (text[])
+- `case_number`, `jurisdiction`
+- `page_count`, `extracted_clauses` (text[])
+- `workshop_id`, `source_filename`, `source_bytes`
+- `raw` (jsonb — full page texts + anything the heuristic isn't sure about)
 
-- `getWorkshop(buildingId)` — returns workshop row + intake_token (one-time reveal) + steward.
-- `draftPromoCard(intakeId, rowIndex)` — calls `speakAsSoul` with the Steward's voice + Workshop `system_prompt`; returns `{ title, body, hashtags }`. Bank-tracked, free-premium chain.
-- `schedulePost(workshopId, card, scheduled_at, channel)` — inserts `scheduled_posts`.
-- `publishPost(postId)` — marks published, returns copy-for-X / copy-for-Meta text blobs.
-- `cancelPost(postId)`, `listScheduled(workshopId, monthRange)`.
-- `rotateWorkshopToken(workshopId)` — re-mints intake_token on demand.
+Index: `(workshop_id, date_served desc nulls last)`, `(document_type)`.
 
-### 3. Server route — the courier's door (`src/routes/api/public/workshop-intake.ts`)
+Both tables get the same permissive RLS as the existing curated stores.
 
-```text
-POST /api/public/workshop-intake
-Headers:  X-Workshop-Token: <per-workshop token>
-Body:     { workshop_id, tool_key, source, rows: [...] }
-```
-
-- Looks up `workshops.intake_token`; rejects 401 if mismatch.
-- Validates with Zod (rows ≤ 500, source ≤ 255 chars).
-- Inserts one row into `csv_intakes` with `tool_key`.
-- Returns `{ intake_id, row_count }`.
-
-### 4. Workshop UI (`src/routes/workshop.$buildingId.tsx`)
-
-Reuses Your existing `workshop.publishing-house.tsx` as the base; promoted to dynamic route.
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│ BrandMark subtle · "The Publishing House" · Steward: Aria ▾ │
-│ ⚒  Choose Implement: [ Promo Cards ▾ ]                      │
-├──────────────────────┬──────────────────────────────────────┤
-│  PRODUCTION          │  SCRIPTORIUM (chat with Aria)        │
-│  Parchment card      │  ▸ Intake drawer                     │
-│  📅 Schedule  📤     │     • blog-export.csv · 47 rows      │
-│  Clear               │       [Draft row 1] [Draft row 2]…   │
-├──────────────────────┴──────────────────────────────────────┤
-│  EVENT-SPARK CALENDAR (full width, gold chips)              │
-└─────────────────────────────────────────────────────────────┘
-```
-
-- Intake drawer = Supabase Realtime on `csv_intakes` filtered by `workshop_id + tool_key='promo-cards'`. New CSV lights up live.
-- "Draft this row" → `draftPromoCard` → Aria's voiced card fills the Production pane.
-- "Schedule" opens shadcn Calendar; "Publish-now" reveals copy buttons.
-- Intake-token panel (small, top-right): shows the token **once** after rotation, with copy-to-clipboard + Rotate button.
-
-### 5. Your local script (the courier — one file)
-
-```python
-# publish_blog_to_workshop.py
-import csv, json, os, requests
-
-WORKSHOP_ID = "PASTE_ONCE_YOU_RAISE_IT"
-TOKEN       = os.environ["WORKSHOP_INTAKE_TOKEN"]
-URL         = "https://project--5548c05f-8aea-4910-b8db-2e5ca1f9bdfd.lovable.app/api/public/workshop-intake"
-
-rows = []
-for fn in os.listdir("Source_Data"):
-    if fn.endswith(".csv"):
-        with open(f"Source_Data/{fn}", encoding="utf-8") as f:
-            for r in csv.reader(f):
-                if len(r) >= 3 and "https://" in r[2]:
-                    title, url = r[0], r[2]
-                    if not any(x in title for x in ["Homepage","My Story","Archives"]):
-                        rows.append({"title": title, "url": url})
-
-resp = requests.post(URL,
-    headers={"Content-Type":"application/json","X-Workshop-Token":TOKEN},
-    json={"workshop_id":WORKSHOP_ID,"tool_key":"promo-cards","source":"blog-export","rows":rows})
-print(resp.status_code, resp.json())
-```
-
-That's it. No Venice, no JSON registry, no AI. The Kingdom takes it from there.
-
-### 6. Memory updates
-
-- New `mem://features/workshops` — Implement doctrine, courier contract, per-Workshop token.
-- Update build order: Phase 8 = **Workshop / Implements** SHIPPED.
+`curated_outputs` stays in the schema for now (Phase 8.1 rows live there) — new writes go to the split tables; we can retire it once the old rows are migrated or aged out.
 
 ---
 
-## Credit estimate
+### 2. Parser upgrades (`src/server/dropzone.functions.ts`)
 
-~3.4 credits, broken down: migration + workshop.functions (~0.6), intake route (~0.4), UI shell + selector + intake drawer + realtime (~1.0), promo-card production pane + draft + schedule + publish (~1.0), calendar wire-up + memory updates (~0.4).
+**CSV → `blog_archive`:** widen the header detector to also surface `views / hits / visits`, `comments`, `category / categories`, `post_id`. Anything unmapped lands in `raw`. Still mirror rows into `csv_intakes` (`tool_key: 'promo-cards'`) so the Steward Soul has the Scriptorium queue.
 
-Deferred (next sessions, when You say): Google Calendar 2-way sync, Nano-Banana card images, real social posting via OAuth, Implements #2+ (Legal Strategy Drafter, Research Digest, Observatory).
+**PDF → `legal_documents`:** keep `unpdf` for text + page count, then add deterministic extractors (all regex/heuristic, no extra AI cost):
+- **emails:** standard email regex, dedupe.
+- **phone numbers:** NANP + international common forms.
+- **addresses:** street-line heuristic (number + street-type keyword).
+- **dates:** match `Served on …`, `Date of Service:`, `Filed:`, `Hearing:`, `Due:`; parse into ISO. `date_served` is required for the calendar — if not found, leave null and surface a "needs review" badge in the Scriptorium.
+- **served_upon / served_by:** capture phrase windows around "served upon", "to:", "by:".
+- **case_number / jurisdiction:** match `Case No.`, `Docket`, court-name keywords.
+- **document_type:** keyword classifier over the first page (Affidavit / Notice / Summons / Motion / Order / Other).
+
+Return shape from `processDroppedFile` gains `legal_document_id` or `blog_archive_id` so the UI can deep-link.
 
 ---
 
-## Order of operations
+### 3. Studio reads (Event-Spark integration)
 
-1. Migration (You approve).
-2. Server fns + intake route.
-3. Workshop UI + intake drawer + first Implement.
-4. You raise a Publishing House on the Realm, copy the intake token into Your `.env`, drop `publish_blog_to_workshop.py` next to Your CSVs, run it. Cards appear in the drawer. You click "Draft." Aria speaks. You schedule. The calendar lights up.
+Add two server functions:
+- `listBlogArchive({ workshop_id, sort: 'recent'|'top-views', limit })`
+- `listLegalDocuments({ workshop_id, anchor: 'date_served'|'hearing_date', from, to })`
 
-Say the word and I'll execute.
+In the Workshop production pane (`src/routes/workshop.$buildingId.tsx`), the Implement selector gets two new sources: **"Blog Archive → Promo Card"** and **"Legal Docket → Milestone Card"**. Picking a row pre-fills the Steward Soul's draft with the row's typed fields (title, date, recipients) so the card writes itself in a sentence or two.
+
+`scheduled_posts` already exists — when a Legal Milestone card is scheduled, default `scheduled_at` = `date_served` (or `hearing_date` if the King chose that anchor at draft time).
+
+---
+
+### 4. Migration & cleanup
+
+- Migration: create the two enums (`legal_doc_type`), two tables, indexes, RLS.
+- No data migration of existing `curated_outputs` rows (small sample set from Phase 8.1 testing — fine to leave or re-drop the files).
+- `listCuratedOutputs` / `listUnrecognized` stay; we just stop writing new `blog-archive` / `legal-document` rows into `curated_outputs`.
+
+---
+
+### 5. Out of scope (next phases, not now)
+
+- The actual Google Calendar push — `scheduled_posts.google_event_id` is already in place; we'll wire the OAuth + insert in a follow-up.
+- A "needs review" editor for legal docs with missing `date_served` — for now we surface them in the Scriptorium with a chip; full editor is its own phase.
+- Re-parsing old `curated_outputs` rows into the new tables.
+
+---
+
+### Technical notes
+
+- All extractors run in TS on the Worker — no Python server-side, consistent with Phase 8.1.
+- All heuristic extractors are pure functions in `src/server/legal-extractors.ts` so they're unit-testable later.
+- `raw` jsonb on both tables is the escape hatch — anything the heuristics miss is still recoverable; the Steward Soul can fish it out at draft time.
+
+Ready to build on approval.
