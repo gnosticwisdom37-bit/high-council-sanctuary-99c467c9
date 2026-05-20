@@ -372,6 +372,48 @@ export type Database = {
         }
         Relationships: []
       }
+      legal_calendar_events: {
+        Row: {
+          anchor_used: string
+          created_at: string
+          event_at: string
+          google_calendar_id: string
+          google_event_id: string
+          id: string
+          legal_document_id: string
+          reminder_days: number[]
+          summary: string
+          updated_at: string
+          workshop_id: string
+        }
+        Insert: {
+          anchor_used: string
+          created_at?: string
+          event_at: string
+          google_calendar_id: string
+          google_event_id: string
+          id?: string
+          legal_document_id: string
+          reminder_days?: number[]
+          summary?: string
+          updated_at?: string
+          workshop_id: string
+        }
+        Update: {
+          anchor_used?: string
+          created_at?: string
+          event_at?: string
+          google_calendar_id?: string
+          google_event_id?: string
+          id?: string
+          legal_document_id?: string
+          reminder_days?: number[]
+          summary?: string
+          updated_at?: string
+          workshop_id?: string
+        }
+        Relationships: []
+      }
       legal_documents: {
         Row: {
           addresses: string[]
@@ -562,6 +604,8 @@ export type Database = {
           title: string
           updated_at: string
           workshop_id: string
+          wp_post_id: string | null
+          wp_url: string | null
         }
         Insert: {
           body: string
@@ -578,6 +622,8 @@ export type Database = {
           title: string
           updated_at?: string
           workshop_id: string
+          wp_post_id?: string | null
+          wp_url?: string | null
         }
         Update: {
           body?: string
@@ -594,6 +640,8 @@ export type Database = {
           title?: string
           updated_at?: string
           workshop_id?: string
+          wp_post_id?: string | null
+          wp_url?: string | null
         }
         Relationships: [
           {
@@ -885,6 +933,45 @@ export type Database = {
         }
         Relationships: []
       }
+      workshop_wp_links: {
+        Row: {
+          created_at: string
+          default_categories: string[]
+          default_status: string
+          default_tags: string[]
+          id: string
+          updated_at: string
+          workshop_id: string
+          wp_site_id: string
+          wp_site_name: string | null
+          wp_site_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          default_categories?: string[]
+          default_status?: string
+          default_tags?: string[]
+          id?: string
+          updated_at?: string
+          workshop_id: string
+          wp_site_id: string
+          wp_site_name?: string | null
+          wp_site_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          default_categories?: string[]
+          default_status?: string
+          default_tags?: string[]
+          id?: string
+          updated_at?: string
+          workshop_id?: string
+          wp_site_id?: string
+          wp_site_name?: string | null
+          wp_site_url?: string | null
+        }
+        Relationships: []
+      }
       workshops: {
         Row: {
           active_tool_key: string
@@ -959,7 +1046,7 @@ export type Database = {
         | "order"
         | "other"
       placement_candidate_kind: "building" | "workshop" | "item" | "chamber"
-      post_channel: "x" | "meta" | "both"
+      post_channel: "x" | "meta" | "both" | "wordpress"
       post_status: "draft" | "scheduled" | "published" | "cancelled"
       realm_occupant_type: "soul" | "building" | "item" | "chamber" | "castle"
     }
@@ -1106,7 +1193,7 @@ export const Constants = {
         "other",
       ],
       placement_candidate_kind: ["building", "workshop", "item", "chamber"],
-      post_channel: ["x", "meta", "both"],
+      post_channel: ["x", "meta", "both", "wordpress"],
       post_status: ["draft", "scheduled", "published", "cancelled"],
       realm_occupant_type: ["soul", "building", "item", "chamber", "castle"],
     },
