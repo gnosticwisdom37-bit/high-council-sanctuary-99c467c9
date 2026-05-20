@@ -102,7 +102,7 @@ export const createLegalEvent = createServerFn({ method: "POST" })
     }
     if (!doc) return { ok: false as const, error: "Legal document not found." };
 
-    const anchorIso = (doc as Record<string, string | null>)[data.anchor];
+    const anchorIso = (doc as unknown as Record<string, string | null>)[data.anchor];
     if (!anchorIso) {
       return { ok: false as const, error: `Document has no ${data.anchor}.` };
     }
