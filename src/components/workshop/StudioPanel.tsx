@@ -215,7 +215,7 @@ function PromoTab({
     setSelectedId(id);
     const r = await draftFn({ data: { workshop_id: workshopId, blog_archive_id: id } });
     if (r.ok) setCard(r.card);
-    else setNotice({ kind: "err", text: r.error });
+    else setNotice({ kind: "err", text: r.error ?? "Unknown error" });
     setDrafting(false);
   }, [draftFn, workshopId, setNotice]);
 
@@ -234,7 +234,7 @@ function PromoTab({
       setNotice({ kind: "ok", text: when ? "Scheduled for the calendar." : "Saved as a draft." });
       setCard(null); setSelectedId(null);
       onScheduled?.();
-    } else setNotice({ kind: "err", text: r.error });
+    } else setNotice({ kind: "err", text: r.error ?? "Unknown error" });
     setScheduling(false);
   }, [card, scheduleFn, workshopId, setNotice, onScheduled]);
 
@@ -383,7 +383,7 @@ function NewPostTab({
     setLoadingSites(true);
     const r = await listSitesFn({});
     if (r.ok) setSites(r.sites);
-    else setNotice({ kind: "err", text: r.error });
+    else setNotice({ kind: "err", text: r.error ?? "Unknown error" });
     setLoadingSites(false);
   }, [listSitesFn, setNotice]);
 
@@ -401,7 +401,7 @@ function NewPostTab({
       setNotice({ kind: "ok", text: `Bound to ${s.name}.` });
       setShowSitePicker(false);
       void refreshLink();
-    } else setNotice({ kind: "err", text: r.error });
+    } else setNotice({ kind: "err", text: r.error ?? "Unknown error" });
   }, [setSiteFn, workshopId, setNotice, refreshLink]);
 
   const runDraft = useCallback(async () => {
@@ -417,7 +417,7 @@ function NewPostTab({
       source_blog_archive_id: sourceId,
     } });
     if (r.ok) setDraft(r.post);
-    else setNotice({ kind: "err", text: r.error });
+    else setNotice({ kind: "err", text: r.error ?? "Unknown error" });
     setDrafting(false);
   }, [draftFn, workshopId, brief, sourceId, setNotice]);
 
@@ -443,7 +443,7 @@ function NewPostTab({
       setNotice({ kind: "ok", text: status === "publish" ? "Published to WordPress." : status === "future" ? "Scheduled on WordPress." : "Draft saved on WordPress." });
       setDraft(null); setBrief(""); setSourceId(null);
       onScheduled?.();
-    } else setNotice({ kind: "err", text: r.error });
+    } else setNotice({ kind: "err", text: r.error ?? "Unknown error" });
     setPublishing(false);
   }, [draft, link, status, scheduleAt, createPostFn, workshopId, sourceId, setNotice, onScheduled]);
 
@@ -657,7 +657,7 @@ function LegalTab({
     setDrafting(true); setNotice(null); setSelectedId(id);
     const r = await draftFn({ data: { workshop_id: workshopId, legal_document_id: id, anchor } });
     if (r.ok) setCard(r.card);
-    else setNotice({ kind: "err", text: r.error });
+    else setNotice({ kind: "err", text: r.error ?? "Unknown error" });
     setDrafting(false);
   }, [draftFn, workshopId, anchor, setNotice]);
 
@@ -665,14 +665,14 @@ function LegalTab({
     setCalendarPicker(true); setLoadingCals(true);
     const r = await listCalsFn({});
     if (r.ok) setCalendars(r.calendars);
-    else setNotice({ kind: "err", text: r.error });
+    else setNotice({ kind: "err", text: r.error ?? "Unknown error" });
     setLoadingCals(false);
   }, [listCalsFn, setNotice]);
 
   const pickCal = useCallback(async (id: string) => {
     const r = await setCalFn({ data: { workshop_id: workshopId, google_calendar_id: id } });
     if (r.ok) { setNotice({ kind: "ok", text: "Calendar bound." }); setCalendarPicker(false); }
-    else setNotice({ kind: "err", text: r.error });
+    else setNotice({ kind: "err", text: r.error ?? "Unknown error" });
   }, [setCalFn, workshopId, setNotice]);
 
   const send = useCallback(async () => {
@@ -691,9 +691,9 @@ function LegalTab({
       setCard(null); setSelectedId(null);
       onScheduled?.();
     } else if (r.error.toLowerCase().includes("no google calendar")) {
-      setNotice({ kind: "err", text: r.error });
+      setNotice({ kind: "err", text: r.error ?? "Unknown error" });
       await openCalPicker();
-    } else setNotice({ kind: "err", text: r.error });
+    } else setNotice({ kind: "err", text: r.error ?? "Unknown error" });
     setSending(false);
   }, [card, selectedId, createEventFn, workshopId, setNotice, openCalPicker, onScheduled]);
 
