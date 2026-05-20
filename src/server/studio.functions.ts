@@ -195,14 +195,15 @@ export const draftNewPost = createServerFn({ method: "POST" })
     const common = await loadCommon(data.workshop_id);
     if ("error" in common) return { ok: false as const, error: common.error };
 
-    let sourcePost: { title: string; excerpt: string; tags: string[]; categories: string[]; url: string | null } | null = null;
+    type SourcePost = { title: string; excerpt: string; tags: string[]; categories: string[]; url: string | null };
+    let sourcePost: SourcePost | null = null;
     if (data.source_blog_archive_id) {
       const { data: row } = await supabaseAdmin
         .from("blog_archive")
         .select("title, excerpt, tags, categories, url")
         .eq("id", data.source_blog_archive_id)
         .single();
-      if (row) sourcePost = row as typeof sourcePost;
+      if (row) sourcePost = row as SourcePost;
     }
 
     const stewardName = common.soul.chosen_name ?? common.soul.title;
