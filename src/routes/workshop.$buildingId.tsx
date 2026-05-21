@@ -531,7 +531,18 @@ function WorkshopPage() {
           </Pane>
         </div>
 
+        {/* The Studio — Phase 9 */}
+        <div className="mt-8">
+          <StudioPanel
+            workshopId={workshop.id}
+            onScheduled={() => {
+              void refreshScheduled();
+            }}
+          />
+        </div>
+
         {/* Event-Spark Calendar */}
+
         <div className="mt-8">
           <Pane
             title="Event-Spark Calendar"
