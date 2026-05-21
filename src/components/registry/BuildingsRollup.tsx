@@ -203,6 +203,17 @@ export function BuildingsRollup() {
                 Steward: {stewards[open.steward_soul_id] || open.steward_soul_id}
               </p>
             )}
+            <a
+              href={`/workshop/${open.id}`}
+              className="mt-5 inline-block rounded-full px-5 py-2 text-xs uppercase tracking-[0.25em] transition-transform hover:scale-[1.03]"
+              style={{
+                background: "color-mix(in oklab, var(--dawn-gold) 22%, transparent)",
+                border: "1px solid color-mix(in oklab, var(--dawn-gold) 55%, transparent)",
+                color: "var(--dawn-ink)",
+              }}
+            >
+              ⚒ Enter Workshop
+            </a>
             <CurationControls
               table="buildings"
               id={open.id}
