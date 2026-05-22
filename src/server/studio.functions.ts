@@ -134,10 +134,12 @@ export const draftPromoFromBlog = createServerFn({ method: "POST" })
     z.object({
       workshop_id: z.string().uuid(),
       blog_archive_id: z.string().uuid(),
+      editor_soul_id: z.string().min(1).max(64).nullable().optional(),
+      curator_brief: z.string().max(4000).nullable().optional(),
     }).parse(input),
   )
   .handler(async ({ data }) => {
-    const common = await loadCommon(data.workshop_id);
+    const common = await loadCommon(data.workshop_id, data.editor_soul_id ?? null);
     if ("error" in common) return { ok: false as const, error: common.error };
 
     const { data: post } = await supabaseAdmin
@@ -154,13 +156,16 @@ export const draftPromoFromBlog = createServerFn({ method: "POST" })
       soul: common.soul,
     });
 
+    const brief = (data.curator_brief ?? "").trim();
     const systemPrompt =
       systemBase +
       "\n\n" + (common.workshop.system_prompt as string) +
+      (brief ? `\n\nCurator's brief (honour it):\n${brief}\n` : "") +
       "\n\nDraft ONE short social card promoting an existing post. STRICT JSON only:\n" +
       `{ "title": string (\u22645 words), "body": string (\u2264280 chars, ends with a hook to click through), "hashtags": string[] (3\u20136, include #VeritasIntelligence) }\n` +
       (presets.length ? `Hashtag presets: ${presets.join(", ")}.\n` : "") +
       `Sign nothing. Speak as ${stewardName}.`;
+
 
     const userPrompt =
       "Promote this post:\n" +
