@@ -22,7 +22,13 @@ import {
   Sparkles,
 } from "lucide-react";
 import { listBlogArchive, listLegalDocuments } from "@/server/dropzone.functions";
-import { draftPromoFromBlog, draftNewPost, draftLegalCard } from "@/server/studio.functions";
+import {
+  draftPromoFromBlog,
+  draftNewPost,
+  draftLegalCard,
+  listCouncilSouls,
+  curateBlogSources,
+} from "@/server/studio.functions";
 import { schedulePost } from "@/server/workshop.functions";
 import {
   listWpSites,
