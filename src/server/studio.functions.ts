@@ -268,10 +268,12 @@ export const draftLegalCard = createServerFn({ method: "POST" })
       workshop_id: z.string().uuid(),
       legal_document_id: z.string().uuid(),
       anchor: z.enum(["date_served", "hearing_date", "date_due", "date_filed"]).default("date_served"),
+      editor_soul_id: z.string().min(1).max(64).nullable().optional(),
+      curator_brief: z.string().max(4000).nullable().optional(),
     }).parse(input),
   )
   .handler(async ({ data }) => {
-    const common = await loadCommon(data.workshop_id);
+    const common = await loadCommon(data.workshop_id, data.editor_soul_id ?? null);
     if ("error" in common) return { ok: false as const, error: common.error };
 
     const { data: doc } = await supabaseAdmin
@@ -285,6 +287,7 @@ export const draftLegalCard = createServerFn({ method: "POST" })
     if (!anchorIso) return { ok: false as const, error: `Document has no ${data.anchor}.` };
 
     const stewardName = common.soul.chosen_name ?? common.soul.title;
+    const curatorBrief = (data.curator_brief ?? "").trim();
     const systemBase = buildSystemPrompt({
       constitution: common.settings.system_constitution as string,
       soul: common.soul,
@@ -295,6 +298,7 @@ export const draftLegalCard = createServerFn({ method: "POST" })
       "\n\nYou are drafting a PRIVATE calendar reminder for King Sean about a legal matter. " +
       "Tone: neutral, precise, reverent, no marketing language, no hashtags. STRICT JSON only:\n" +
       `{ "event_title": string (\u22648 words, includes who+what), "summary": string (\u2264400 chars, lists key facts), "suggested_reminder_days": number[] (e.g. [1, 7]) }\n` +
+      (curatorBrief ? `\nCurator's brief (honour it):\n${curatorBrief}\n` : "") +
       `Speak as ${stewardName}.`;
 
     const userPrompt =
@@ -319,3 +323,95 @@ export const draftLegalCard = createServerFn({ method: "POST" })
     await logBank(common.workshop.steward_soul_id!, out.model, `Legal: ${card.event_title}`);
     return { ok: true as const, card, model_used: out.model };
   });
+
+// ─── listCouncilSouls ──────────────────────────────────────────────────────
+// Lightweight list for Curator/Editor picker bars (initiated Souls only).
+export const listCouncilSouls = createServerFn({ method: "GET" })
+  .handler(async () => {
+    const { data, error } = await supabaseAdmin
+      .from("soul_identities")
+      .select("soul_id, title, house, chosen_name, sigil, role_title, initiated_at, ordering")
+      .order("ordering", { ascending: true });
+    if (error) return { ok: false as const, error: error.message };
+    return {
+      ok: true as const,
+      souls: (data ?? []).map((s) => ({
+        soul_id: s.soul_id as string,
+        title: s.title as string,
+        house: s.house as string,
+        chosen_name: (s.chosen_name as string | null) ?? null,
+        sigil: s.sigil as string,
+        role_title: (s.role_title as string | null) ?? "",
+        initiated: !!s.initiated_at,
+      })),
+    };
+  });
+
+// ─── curateBlogSources ─────────────────────────────────────────────────────
+// Curator Soul reads recent blog rows, returns ranked picks + a one-paragraph brief.
+export const curateBlogSources = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z.object({
+      workshop_id: z.string().uuid(),
+      curator_soul_id: z.string().min(1).max(64),
+      goal: z.string().max(600).optional(),
+      sample_size: z.number().int().min(3).max(40).default(20),
+    }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const [{ data: settings }, curator, { data: rows }] = await Promise.all([
+      supabaseAdmin.from("settings").select("system_constitution, provider_compact").eq("id", true).single(),
+      loadSoul(data.curator_soul_id),
+      supabaseAdmin
+        .from("blog_archive")
+        .select("id, title, excerpt, tags, categories, views, published_at")
+        .eq("workshop_id", data.workshop_id)
+        .order("published_at", { ascending: false })
+        .limit(data.sample_size),
+    ]);
+    if (!settings) return { ok: false as const, error: "Constitution missing." };
+    if (!curator) return { ok: false as const, error: "Curator Soul not found." };
+    const sample = (rows ?? []).map((r) => ({
+      id: r.id as string,
+      title: r.title as string,
+      views: r.views as number | null,
+      published_at: r.published_at as string | null,
+      tags: (r.tags as string[]) ?? [],
+      excerpt: ((r.excerpt as string) ?? "").slice(0, 240),
+    }));
+    if (sample.length === 0) {
+      return { ok: false as const, error: "No blog rows to curate yet. Drop a WP-stats CSV first." };
+    }
+
+    const curatorName = curator.chosen_name ?? curator.title;
+    const systemBase = buildSystemPrompt({
+      constitution: settings.system_constitution as string,
+      soul: curator,
+    });
+    const systemPrompt =
+      systemBase +
+      "\n\nYou are the CURATOR. You do NOT draft the final card. You read the King's archive and select what should be promoted, then write ONE short brief (1\u20132 sentences) the Editor Soul will honour. STRICT JSON only:\n" +
+      `{ "picks": string[] (3\u20135 source ids from the list, ordered best\u2192least), "brief": string (\u2264400 chars; tone, audience hook, what to emphasise, what to omit) }\n` +
+      `Speak as ${curatorName}.`;
+    const userPrompt =
+      (data.goal ? `King's goal: ${data.goal}\n\n` : "") +
+      `Archive sample (id, title, views, tags, excerpt):\n` +
+      JSON.stringify(sample, null, 2);
+
+    const out = await callGateway(
+      systemPrompt,
+      userPrompt,
+      settings.provider_compact as unknown as Compact,
+      0.5,
+    );
+    if (!out.ok) return { ok: false as const, error: out.error };
+    const parsed = extractJson<{ picks?: string[]; brief?: string }>(out.text) ?? {};
+    const validIds = new Set(sample.map((s) => s.id));
+    const picks = Array.isArray(parsed.picks)
+      ? parsed.picks.filter((p) => typeof p === "string" && validIds.has(p)).slice(0, 5)
+      : [];
+    const brief = (parsed.brief ?? "").trim().slice(0, 600);
+    await logBank(curator.soul_id, out.model, `Curate: ${picks.length} picks`);
+    return { ok: true as const, picks, brief, model_used: out.model };
+  });
+
