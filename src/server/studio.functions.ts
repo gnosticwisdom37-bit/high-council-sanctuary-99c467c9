@@ -21,7 +21,7 @@ import {
 
 type Compact = { fallback_chain?: string[] };
 
-async function loadCommon(workshop_id: string) {
+async function loadCommon(workshop_id: string, editor_soul_id_override?: string | null) {
   const [{ data: workshop }, { data: settings }] = await Promise.all([
     supabaseAdmin
       .from("workshops")
@@ -36,19 +36,29 @@ async function loadCommon(workshop_id: string) {
   ]);
   if (!workshop) return { error: "Workshop not found." as const };
   if (!settings) return { error: "Constitution missing." as const };
-  if (!workshop.steward_soul_id) return { error: "No Steward Soul attends this Workshop." as const };
-  const { data: stewardRow } = await supabaseAdmin
+  const editorSoulId = (editor_soul_id_override ?? "").trim() || workshop.steward_soul_id;
+  if (!editorSoulId) return { error: "No Editor Soul chosen for this Workshop." as const };
+  const { data: editorRow } = await supabaseAdmin
     .from("soul_identities")
     .select("*")
-    .eq("soul_id", workshop.steward_soul_id)
+    .eq("soul_id", editorSoulId)
     .single();
-  if (!stewardRow) return { error: "Steward Soul identity not found." as const };
+  if (!editorRow) return { error: "Editor Soul identity not found." as const };
   return {
-    workshop,
+    workshop: { ...workshop, steward_soul_id: editorSoulId },
     settings,
-    soul: stewardRow as unknown as SoulIdentity,
+    soul: editorRow as unknown as SoulIdentity,
     compact: settings.provider_compact as unknown as ProviderCompact,
   };
+}
+
+async function loadSoul(soul_id: string) {
+  const { data } = await supabaseAdmin
+    .from("soul_identities")
+    .select("*")
+    .eq("soul_id", soul_id)
+    .single();
+  return (data as unknown as SoulIdentity | null) ?? null;
 }
 
 async function callGateway(
