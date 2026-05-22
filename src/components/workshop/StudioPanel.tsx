@@ -89,15 +89,50 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: "legal", label: "Legal Milestone", icon: <Gavel className="h-3.5 w-3.5" /> },
 ];
 
+type CouncilSoul = {
+  soul_id: string;
+  title: string;
+  house: string;
+  chosen_name: string | null;
+  sigil: string;
+  role_title: string;
+  initiated: boolean;
+};
+
 export function StudioPanel({
   workshopId,
+  stewardSoulId,
   onScheduled,
 }: {
   workshopId: string;
+  stewardSoulId?: string | null;
   onScheduled?: () => void;
 }) {
   const [tab, setTab] = useState<TabKey>("promo");
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  // Curator + Editor Souls — picked once, used across all three tabs.
+  const listSoulsFn = useServerFn(listCouncilSouls);
+  const [souls, setSouls] = useState<CouncilSoul[]>([]);
+  const [curatorId, setCuratorId] = useState<string | null>(null);
+  const [editorId, setEditorId] = useState<string | null>(null);
+
+  useEffect(() => {
+    void listSoulsFn({}).then((r) => {
+      if (r.ok) {
+        setSouls(r.souls);
+        // Default both Curator and Editor to the Workshop's Steward.
+        if (stewardSoulId) {
+          setCuratorId((prev) => prev ?? stewardSoulId);
+          setEditorId((prev) => prev ?? stewardSoulId);
+        } else if (r.souls.length > 0) {
+          const firstInitiated = r.souls.find((s) => s.initiated) ?? r.souls[0];
+          setCuratorId((prev) => prev ?? firstInitiated.soul_id);
+          setEditorId((prev) => prev ?? firstInitiated.soul_id);
+        }
+      }
+    });
+  }, [listSoulsFn, stewardSoulId]);
 
   return (
     <section
@@ -119,12 +154,21 @@ export function StudioPanel({
           className="text-[10px] uppercase tracking-[0.25em]"
           style={{ color: "color-mix(in oklab, var(--dawn-parchment) 70%, transparent)" }}
         >
-          Three card types · sourced from Your Archives
+          Two Souls · Curator selects · Editor drafts
         </p>
       </div>
 
+      {/* Curator | Editor picker bar (Phase 10.1) */}
+      <CuratorEditorBar
+        souls={souls}
+        curatorId={curatorId}
+        editorId={editorId}
+        onCurator={setCuratorId}
+        onEditor={setEditorId}
+      />
+
       {/* Tab strip */}
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-4 mt-4 flex flex-wrap gap-2">
         {TABS.map((t) => {
           const active = tab === t.key;
           return (
@@ -163,12 +207,35 @@ export function StudioPanel({
         </p>
       )}
 
-      {tab === "promo" && <PromoTab workshopId={workshopId} setNotice={setNotice} onScheduled={onScheduled} />}
-      {tab === "newpost" && <NewPostTab workshopId={workshopId} setNotice={setNotice} onScheduled={onScheduled} />}
-      {tab === "legal" && <LegalTab workshopId={workshopId} setNotice={setNotice} onScheduled={onScheduled} />}
+      {tab === "promo" && (
+        <PromoTab
+          workshopId={workshopId}
+          curatorId={curatorId}
+          editorId={editorId}
+          setNotice={setNotice}
+          onScheduled={onScheduled}
+        />
+      )}
+      {tab === "newpost" && (
+        <NewPostTab
+          workshopId={workshopId}
+          editorId={editorId}
+          setNotice={setNotice}
+          onScheduled={onScheduled}
+        />
+      )}
+      {tab === "legal" && (
+        <LegalTab
+          workshopId={workshopId}
+          editorId={editorId}
+          setNotice={setNotice}
+          onScheduled={onScheduled}
+        />
+      )}
     </section>
   );
 }
+
 
 // ─── shared bits ──────────────────────────────────────────────────────────
 function paneStyle(): React.CSSProperties {
