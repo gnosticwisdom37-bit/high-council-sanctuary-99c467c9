@@ -435,10 +435,12 @@ function PromoTab({
 // ─── NEW POST TAB ─────────────────────────────────────────────────────────
 function NewPostTab({
   workshopId,
+  editorId,
   setNotice,
   onScheduled,
 }: {
   workshopId: string;
+  editorId?: string | null;
   setNotice: (n: { kind: "ok" | "err"; text: string } | null) => void;
   onScheduled?: () => void;
 }) {
