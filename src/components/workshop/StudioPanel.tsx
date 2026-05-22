@@ -259,15 +259,20 @@ function btnStyle(primary?: boolean): React.CSSProperties {
 // ─── PROMO TAB ────────────────────────────────────────────────────────────
 function PromoTab({
   workshopId,
+  curatorId,
+  editorId,
   setNotice,
   onScheduled,
 }: {
   workshopId: string;
+  curatorId?: string | null;
+  editorId?: string | null;
   setNotice: (n: { kind: "ok" | "err"; text: string } | null) => void;
   onScheduled?: () => void;
 }) {
   const listBlog = useServerFn(listBlogArchive);
   const draftFn = useServerFn(draftPromoFromBlog);
+  const curateFn = useServerFn(curateBlogSources);
   const scheduleFn = useServerFn(schedulePost);
   const [posts, setPosts] = useState<BlogRow[]>([]);
   const [sort, setSort] = useState<"recent" | "top-views">("recent");
@@ -275,6 +280,9 @@ function PromoTab({
   const [card, setCard] = useState<PromoCard | null>(null);
   const [drafting, setDrafting] = useState(false);
   const [scheduling, setScheduling] = useState(false);
+  const [curatorBrief, setCuratorBrief] = useState("");
+  const [curating, setCurating] = useState(false);
+  const [curatorPicks, setCuratorPicks] = useState<string[]>([]);
 
   const refresh = useCallback(async () => {
     const r = await listBlog({ data: { workshop_id: workshopId, sort, limit: 50 } });
@@ -282,15 +290,31 @@ function PromoTab({
   }, [listBlog, workshopId, sort]);
   useEffect(() => { void refresh(); }, [refresh]);
 
+  const askCurator = useCallback(async () => {
+    if (!curatorId) { setNotice({ kind: "err", text: "Pick a Curator Soul first." }); return; }
+    setCurating(true); setNotice(null);
+    const r = await curateFn({ data: { workshop_id: workshopId, curator_soul_id: curatorId } });
+    if (r.ok) { setCuratorBrief(r.brief); setCuratorPicks(r.picks); }
+    else setNotice({ kind: "err", text: r.error ?? "Unknown error" });
+    setCurating(false);
+  }, [curateFn, curatorId, workshopId, setNotice]);
+
   const draft = useCallback(async (id: string) => {
     setDrafting(true);
     setNotice(null);
     setSelectedId(id);
-    const r = await draftFn({ data: { workshop_id: workshopId, blog_archive_id: id } });
+    const r = await draftFn({ data: {
+      workshop_id: workshopId,
+      blog_archive_id: id,
+      editor_soul_id: editorId ?? null,
+      curator_brief: curatorBrief.trim() || null,
+    } });
     if (r.ok) setCard(r.card);
     else setNotice({ kind: "err", text: r.error ?? "Unknown error" });
     setDrafting(false);
-  }, [draftFn, workshopId, setNotice]);
+  }, [draftFn, workshopId, editorId, curatorBrief, setNotice]);
+
+
 
   const schedule = useCallback(async (when: Date | null) => {
     if (!card) return;
