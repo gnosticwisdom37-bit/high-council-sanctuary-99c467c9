@@ -381,14 +381,18 @@ function PromoTab({
         <ScrollList>
           {posts.length === 0 ? (
             <EmptyHint text="No posts yet — drop a WP-stats CSV into the Drop Zone above." />
-          ) : posts.map((p) => (
+          ) : posts.map((p) => {
+            const picked = curatorPicks.includes(p.id);
+            return (
             <li key={p.id}>
               <button
                 onClick={() => void draft(p.id)}
                 disabled={drafting}
                 className="block w-full rounded-md px-2.5 py-2 text-left hover:bg-black/5 disabled:opacity-50"
+                style={picked ? { background: "color-mix(in oklab, var(--dawn-gold-bright) 18%, transparent)" } : undefined}
               >
                 <p className="line-clamp-2 text-sm font-medium" style={{ fontFamily: "Cinzel, serif" }}>
+                  {picked && <span style={{ color: "var(--dawn-gold-bright)" }}>★ </span>}
                   {p.title}
                 </p>
                 <p className="mt-0.5 text-[10px] uppercase tracking-[0.2em] opacity-70">
@@ -398,7 +402,8 @@ function PromoTab({
                 </p>
               </button>
             </li>
-          ))}
+            );
+          })}
         </ScrollList>
       </div>
 
