@@ -349,6 +349,35 @@ function PromoTab({
             </button>
           </div>
         </div>
+
+        {/* Curator brief — Phase 10.1 */}
+        <div className="mb-2 rounded-md border border-black/10 bg-white/40 p-2">
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <p className="text-[10px] uppercase tracking-[0.3em] opacity-70">Curator's brief</p>
+            <button
+              onClick={() => void askCurator()}
+              disabled={curating}
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.2em]"
+              style={btnStyle()}
+              title="Ask the Curator Soul to pick & brief"
+            >
+              {curating ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Sparkles className="h-3 w-3" />Ask Curator</>}
+            </button>
+          </div>
+          <textarea
+            className="w-full rounded border border-black/10 bg-white/60 px-2 py-1 text-xs"
+            rows={2}
+            placeholder="Optional brief from the Curator — tone, audience, what to emphasise."
+            value={curatorBrief}
+            onChange={(e) => setCuratorBrief(e.target.value)}
+          />
+          {curatorPicks.length > 0 && (
+            <p className="mt-1 text-[10px] uppercase tracking-[0.2em] opacity-60">
+              Curator picked {curatorPicks.length} — highlighted below.
+            </p>
+          )}
+        </div>
+
         <ScrollList>
           {posts.length === 0 ? (
             <EmptyHint text="No posts yet — drop a WP-stats CSV into the Drop Zone above." />
