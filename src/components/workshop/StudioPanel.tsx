@@ -970,3 +970,60 @@ function EmptyHint({ icon, text }: { icon?: React.ReactNode; text: string }) {
     </div>
   );
 }
+
+// ─── Curator | Editor picker bar (Phase 10.1) ─────────────────────────────
+function CuratorEditorBar({
+  souls,
+  curatorId,
+  editorId,
+  onCurator,
+  onEditor,
+}: {
+  souls: CouncilSoul[];
+  curatorId: string | null;
+  editorId: string | null;
+  onCurator: (id: string) => void;
+  onEditor: (id: string) => void;
+}) {
+  const opts = souls.filter((s) => s.initiated);
+  const list = opts.length > 0 ? opts : souls;
+  const renderSelect = (
+    label: string,
+    value: string | null,
+    onChange: (id: string) => void,
+  ) => (
+    <label className="flex flex-1 items-center gap-2 text-[10px] uppercase tracking-[0.25em]"
+      style={{ color: "color-mix(in oklab, var(--dawn-parchment) 80%, transparent)" }}>
+      <span className="shrink-0" style={{ color: "var(--dawn-gold-bright)", fontFamily: "Cinzel, serif" }}>
+        {label}
+      </span>
+      <select
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        className="min-w-0 flex-1 rounded-md border bg-transparent px-2 py-1 text-xs"
+        style={{
+          color: "var(--dawn-parchment)",
+          borderColor: "color-mix(in oklab, var(--dawn-gold) 40%, transparent)",
+          fontFamily: "var(--font-body)",
+        }}
+      >
+        {list.map((s) => (
+          <option key={s.soul_id} value={s.soul_id} style={{ color: "var(--dawn-ink)" }}>
+            {s.sigil} {s.chosen_name ?? s.title} · {s.house}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-lg px-3 py-2"
+      style={{
+        background: "color-mix(in oklab, var(--dawn-deep) 40%, transparent)",
+        border: "1px solid color-mix(in oklab, var(--dawn-gold) 30%, transparent)",
+      }}>
+      {renderSelect("Curator", curatorId, onCurator)}
+      <span className="opacity-40" style={{ color: "var(--dawn-gold-bright)" }}>|</span>
+      {renderSelect("Editor", editorId, onEditor)}
+    </div>
+  );
+}
