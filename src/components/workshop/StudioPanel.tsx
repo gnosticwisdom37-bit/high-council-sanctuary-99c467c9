@@ -756,11 +756,16 @@ function LegalTab({
 
   const draft = useCallback(async (id: string) => {
     setDrafting(true); setNotice(null); setSelectedId(id);
-    const r = await draftFn({ data: { workshop_id: workshopId, legal_document_id: id, anchor } });
+    const r = await draftFn({ data: {
+      workshop_id: workshopId,
+      legal_document_id: id,
+      anchor,
+      editor_soul_id: editorId ?? null,
+    } });
     if (r.ok) setCard(r.card);
     else setNotice({ kind: "err", text: r.error ?? "Unknown error" });
     setDrafting(false);
-  }, [draftFn, workshopId, anchor, setNotice]);
+  }, [draftFn, workshopId, anchor, editorId, setNotice]);
 
   const openCalPicker = useCallback(async () => {
     setCalendarPicker(true); setLoadingCals(true);
