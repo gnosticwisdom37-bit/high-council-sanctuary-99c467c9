@@ -514,11 +514,12 @@ function NewPostTab({
       workshop_id: workshopId,
       brief: brief.trim() || undefined,
       source_blog_archive_id: sourceId,
+      editor_soul_id: editorId ?? null,
     } });
     if (r.ok) setDraft(r.post);
     else setNotice({ kind: "err", text: r.error ?? "Unknown error" });
     setDrafting(false);
-  }, [draftFn, workshopId, brief, sourceId, setNotice]);
+  }, [draftFn, workshopId, brief, sourceId, editorId, setNotice]);
 
   const publish = useCallback(async () => {
     if (!draft) return;
