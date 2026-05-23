@@ -535,6 +535,7 @@ function WorkshopPage() {
         <div className="mt-8">
           <StudioPanel
             workshopId={workshop.id}
+            stewardSoulId={workshop.steward_soul_id}
             onScheduled={() => {
               void refreshScheduled();
             }}

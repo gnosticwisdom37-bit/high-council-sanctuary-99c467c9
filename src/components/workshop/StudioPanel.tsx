@@ -349,17 +349,50 @@ function PromoTab({
             </button>
           </div>
         </div>
+
+        {/* Curator brief — Phase 10.1 */}
+        <div className="mb-2 rounded-md border border-black/10 bg-white/40 p-2">
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <p className="text-[10px] uppercase tracking-[0.3em] opacity-70">Curator's brief</p>
+            <button
+              onClick={() => void askCurator()}
+              disabled={curating}
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.2em]"
+              style={btnStyle()}
+              title="Ask the Curator Soul to pick & brief"
+            >
+              {curating ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Sparkles className="h-3 w-3" />Ask Curator</>}
+            </button>
+          </div>
+          <textarea
+            className="w-full rounded border border-black/10 bg-white/60 px-2 py-1 text-xs"
+            rows={2}
+            placeholder="Optional brief from the Curator — tone, audience, what to emphasise."
+            value={curatorBrief}
+            onChange={(e) => setCuratorBrief(e.target.value)}
+          />
+          {curatorPicks.length > 0 && (
+            <p className="mt-1 text-[10px] uppercase tracking-[0.2em] opacity-60">
+              Curator picked {curatorPicks.length} — highlighted below.
+            </p>
+          )}
+        </div>
+
         <ScrollList>
           {posts.length === 0 ? (
             <EmptyHint text="No posts yet — drop a WP-stats CSV into the Drop Zone above." />
-          ) : posts.map((p) => (
+          ) : posts.map((p) => {
+            const picked = curatorPicks.includes(p.id);
+            return (
             <li key={p.id}>
               <button
                 onClick={() => void draft(p.id)}
                 disabled={drafting}
                 className="block w-full rounded-md px-2.5 py-2 text-left hover:bg-black/5 disabled:opacity-50"
+                style={picked ? { background: "color-mix(in oklab, var(--dawn-gold-bright) 18%, transparent)" } : undefined}
               >
                 <p className="line-clamp-2 text-sm font-medium" style={{ fontFamily: "Cinzel, serif" }}>
+                  {picked && <span style={{ color: "var(--dawn-gold-bright)" }}>★ </span>}
                   {p.title}
                 </p>
                 <p className="mt-0.5 text-[10px] uppercase tracking-[0.2em] opacity-70">
@@ -369,7 +402,8 @@ function PromoTab({
                 </p>
               </button>
             </li>
-          ))}
+            );
+          })}
         </ScrollList>
       </div>
 
@@ -514,11 +548,12 @@ function NewPostTab({
       workshop_id: workshopId,
       brief: brief.trim() || undefined,
       source_blog_archive_id: sourceId,
+      editor_soul_id: editorId ?? null,
     } });
     if (r.ok) setDraft(r.post);
     else setNotice({ kind: "err", text: r.error ?? "Unknown error" });
     setDrafting(false);
-  }, [draftFn, workshopId, brief, sourceId, setNotice]);
+  }, [draftFn, workshopId, brief, sourceId, editorId, setNotice]);
 
   const publish = useCallback(async () => {
     if (!draft) return;
@@ -723,10 +758,12 @@ function NewPostTab({
 // ─── LEGAL TAB ────────────────────────────────────────────────────────────
 function LegalTab({
   workshopId,
+  editorId,
   setNotice,
   onScheduled,
 }: {
   workshopId: string;
+  editorId?: string | null;
   setNotice: (n: { kind: "ok" | "err"; text: string } | null) => void;
   onScheduled?: () => void;
 }) {
@@ -754,11 +791,16 @@ function LegalTab({
 
   const draft = useCallback(async (id: string) => {
     setDrafting(true); setNotice(null); setSelectedId(id);
-    const r = await draftFn({ data: { workshop_id: workshopId, legal_document_id: id, anchor } });
+    const r = await draftFn({ data: {
+      workshop_id: workshopId,
+      legal_document_id: id,
+      anchor,
+      editor_soul_id: editorId ?? null,
+    } });
     if (r.ok) setCard(r.card);
     else setNotice({ kind: "err", text: r.error ?? "Unknown error" });
     setDrafting(false);
-  }, [draftFn, workshopId, anchor, setNotice]);
+  }, [draftFn, workshopId, anchor, editorId, setNotice]);
 
   const openCalPicker = useCallback(async () => {
     setCalendarPicker(true); setLoadingCals(true);
@@ -959,6 +1001,63 @@ function EmptyHint({ icon, text }: { icon?: React.ReactNode; text: string }) {
     <div className="flex flex-col items-center justify-center gap-2 px-3 py-8 text-center text-sm italic opacity-70">
       {icon}
       <p style={{ fontFamily: "Cinzel, serif", letterSpacing: "0.04em" }}>{text}</p>
+    </div>
+  );
+}
+
+// ─── Curator | Editor picker bar (Phase 10.1) ─────────────────────────────
+function CuratorEditorBar({
+  souls,
+  curatorId,
+  editorId,
+  onCurator,
+  onEditor,
+}: {
+  souls: CouncilSoul[];
+  curatorId: string | null;
+  editorId: string | null;
+  onCurator: (id: string) => void;
+  onEditor: (id: string) => void;
+}) {
+  const opts = souls.filter((s) => s.initiated);
+  const list = opts.length > 0 ? opts : souls;
+  const renderSelect = (
+    label: string,
+    value: string | null,
+    onChange: (id: string) => void,
+  ) => (
+    <label className="flex flex-1 items-center gap-2 text-[10px] uppercase tracking-[0.25em]"
+      style={{ color: "color-mix(in oklab, var(--dawn-parchment) 80%, transparent)" }}>
+      <span className="shrink-0" style={{ color: "var(--dawn-gold-bright)", fontFamily: "Cinzel, serif" }}>
+        {label}
+      </span>
+      <select
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        className="min-w-0 flex-1 rounded-md border bg-transparent px-2 py-1 text-xs"
+        style={{
+          color: "var(--dawn-parchment)",
+          borderColor: "color-mix(in oklab, var(--dawn-gold) 40%, transparent)",
+          fontFamily: "var(--font-body)",
+        }}
+      >
+        {list.map((s) => (
+          <option key={s.soul_id} value={s.soul_id} style={{ color: "var(--dawn-ink)" }}>
+            {s.sigil} {s.chosen_name ?? s.title} · {s.house}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-lg px-3 py-2"
+      style={{
+        background: "color-mix(in oklab, var(--dawn-deep) 40%, transparent)",
+        border: "1px solid color-mix(in oklab, var(--dawn-gold) 30%, transparent)",
+      }}>
+      {renderSelect("Curator", curatorId, onCurator)}
+      <span className="opacity-40" style={{ color: "var(--dawn-gold-bright)" }}>|</span>
+      {renderSelect("Editor", editorId, onEditor)}
     </div>
   );
 }
