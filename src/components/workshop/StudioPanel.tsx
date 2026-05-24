@@ -257,6 +257,14 @@ function btnStyle(primary?: boolean): React.CSSProperties {
 }
 
 // ─── PROMO TAB ────────────────────────────────────────────────────────────
+type PromoChannel = "x" | "threads" | "facebook" | "instagram";
+const PROMO_CHANNELS: { key: PromoChannel; label: string; max: number; scheduleAs: "x" | "meta" }[] = [
+  { key: "x",         label: "X",          max: 280,  scheduleAs: "x" },
+  { key: "threads",   label: "Threads",    max: 500,  scheduleAs: "x" },
+  { key: "facebook",  label: "Facebook",   max: 600,  scheduleAs: "meta" },
+  { key: "instagram", label: "Instagram",  max: 2200, scheduleAs: "meta" },
+];
+
 function PromoTab({
   workshopId,
   curatorId,
@@ -277,12 +285,20 @@ function PromoTab({
   const [posts, setPosts] = useState<BlogRow[]>([]);
   const [sort, setSort] = useState<"recent" | "top-views">("recent");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [card, setCard] = useState<PromoCard | null>(null);
+  const [channel, setChannel] = useState<PromoChannel>("x");
+  // Per-channel card cache so the King can flip tabs without losing work.
+  const [cards, setCards] = useState<Partial<Record<PromoChannel, PromoCard>>>({});
+  const card = cards[channel] ?? null;
+  const setCard = useCallback((next: PromoCard | null) => {
+    setCards((prev) => ({ ...prev, [channel]: next ?? undefined }));
+  }, [channel]);
   const [drafting, setDrafting] = useState(false);
   const [scheduling, setScheduling] = useState(false);
   const [curatorBrief, setCuratorBrief] = useState("");
   const [curating, setCurating] = useState(false);
   const [curatorPicks, setCuratorPicks] = useState<string[]>([]);
+
+  const spec = PROMO_CHANNELS.find((c) => c.key === channel)!;
 
   const refresh = useCallback(async () => {
     const r = await listBlog({ data: { workshop_id: workshopId, sort, limit: 50 } });
@@ -308,13 +324,12 @@ function PromoTab({
       blog_archive_id: id,
       editor_soul_id: editorId ?? null,
       curator_brief: curatorBrief.trim() || null,
+      channel,
     } });
-    if (r.ok) setCard(r.card);
+    if (r.ok) setCards((prev) => ({ ...prev, [channel]: r.card }));
     else setNotice({ kind: "err", text: r.error ?? "Unknown error" });
     setDrafting(false);
-  }, [draftFn, workshopId, editorId, curatorBrief, setNotice]);
-
-
+  }, [draftFn, workshopId, editorId, curatorBrief, channel, setNotice]);
 
   const schedule = useCallback(async (when: Date | null) => {
     if (!card) return;
@@ -324,143 +339,186 @@ function PromoTab({
         workshop_id: workshopId,
         card,
         scheduled_at: when ? when.toISOString() : null,
-        channel: "both",
+        channel,
       },
     });
     if (r.ok) {
-      setNotice({ kind: "ok", text: when ? "Scheduled for the calendar." : "Saved as a draft." });
-      setCard(null); setSelectedId(null);
+      setNotice({ kind: "ok", text: when ? `Scheduled for ${spec.label}.` : `Saved as a ${spec.label} draft.` });
+      setCards((prev) => ({ ...prev, [channel]: undefined }));
+      setSelectedId(null);
       onScheduled?.();
     } else setNotice({ kind: "err", text: r.error ?? "Unknown error" });
     setScheduling(false);
-  }, [card, scheduleFn, workshopId, setNotice, onScheduled]);
+  }, [card, scheduleFn, workshopId, channel, spec.label, setNotice, onScheduled]);
+
+  const bodyLen = card?.body.length ?? 0;
+  const over = bodyLen > spec.max;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">
-      {/* Source picker */}
-      <div className="rounded-xl p-3" style={paneStyle()}>
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <p className="text-[10px] uppercase tracking-[0.3em]">Blog Archive</p>
-          <div className="flex gap-1">
-            <SortPill active={sort === "recent"} onClick={() => setSort("recent")}>Recent</SortPill>
-            <SortPill active={sort === "top-views"} onClick={() => setSort("top-views")}>Top views</SortPill>
-            <button onClick={() => void refresh()} title="Refresh" className="rounded p-1 hover:bg-black/5">
-              <RefreshCw className="h-3 w-3" />
-            </button>
-          </div>
-        </div>
-
-        {/* Curator brief — Phase 10.1 */}
-        <div className="mb-2 rounded-md border border-black/10 bg-white/40 p-2">
-          <div className="mb-1 flex items-center justify-between gap-2">
-            <p className="text-[10px] uppercase tracking-[0.3em] opacity-70">Curator's brief</p>
+    <div className="space-y-3">
+      {/* Per-channel sub-tabs */}
+      <div className="flex flex-wrap gap-1.5">
+        {PROMO_CHANNELS.map((c) => {
+          const active = channel === c.key;
+          const hasDraft = !!cards[c.key];
+          return (
             <button
-              onClick={() => void askCurator()}
-              disabled={curating}
-              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.2em]"
-              style={btnStyle()}
-              title="Ask the Curator Soul to pick & brief"
+              key={c.key}
+              onClick={() => setChannel(c.key)}
+              className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] transition-all"
+              style={{
+                background: active
+                  ? "color-mix(in oklab, var(--dawn-gold-bright) 28%, transparent)"
+                  : "color-mix(in oklab, var(--dawn-deep) 25%, transparent)",
+                color: active ? "var(--dawn-ink)" : "var(--dawn-parchment)",
+                border: `1px solid color-mix(in oklab, var(--dawn-gold) ${active ? 65 : 30}%, transparent)`,
+                fontFamily: "Cinzel, serif",
+              }}
+              title={`${c.label} · ${c.max} chars`}
             >
-              {curating ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Sparkles className="h-3 w-3" />Ask Curator</>}
+              {c.label}
+              <span className="opacity-60">{c.max}</span>
+              {hasDraft && <span style={{ color: "var(--dawn-gold-bright)" }}>•</span>}
             </button>
-          </div>
-          <textarea
-            className="w-full rounded border border-black/10 bg-white/60 px-2 py-1 text-xs"
-            rows={2}
-            placeholder="Optional brief from the Curator — tone, audience, what to emphasise."
-            value={curatorBrief}
-            onChange={(e) => setCuratorBrief(e.target.value)}
-          />
-          {curatorPicks.length > 0 && (
-            <p className="mt-1 text-[10px] uppercase tracking-[0.2em] opacity-60">
-              Curator picked {curatorPicks.length} — highlighted below.
-            </p>
-          )}
-        </div>
-
-        <ScrollList>
-          {posts.length === 0 ? (
-            <EmptyHint text="No posts yet — drop a WP-stats CSV into the Drop Zone above." />
-          ) : posts.map((p) => {
-            const picked = curatorPicks.includes(p.id);
-            return (
-            <li key={p.id}>
-              <button
-                onClick={() => void draft(p.id)}
-                disabled={drafting}
-                className="block w-full rounded-md px-2.5 py-2 text-left hover:bg-black/5 disabled:opacity-50"
-                style={picked ? { background: "color-mix(in oklab, var(--dawn-gold-bright) 18%, transparent)" } : undefined}
-              >
-                <p className="line-clamp-2 text-sm font-medium" style={{ fontFamily: "Cinzel, serif" }}>
-                  {picked && <span style={{ color: "var(--dawn-gold-bright)" }}>★ </span>}
-                  {p.title}
-                </p>
-                <p className="mt-0.5 text-[10px] uppercase tracking-[0.2em] opacity-70">
-                  {p.published_at ? new Date(p.published_at).toLocaleDateString() : "no date"}
-                  {p.views != null ? ` · ${p.views} views` : ""}
-                  {selectedId === p.id && drafting ? " · drafting…" : ""}
-                </p>
-              </button>
-            </li>
-            );
-          })}
-        </ScrollList>
+          );
+        })}
       </div>
 
-      {/* Card preview + actions */}
-      <div className="rounded-xl p-4" style={paneStyle()}>
-        {!card ? (
-          <EmptyHint icon={<Sparkles className="h-7 w-7" />} text="Pick a post and the Steward will draft a promo card." />
-        ) : (
-          <div className="space-y-3">
-            <p className="text-xs uppercase tracking-[0.3em] opacity-70">Drafted card</p>
-            <input
-              className="w-full rounded-md border border-black/10 bg-white/60 px-2.5 py-1.5 text-base font-medium"
-              value={card.title}
-              onChange={(e) => setCard({ ...card, title: e.target.value })}
-              style={{ fontFamily: "Cinzel, serif" }}
-            />
-            <textarea
-              className="w-full rounded-md border border-black/10 bg-white/60 px-2.5 py-1.5 text-sm"
-              rows={4}
-              value={card.body}
-              onChange={(e) => setCard({ ...card, body: e.target.value })}
-            />
-            <input
-              className="w-full rounded-md border border-black/10 bg-white/60 px-2.5 py-1.5 text-xs"
-              value={card.hashtags.join(" ")}
-              onChange={(e) =>
-                setCard({ ...card, hashtags: e.target.value.split(/\s+/).filter(Boolean) })
-              }
-            />
-            {card.source_url && (
-              <a
-                href={card.source_url} target="_blank" rel="noreferrer"
-                className="inline-flex items-center gap-1 text-xs underline opacity-70"
-              >
-                <ExternalLink className="h-3 w-3" />Source post
-              </a>
-            )}
-            <div className="flex flex-wrap gap-2 pt-1">
-              <button
-                onClick={() => void schedule(null)}
-                disabled={scheduling}
-                className="rounded-full px-3 py-1.5 text-xs uppercase tracking-[0.2em]"
-                style={btnStyle()}
-              >
-                Save as draft
-              </button>
-              <button
-                onClick={() => void schedule(new Date())}
-                disabled={scheduling}
-                className="rounded-full px-3 py-1.5 text-xs uppercase tracking-[0.2em]"
-                style={btnStyle(true)}
-              >
-                {scheduling ? <Loader2 className="h-3 w-3 animate-spin" /> : "Schedule social post"}
+      <div className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">
+        {/* Source picker */}
+        <div className="rounded-xl p-3" style={paneStyle()}>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-[10px] uppercase tracking-[0.3em]">Blog Archive</p>
+            <div className="flex gap-1">
+              <SortPill active={sort === "recent"} onClick={() => setSort("recent")}>Recent</SortPill>
+              <SortPill active={sort === "top-views"} onClick={() => setSort("top-views")}>Top views</SortPill>
+              <button onClick={() => void refresh()} title="Refresh" className="rounded p-1 hover:bg-black/5">
+                <RefreshCw className="h-3 w-3" />
               </button>
             </div>
           </div>
-        )}
+
+          {/* Curator brief — Phase 10.1 */}
+          <div className="mb-2 rounded-md border border-black/10 bg-white/40 p-2">
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <p className="text-[10px] uppercase tracking-[0.3em] opacity-70">Curator's brief</p>
+              <button
+                onClick={() => void askCurator()}
+                disabled={curating}
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.2em]"
+                style={btnStyle()}
+                title="Ask the Curator Soul to pick & brief"
+              >
+                {curating ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Sparkles className="h-3 w-3" />Ask Curator</>}
+              </button>
+            </div>
+            <textarea
+              className="w-full rounded border border-black/10 bg-white/60 px-2 py-1 text-xs"
+              rows={2}
+              placeholder="Optional brief from the Curator — tone, audience, what to emphasise."
+              value={curatorBrief}
+              onChange={(e) => setCuratorBrief(e.target.value)}
+            />
+            {curatorPicks.length > 0 && (
+              <p className="mt-1 text-[10px] uppercase tracking-[0.2em] opacity-60">
+                Curator picked {curatorPicks.length} — highlighted below.
+              </p>
+            )}
+          </div>
+
+          <ScrollList>
+            {posts.length === 0 ? (
+              <EmptyHint text="No posts yet — drop a WP-stats CSV into the Drop Zone above." />
+            ) : posts.map((p) => {
+              const picked = curatorPicks.includes(p.id);
+              return (
+              <li key={p.id}>
+                <button
+                  onClick={() => void draft(p.id)}
+                  disabled={drafting}
+                  className="block w-full rounded-md px-2.5 py-2 text-left hover:bg-black/5 disabled:opacity-50"
+                  style={picked ? { background: "color-mix(in oklab, var(--dawn-gold-bright) 18%, transparent)" } : undefined}
+                >
+                  <p className="line-clamp-2 text-sm font-medium" style={{ fontFamily: "Cinzel, serif" }}>
+                    {picked && <span style={{ color: "var(--dawn-gold-bright)" }}>★ </span>}
+                    {p.title}
+                  </p>
+                  <p className="mt-0.5 text-[10px] uppercase tracking-[0.2em] opacity-70">
+                    {p.published_at ? new Date(p.published_at).toLocaleDateString() : "no date"}
+                    {p.views != null ? ` · ${p.views} views` : ""}
+                    {selectedId === p.id && drafting ? " · drafting…" : ""}
+                  </p>
+                </button>
+              </li>
+              );
+            })}
+          </ScrollList>
+        </div>
+
+        {/* Card preview + actions */}
+        <div className="rounded-xl p-4" style={paneStyle()}>
+          {!card ? (
+            <EmptyHint icon={<Sparkles className="h-7 w-7" />} text={`Pick a post — Editor will draft a ${spec.label} card (${spec.max} chars).`} />
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs uppercase tracking-[0.3em] opacity-70">{spec.label} draft</p>
+                <p
+                  className="text-[10px] uppercase tracking-[0.2em]"
+                  style={{ color: over ? "var(--dawn-ember)" : "var(--dawn-ink)", opacity: over ? 1 : 0.6 }}
+                >
+                  {bodyLen} / {spec.max}{over ? " · over!" : ""}
+                </p>
+              </div>
+              <input
+                className="w-full rounded-md border border-black/10 bg-white/60 px-2.5 py-1.5 text-base font-medium"
+                value={card.title}
+                onChange={(e) => setCard({ ...card, title: e.target.value })}
+                style={{ fontFamily: "Cinzel, serif" }}
+              />
+              <textarea
+                className="w-full rounded-md border border-black/10 bg-white/60 px-2.5 py-1.5 text-sm"
+                rows={channel === "instagram" ? 10 : channel === "facebook" ? 6 : 4}
+                value={card.body}
+                onChange={(e) => setCard({ ...card, body: e.target.value })}
+              />
+              <input
+                className="w-full rounded-md border border-black/10 bg-white/60 px-2.5 py-1.5 text-xs"
+                value={card.hashtags.join(" ")}
+                onChange={(e) =>
+                  setCard({ ...card, hashtags: e.target.value.split(/\s+/).filter(Boolean) })
+                }
+              />
+              {card.source_url && (
+                <a
+                  href={card.source_url} target="_blank" rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-xs underline opacity-70"
+                >
+                  <ExternalLink className="h-3 w-3" />Source post
+                </a>
+              )}
+              <div className="flex flex-wrap gap-2 pt-1">
+                <button
+                  onClick={() => void schedule(null)}
+                  disabled={scheduling}
+                  className="rounded-full px-3 py-1.5 text-xs uppercase tracking-[0.2em]"
+                  style={btnStyle()}
+                >
+                  Save as draft
+                </button>
+                <button
+                  onClick={() => void schedule(new Date())}
+                  disabled={scheduling || over}
+                  className="rounded-full px-3 py-1.5 text-xs uppercase tracking-[0.2em] disabled:opacity-50"
+                  style={btnStyle(true)}
+                  title={over ? "Body exceeds the channel limit" : undefined}
+                >
+                  {scheduling ? <Loader2 className="h-3 w-3 animate-spin" /> : `Schedule ${spec.label} post`}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

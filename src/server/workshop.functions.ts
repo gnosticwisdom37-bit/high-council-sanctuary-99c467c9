@@ -377,7 +377,7 @@ export const schedulePost = createServerFn({ method: "POST" })
         workshop_id: z.string().uuid(),
         card: CardSchema,
         scheduled_at: z.string().datetime().nullable(),
-        channel: z.enum(["x", "meta", "both"]).default("both"),
+        channel: z.enum(["x", "meta", "both", "threads", "facebook", "instagram"]).default("both"),
         source_intake_id: z.string().uuid().nullable().optional(),
         source_row_index: z.number().int().min(0).nullable().optional(),
       })

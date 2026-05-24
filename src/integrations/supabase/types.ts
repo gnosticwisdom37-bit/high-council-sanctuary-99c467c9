@@ -1046,7 +1046,14 @@ export type Database = {
         | "order"
         | "other"
       placement_candidate_kind: "building" | "workshop" | "item" | "chamber"
-      post_channel: "x" | "meta" | "both" | "wordpress"
+      post_channel:
+        | "x"
+        | "meta"
+        | "both"
+        | "wordpress"
+        | "threads"
+        | "facebook"
+        | "instagram"
       post_status: "draft" | "scheduled" | "published" | "cancelled"
       realm_occupant_type: "soul" | "building" | "item" | "chamber" | "castle"
     }
@@ -1193,7 +1200,15 @@ export const Constants = {
         "other",
       ],
       placement_candidate_kind: ["building", "workshop", "item", "chamber"],
-      post_channel: ["x", "meta", "both", "wordpress"],
+      post_channel: [
+        "x",
+        "meta",
+        "both",
+        "wordpress",
+        "threads",
+        "facebook",
+        "instagram",
+      ],
       post_status: ["draft", "scheduled", "published", "cancelled"],
       realm_occupant_type: ["soul", "building", "item", "chamber", "castle"],
     },
