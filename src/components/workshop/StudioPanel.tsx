@@ -506,7 +506,7 @@ function PromoTab({
                   <ExternalLink className="h-3 w-3" />Source post
                 </a>
               )}
-              <div className="flex flex-wrap gap-2 pt-1">
+              <div className="flex flex-wrap items-center gap-2 pt-1">
                 <button
                   onClick={() => void schedule(null)}
                   disabled={scheduling}
@@ -519,10 +519,34 @@ function PromoTab({
                   onClick={() => void schedule(new Date())}
                   disabled={scheduling || over}
                   className="rounded-full px-3 py-1.5 text-xs uppercase tracking-[0.2em] disabled:opacity-50"
-                  style={btnStyle(true)}
-                  title={over ? "Body exceeds the channel limit" : undefined}
+                  style={btnStyle()}
+                  title={over ? "Body exceeds the channel limit" : "Post right now"}
                 >
-                  {scheduling ? <Loader2 className="h-3 w-3 animate-spin" /> : `Schedule ${spec.label} post`}
+                  Post now
+                </button>
+                <span className="mx-1 h-4 w-px bg-black/15" aria-hidden />
+                <input
+                  type="datetime-local"
+                  value={scheduleAt}
+                  onChange={(e) => setScheduleAt(e.target.value)}
+                  className="rounded-md border border-black/10 bg-white/70 px-2 py-1 text-xs"
+                  title="When to post (local time)"
+                />
+                <button
+                  onClick={() => {
+                    const when = scheduleAt ? new Date(scheduleAt) : null;
+                    if (!when || isNaN(when.getTime())) {
+                      setNotice({ kind: "err", text: "Pick a valid date and time first." });
+                      return;
+                    }
+                    void schedule(when);
+                  }}
+                  disabled={scheduling || over || !scheduleAt}
+                  className="rounded-full px-3 py-1.5 text-xs uppercase tracking-[0.2em] disabled:opacity-50"
+                  style={btnStyle(true)}
+                  title={over ? "Body exceeds the channel limit" : `Schedule this ${spec.label} post`}
+                >
+                  {scheduling ? <Loader2 className="h-3 w-3 animate-spin" /> : `Schedule ${spec.label}`}
                 </button>
               </div>
             </div>
