@@ -128,6 +128,16 @@ async function logBank(soul_id: string, model: string, summary: string) {
   });
 }
 
+// Per-channel limits and tonal guidance.
+const CHANNEL_SPECS = {
+  x:         { label: "X (Twitter)",  max: 280,  tone: "punchy, one idea, one strong hook; minimal emoji; 1–2 hashtags." },
+  threads:   { label: "Threads",      max: 500,  tone: "conversational, warm, slightly longer than X; 2–3 hashtags; can ask a question." },
+  facebook:  { label: "Facebook",     max: 600,  tone: "narrative; 1–2 short paragraphs; 2–3 hashtags; soft CTA at end." },
+  instagram: { label: "Instagram",    max: 2200, tone: "evocative caption with line-breaks; emoji ok in moderation; 5–8 hashtags including a niche tag." },
+  both:      { label: "Generic",      max: 280,  tone: "punchy, one idea, one strong hook." },
+} as const;
+type ChannelKey = keyof typeof CHANNEL_SPECS;
+
 // ─── draftPromoFromBlog ────────────────────────────────────────────────────
 export const draftPromoFromBlog = createServerFn({ method: "POST" })
   .inputValidator((input) =>
@@ -136,6 +146,7 @@ export const draftPromoFromBlog = createServerFn({ method: "POST" })
       blog_archive_id: z.string().uuid(),
       editor_soul_id: z.string().min(1).max(64).nullable().optional(),
       curator_brief: z.string().max(4000).nullable().optional(),
+      channel: z.enum(["x", "threads", "facebook", "instagram", "both"]).default("x"),
     }).parse(input),
   )
   .handler(async ({ data }) => {
@@ -157,12 +168,14 @@ export const draftPromoFromBlog = createServerFn({ method: "POST" })
     });
 
     const brief = (data.curator_brief ?? "").trim();
+    const spec = CHANNEL_SPECS[data.channel as ChannelKey];
+    const hashtagCount = data.channel === "instagram" ? "5\u20138" : data.channel === "x" ? "1\u20133" : "2\u20134";
     const systemPrompt =
       systemBase +
       "\n\n" + (common.workshop.system_prompt as string) +
       (brief ? `\n\nCurator's brief (honour it):\n${brief}\n` : "") +
-      "\n\nDraft ONE short social card promoting an existing post. STRICT JSON only:\n" +
-      `{ "title": string (\u22645 words), "body": string (\u2264280 chars, ends with a hook to click through), "hashtags": string[] (3\u20136, include #VeritasIntelligence) }\n` +
+      `\n\nDraft ONE social card for **${spec.label}**. ${spec.tone}\nSTRICT JSON only:\n` +
+      `{ "title": string (\u22645 words), "body": string (\u2264${spec.max} chars, ends with a hook to click through), "hashtags": string[] (${hashtagCount}, include #VeritasIntelligence) }\n` +
       (presets.length ? `Hashtag presets: ${presets.join(", ")}.\n` : "") +
       `Sign nothing. Speak as ${stewardName}.`;
 
@@ -182,14 +195,16 @@ export const draftPromoFromBlog = createServerFn({ method: "POST" })
     if (!out.ok) return { ok: false as const, error: out.error };
     const parsed = extractJson<{ title?: string; body?: string; hashtags?: string[] }>(out.text) ?? {};
     const title = (parsed.title ?? post.title).slice(0, 120);
-    const body = (parsed.body ?? "").slice(0, 320);
+    const body = (parsed.body ?? "").slice(0, spec.max);
     const hashtags = Array.isArray(parsed.hashtags)
-      ? parsed.hashtags.filter((h) => typeof h === "string").map((h) => h.startsWith("#") ? h : `#${h}`).slice(0, 8)
+      ? parsed.hashtags.filter((h) => typeof h === "string").map((h) => h.startsWith("#") ? h : `#${h}`).slice(0, 10)
       : presets;
-    await logBank(common.workshop.steward_soul_id!, out.model, `Promo: ${title}`);
+    await logBank(common.workshop.steward_soul_id!, out.model, `Promo (${data.channel}): ${title}`);
     return {
       ok: true as const,
       card: { title, body, hashtags, source_url: post.url ?? null },
+      channel: data.channel,
+      max_chars: spec.max,
       model_used: out.model,
     };
   });
