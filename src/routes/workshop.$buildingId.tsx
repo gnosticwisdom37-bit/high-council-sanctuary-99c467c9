@@ -27,6 +27,7 @@ import {
 import { BrandMark } from "@/components/kingdom/BrandMark";
 import { DropZone } from "@/components/workshop/DropZone";
 import { StudioPanel } from "@/components/workshop/StudioPanel";
+import { InboxPanel } from "@/components/workshop/InboxPanel";
 import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -541,6 +542,13 @@ function WorkshopPage() {
             }}
           />
         </div>
+
+        {/* The Sacred Inbox — Phase 10.3 */}
+        <div className="mt-8">
+          <InboxPanel workshopId={workshop.id} stewardSoulId={workshop.steward_soul_id} />
+        </div>
+
+
 
         {/* Event-Spark Calendar */}
 
