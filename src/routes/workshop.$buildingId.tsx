@@ -543,6 +543,13 @@ function WorkshopPage() {
           />
         </div>
 
+        {/* The Sacred Inbox — Phase 10.3 */}
+        <div className="mt-8">
+          <InboxPanel workshopId={workshop.id} stewardSoulId={workshop.steward_soul_id} />
+        </div>
+
+
+
         {/* Event-Spark Calendar */}
 
         <div className="mt-8">
