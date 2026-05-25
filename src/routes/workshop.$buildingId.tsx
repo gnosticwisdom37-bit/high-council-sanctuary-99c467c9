@@ -27,6 +27,7 @@ import {
 import { BrandMark } from "@/components/kingdom/BrandMark";
 import { DropZone } from "@/components/workshop/DropZone";
 import { StudioPanel } from "@/components/workshop/StudioPanel";
+import { InboxPanel } from "@/components/workshop/InboxPanel";
 import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
 import {
