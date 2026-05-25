@@ -321,6 +321,98 @@ export type Database = {
         }
         Relationships: []
       }
+      email_messages: {
+        Row: {
+          body_html: string
+          body_text: string
+          created_at: string
+          direction: Database["public"]["Enums"]["email_direction"]
+          draft_soul_id: string | null
+          from_addr: string
+          gmail_message_id: string
+          id: string
+          sent_at: string | null
+          subject: string
+          thread_id: string
+          to_addr: string
+        }
+        Insert: {
+          body_html?: string
+          body_text?: string
+          created_at?: string
+          direction: Database["public"]["Enums"]["email_direction"]
+          draft_soul_id?: string | null
+          from_addr?: string
+          gmail_message_id: string
+          id?: string
+          sent_at?: string | null
+          subject?: string
+          thread_id: string
+          to_addr?: string
+        }
+        Update: {
+          body_html?: string
+          body_text?: string
+          created_at?: string
+          direction?: Database["public"]["Enums"]["email_direction"]
+          draft_soul_id?: string | null
+          from_addr?: string
+          gmail_message_id?: string
+          id?: string
+          sent_at?: string | null
+          subject?: string
+          thread_id?: string
+          to_addr?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "email_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_threads: {
+        Row: {
+          created_at: string
+          from_addr: string
+          gmail_thread_id: string
+          id: string
+          last_message_at: string | null
+          snippet: string
+          subject: string
+          unread: boolean
+          updated_at: string
+          workshop_id: string
+        }
+        Insert: {
+          created_at?: string
+          from_addr?: string
+          gmail_thread_id: string
+          id?: string
+          last_message_at?: string | null
+          snippet?: string
+          subject?: string
+          unread?: boolean
+          updated_at?: string
+          workshop_id: string
+        }
+        Update: {
+          created_at?: string
+          from_addr?: string
+          gmail_thread_id?: string
+          id?: string
+          last_message_at?: string | null
+          snippet?: string
+          subject?: string
+          unread?: boolean
+          updated_at?: string
+          workshop_id?: string
+        }
+        Relationships: []
+      }
       items: {
         Row: {
           conversation_id: string | null
@@ -369,6 +461,45 @@ export type Database = {
           title?: string
           updated_at?: string
           witnesses?: string[]
+        }
+        Relationships: []
+      }
+      kingdom_stationery: {
+        Row: {
+          accent_color: string
+          created_at: string
+          footer_html: string
+          header_html: string
+          id: boolean
+          logo_url: string | null
+          sign_off_name: string
+          signature_block_html: string
+          thumbprint_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          accent_color?: string
+          created_at?: string
+          footer_html?: string
+          header_html?: string
+          id?: boolean
+          logo_url?: string | null
+          sign_off_name?: string
+          signature_block_html?: string
+          thumbprint_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          accent_color?: string
+          created_at?: string
+          footer_html?: string
+          header_html?: string
+          id?: boolean
+          logo_url?: string | null
+          sign_off_name?: string
+          signature_block_html?: string
+          thumbprint_url?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1036,6 +1167,7 @@ export type Database = {
       deed_quadrant: "NE" | "SE" | "SW" | "NW"
       deed_season: "spring" | "summer" | "fall" | "winter"
       deed_status: "inscribed" | "in_progress" | "fulfilled" | "set_aside"
+      email_direction: "inbound" | "outbound"
       intake_status: "pending" | "consumed"
       item_status: "forged" | "bestowed" | "archived"
       legal_doc_type:
@@ -1189,6 +1321,7 @@ export const Constants = {
       deed_quadrant: ["NE", "SE", "SW", "NW"],
       deed_season: ["spring", "summer", "fall", "winter"],
       deed_status: ["inscribed", "in_progress", "fulfilled", "set_aside"],
+      email_direction: ["inbound", "outbound"],
       intake_status: ["pending", "consumed"],
       item_status: ["forged", "bestowed", "archived"],
       legal_doc_type: [
