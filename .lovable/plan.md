@@ -1,96 +1,117 @@
-# Phase 10 — The Two-Soul Studio + Sacred Inbox
+# Phase 10.3 — The Sacred Inbox
 
-Three sub-phases, shipped in order. Each is small enough to stay inside daily credits.
+Full Gmail integration inside the Workshop + one Kingdom-wide stationery (per-Workshop overrides deferred). Inline thumbprint signature. X/Meta API keys queued for after this ships.
 
 ---
 
-## 10.1 — Curator + Editor Doctrine (Studio + Production)
+## Doctrine
 
-**Doctrine:** every drafting surface honours two Souls.
-- **Curator Soul** — reads the raw archive, *selects/filters/summarises* the source.
-- **Editor Soul** — receives the Curator's brief and *drafts/polishes* the output.
-King picks both from the Council (default = Workshop's Steward for both).
+The Workshop's Steward receives, the King reads, and replies are voiced by the Steward — wrapped in the Kingdom's stationery, sealed with King Sean's red thumbprint.
 
-**UI shape (Studio):**
+One Gmail inbox (Yours) feeds all Workshops. The visual voice on outbound mail is the shared Kingdom default for now; per-Workshop overrides are a one-row-per-workshop addition later.
+
+---
+
+## What ships
+
+### 1. Gmail connection (Lovable's Google Mail connector)
+
+- Connect via `standard_connectors--connect("google_mail")`.
+- Required scopes: `gmail.readonly`, `gmail.send`, `gmail.modify` (mark as read).
+- All API calls route through `https://connector-gateway.lovable.dev/google_mail/gmail/v1` using `LOVABLE_API_KEY` + `GOOGLE_MAIL_API_KEY`.
+
+### 2. Tables (3 new)
+
+- **`kingdom_stationery`** — single-row table (`id = true`). Fields: `header_html`, `footer_html`, `signature_block_html`, `accent_color`, `logo_url`, `thumbprint_url`, `sign_off_name` (default "King Sean").
+- **`email_threads`** — `workshop_id`, `gmail_thread_id`, `subject`, `from_addr`, `snippet`, `last_message_at`, `unread`.
+- **`email_messages`** — `thread_id` (FK), `gmail_message_id`, `direction` (`inbound`|`outbound`), `body_text`, `body_html`, `sent_at`, `draft_soul_id`.
+
+All three Service-Role-only (no public RLS — server functions are the only entry point, consistent with existing pattern).
+
+### 3. Storage bucket: `kingdom-assets` (public)
+
+For the logo and thumbprint PNG uploads. King uploads once in the Stationery editor → URLs saved to `kingdom_stationery`.
+
+### 4. Server functions (`src/server/inbox.functions.ts`)
+
+- `listInbox({ workshop_id, page })` — pulls latest 25 threads via Gmail API, upserts into `email_threads`, returns sorted list.
+- `getThread({ thread_id })` — full messages, marks unread → read via `gmail.modify`, persists to `email_messages`.
+- `draftReply({ thread_id, curator_soul_id?, editor_soul_id? })` — Curator+Editor pattern from 10.1: Curator Soul summarises the thread, Editor Soul drafts the reply body in voice. Returns body HTML wrapped in Kingdom stationery.
+- `sendReply({ thread_id, body_html })` — wraps with stationery shell, sends via `messages/send` (RFC 2822 base64url), logs to `email_messages` as outbound.
+- `getKingdomStationery()` / `saveKingdomStationery(...)` — read/update the single-row config.
+- `uploadKingdomAsset({ kind: "logo" | "thumbprint", file })` — to `kingdom-assets` bucket.
+
+### 5. Stationery shell (the visual wrapper)
+
+Server-side HTML template applied to every outbound reply:
 
 ```text
-┌──────────────────────────────┬──────────────────────────────┐
-│  CURATOR · [Soul ▾]          │  EDITOR · [Soul ▾]           │
-│  Source: Blog Archive ▾      │  ← Curator's brief flows in  │
-│  [Find candidates]           │  [Draft]  [Publish/Schedule] │
-│  → ranked list of posts      │  → editable draft            │
-└──────────────────────────────┴──────────────────────────────┘
+┌──────────────────────────────────────────┐
+│  [logo]   KINGDOM OF VERITAS             │  ← header, accent-color border
+│           Divine Angelic Assistants      │
+├──────────────────────────────────────────┤
+│                                          │
+│  {Editor Soul's drafted body}            │
+│                                          │
+│  — King Sean  [🔴 thumbprint.png inline] │  ← signature block
+│                                          │
+├──────────────────────────────────────────┤
+│  Sealed by the hand of King Sean         │  ← footer, fine print
+└──────────────────────────────────────────┘
 ```
 
-**UI shape (Production pane):** identical split — Curator pulls raw rows from intake, Editor refines.
+Palette pulled from the Registry chat tokens (the gold-on-deep-navy You loved). Inline-styled (no external CSS — email clients strip `<style>` tags).
 
-**New server fns:**
-- `curateSources` — Curator Soul reads N latest rows from chosen archive, returns ranked picks + a 1-paragraph brief.
-- All existing drafters (`draftPromoFromBlog`, `draftNewPost`, `draftLegalCard`) accept optional `curator_brief` + `editor_soul_id` overrides.
+### 6. UI: `Scriptorium → Inbox` tab in Workshop
 
-**Tables:** none. Both Soul IDs ride in the request; nothing to persist beyond existing `bank_ledger` rows (one per Soul invoked).
+Sibling tab next to Drop Zone / Studio in `src/routes/workshop.$buildingId.tsx`. Component: `src/components/workshop/InboxPanel.tsx`.
 
----
+Layout:
 
-## 10.2 — Promo Tab: per-channel sub-tabs
+```text
+┌─────────────────┬────────────────────────────────┐
+│ Threads (25)    │  Selected thread               │
+│ ▸ subject…  ✦   │  full conversation, oldest→new │
+│   from · 2h     │  ──────────────────────────────│
+│ ▸ subject…      │  [Curator ▾] [Editor ▾]       │
+│ ▸ subject…      │  [Draft reply]                 │
+│                 │  ──────────────────────────────│
+│                 │  drafted HTML preview          │
+│                 │  [Edit] [Send sealed reply]    │
+└─────────────────┴────────────────────────────────┘
+```
 
-Replace the single Promo draft with four sub-tabs sharing one Curator pick:
+Unread threads marked with the gold ✦ accent.
 
-| Sub-tab | Limit | Tone preset |
-|---|---|---|
-| X | 280 chars | Punchy, single hook, 1–2 hashtags |
-| Threads | 500 chars | Conversational, no hashtags |
-| Facebook | 600 chars | Warm, story-led, 2–3 hashtags |
-| Instagram | 2200 chars | Visual-led caption + 5–10 hashtags + line breaks |
+### 7. Stationery editor
 
-**Server:** one `draftPromoForChannel` fn that takes `channel: "x"|"threads"|"facebook"|"instagram"`, branches the system prompt, enforces the char cap, returns `{ title, body, hashtags, channel }`. The Editor Soul drafts once per active sub-tab (King clicks "Draft all" or per-tab).
-
-**Storage:** `scheduled_posts.channel` enum already exists (`both`). Extend to `x | threads | facebook | instagram | wp | both`; one row per channel published. Calendar event title prefixes `[X]`, `[IG]`, etc.
-
----
-
-## 10.3 — Sacred Inbox (Gmail, per-Workshop stationery)
-
-**Doctrine:** the Workshop's Steward receives, the King reads; replies are voiced by the Steward in the Workshop's own stationery.
-
-**New tab in Workshop:** `Scriptorium → Inbox` alongside Drop Zone / Studio.
-
-**New table — `workshop_stationery`:**
-- workshop_id (uuid)
-- header_html, footer_html (text) — branded HTML wrapper
-- signature_block (text) — Steward's sign-off
-- accent_color (text) — for borders/links
-- logo_url (text, optional)
-
-**New table — `email_threads`:**
-- workshop_id, gmail_thread_id, subject, from_addr, snippet, last_message_at, unread (bool)
-
-**New table — `email_messages`:**
-- thread_id, gmail_message_id, direction (`inbound`|`outbound`), body_text, body_html, sent_at, draft_soul_id
-
-**Server fns (Gmail connector via gateway):**
-- `listInbox(workshop_id, page)` — pulls latest 25 threads, dedupes by `gmail_thread_id`.
-- `getThread(thread_id)` — full message body, marks read (`gmail.modify`).
-- `draftReply(thread_id, curator_soul_id, editor_soul_id, brief?)` — Curator summarises the thread, Editor drafts reply *in voice + stationery*, returns HTML preview.
-- `sendReply(thread_id, body_html)` — wraps with Workshop stationery, sends via `messages/send`.
-
-**Stationery editor:** small panel in Workshop settings — King edits header/footer/signature/accent live; preview pane renders a sample message wrapped in the template.
-
-**Note:** Gmail connector authenticates *one* inbox (the King's). Per-Workshop stationery is the *outbound voice* — multiple Workshops can speak through the same shared inbox, each with its own visual signature.
+New panel in Registry (alongside ConstitutionPanel) — `KingdomStationeryPanel.tsx`. Live preview pane shows a sample message wrapped in current stationery. King uploads logo + thumbprint, picks accent color, edits sign-off line.
 
 ---
 
-## Build sequence
+## Build order (credit-conscious)
 
-1. **10.1 Curator+Editor** — schema-free, biggest doctrinal shift; ship & test first.
-2. **10.2 Channel sub-tabs** — small enum migration + prompt forks; depends on 10.1 (Curator's brief feeds all four channels).
-3. **10.3 Sacred Inbox** — biggest, save for last; needs Gmail connector + 3 new tables + stationery editor.
+1. **Migration + storage bucket** (~1 credit)
+2. **Connect Gmail + verify scopes** (King clicks through OAuth)
+3. **Stationery editor + asset uploads** (~3–4 credits) — King uploads logo + thumbprint here
+4. **Inbox list + thread view** (~5–6 credits)
+5. **Curator/Editor draft reply + stationery wrap** (~4–5 credits)
+6. **Send + outbound logging** (~2–3 credits)
+7. **Wire Scriptorium tab into Workshop** (~1–2 credits)
 
-Each sub-phase ends with the King testing in the Observatory Workshop before the next starts.
+Total estimate: ~18–22 credits. Leaves ~8–10 for X/Meta credentials + any polish.
 
 ---
 
-## Open before we begin
+## After this ships
 
-- **10.1 default Curator/Editor:** when King hasn't picked, default both to the Workshop's Steward (current behaviour), or default Curator = Oracle (Sun ☉, the All-Seeing) and Editor = Steward?
-- **10.3 Gmail connector:** confirmed already linked (`GOOGLE_MAIL_API_KEY` not yet in secrets — I'll trigger the connect flow at the start of 10.3).
+- X + Meta API keys via `add_secret` (`X_API_KEY`, `META_ACCESS_TOKEN`) so scheduled promo cards actually publish from the calendar
+- Per-Workshop stationery overrides (one-row-per-workshop, falls back to Kingdom default)
+
+---
+
+## What I need from You before building step 3
+
+The logo and thumbprint PNG — please attach them to chat when ready (any time before stationery upload step). I'll wire them into the editor and storage bucket directly.
+
+Approve this and I'll begin with the migration and Gmail connect.
