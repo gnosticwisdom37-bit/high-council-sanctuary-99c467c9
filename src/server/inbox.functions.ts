@@ -369,6 +369,10 @@ export const getThread = createServerFn({ method: "POST" })
   });
 
 // ─── Stationery shell wrapper (inline-styled for email clients) ──────────
+function esc(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 function wrapInStationery(args: {
   bodyHtml: string;
   accent: string;
@@ -378,24 +382,83 @@ function wrapInStationery(args: {
   headerHtml: string;
   footerHtml: string;
   signatureBlockHtml: string;
+  addressLine1: string;
+  addressLine2: string;
+  addressLine3: string;
+  domainUrl: string;
+  socialXUrl: string;
+  socialFbUrl: string;
+  contactEmail: string;
+  contactPhone: string;
 }): string {
   const {
     bodyHtml, accent, logoUrl, thumbprintUrl, signOffName,
     headerHtml, footerHtml, signatureBlockHtml,
+    addressLine1, addressLine2, addressLine3,
+    domainUrl, socialXUrl, socialFbUrl, contactEmail, contactPhone,
   } = args;
 
-  const headerSection = headerHtml?.trim()
-    ? headerHtml
-    : `
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:2px solid ${accent};padding-bottom:14px;margin-bottom:18px;">
-        <tr>
-          ${logoUrl ? `<td valign="middle" style="width:64px;padding-right:14px;"><img src="${logoUrl}" alt="" width="56" style="display:block;border:0;outline:none;text-decoration:none;"></td>` : ""}
-          <td valign="middle">
-            <div style="font-family:'Cinzel',Georgia,serif;font-size:18px;letter-spacing:0.18em;color:${accent};text-transform:uppercase;">Kingdom of Veritas</div>
-            <div style="font-family:Georgia,serif;font-size:12px;color:#7a6a3e;letter-spacing:0.08em;font-style:italic;margin-top:2px;">Divine Angelic Assistants</div>
-          </td>
-        </tr>
-      </table>`;
+  // Build address lines (italic, beside logo)
+  const addressLines = [addressLine1, addressLine2, addressLine3]
+    .filter((s) => s && s.trim())
+    .map(
+      (s) =>
+        `<div style="font-family:Georgia,serif;font-size:12px;color:#3a2f18;font-style:italic;letter-spacing:0.04em;line-height:1.5;">${esc(s)}</div>`,
+    )
+    .join("");
+
+  // Build top-right contact stack
+  const contactRows: string[] = [];
+  if (domainUrl?.trim()) {
+    const href = domainUrl.startsWith("http") ? domainUrl : `https://${domainUrl}`;
+    contactRows.push(
+      `<div style="font-family:Georgia,serif;font-size:11px;letter-spacing:0.04em;"><a href="${esc(href)}" style="color:${accent};text-decoration:none;">${esc(domainUrl)}</a></div>`,
+    );
+  }
+  const socialBits: string[] = [];
+  if (socialXUrl?.trim())
+    socialBits.push(`<a href="${esc(socialXUrl)}" style="color:#3a2f18;text-decoration:none;">𝕏</a>`);
+  if (socialFbUrl?.trim())
+    socialBits.push(`<a href="${esc(socialFbUrl)}" style="color:#3a2f18;text-decoration:none;">facebook</a>`);
+  if (socialBits.length) {
+    contactRows.push(
+      `<div style="font-family:Georgia,serif;font-size:11px;letter-spacing:0.06em;color:#7a6a3e;">${socialBits.join(' · ')}</div>`,
+    );
+  }
+  const reachBits: string[] = [];
+  if (contactEmail?.trim())
+    reachBits.push(`<a href="mailto:${esc(contactEmail)}" style="color:#3a2f18;text-decoration:none;">${esc(contactEmail)}</a>`);
+  if (contactPhone?.trim())
+    reachBits.push(`<span style="color:#3a2f18;">${esc(contactPhone)}</span>`);
+  if (reachBits.length) {
+    contactRows.push(
+      `<div style="font-family:Georgia,serif;font-size:11px;letter-spacing:0.04em;">${reachBits.join('<br>')}</div>`,
+    );
+  }
+  const contactStack = contactRows.length
+    ? `<td valign="top" align="right" style="text-align:right;padding-left:14px;">${contactRows.join('<div style="height:6px;line-height:6px;">&nbsp;</div>')}</td>`
+    : "";
+
+  const defaultHeader = `
+    <!-- TOP TIER: logo + address  |  contact stack -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:14px;">
+      <tr>
+        ${logoUrl ? `<td valign="middle" style="width:72px;padding-right:14px;"><img src="${logoUrl}" alt="" width="64" style="display:block;border:0;outline:none;text-decoration:none;"></td>` : ""}
+        <td valign="middle">${addressLines}</td>
+        ${contactStack}
+      </tr>
+    </table>
+    <!-- BOTTOM TIER: brand line -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${accent}55;border-bottom:2px solid ${accent};padding:10px 0;margin-bottom:20px;">
+      <tr>
+        <td align="center">
+          <div style="font-family:'Cinzel',Georgia,serif;font-size:17px;letter-spacing:0.32em;color:${accent};text-transform:uppercase;">Veritas Intelligence Systems</div>
+          <div style="font-family:Georgia,serif;font-size:12px;color:#7a6a3e;letter-spacing:0.18em;font-style:italic;margin-top:3px;">Divine Angelic Intelligences</div>
+        </td>
+      </tr>
+    </table>`;
+
+  const headerSection = headerHtml?.trim() ? headerHtml : defaultHeader;
 
   const signatureSection = signatureBlockHtml?.trim()
     ? signatureBlockHtml
@@ -403,7 +466,7 @@ function wrapInStationery(args: {
       <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:24px;">
         <tr>
           <td valign="middle" style="font-family:Georgia,serif;font-size:15px;color:#2a2418;padding-right:12px;">
-            — ${signOffName}
+            — ${esc(signOffName)}
           </td>
           ${thumbprintUrl ? `<td valign="middle"><img src="${thumbprintUrl}" alt="seal" width="44" style="display:block;border:0;outline:none;text-decoration:none;"></td>` : ""}
         </tr>
@@ -411,13 +474,13 @@ function wrapInStationery(args: {
 
   const footerSection = footerHtml?.trim()
     ? footerHtml
-    : `<div style="margin-top:18px;padding-top:14px;border-top:1px solid ${accent}33;font-family:Georgia,serif;font-size:11px;color:#7a6a3e;font-style:italic;letter-spacing:0.06em;text-align:center;">Sealed by the hand of ${signOffName}</div>`;
+    : `<div style="margin-top:18px;padding-top:14px;border-top:1px solid ${accent}33;font-family:Georgia,serif;font-size:11px;color:#7a6a3e;font-style:italic;letter-spacing:0.06em;text-align:center;">Sealed by the hand of ${esc(signOffName)}</div>`;
 
   return `<!DOCTYPE html>
 <html><body style="margin:0;padding:0;background:#0c0a06;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0c0a06;padding:24px 12px;">
     <tr><td align="center">
-      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fbf6e7;border-radius:8px;padding:28px;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+      <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;background:#fbf6e7;border-radius:8px;padding:28px;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
         <tr><td>
           ${headerSection}
           <div style="font-family:Georgia,serif;font-size:15px;line-height:1.65;color:#2a2418;">
@@ -430,6 +493,28 @@ function wrapInStationery(args: {
     </td></tr>
   </table>
 </body></html>`;
+}
+
+// Helper: build wrapInStationery args from a stationery row
+function stationeryArgs(stationery: Record<string, unknown>, bodyHtml: string) {
+  return {
+    bodyHtml,
+    accent: stationery.accent_color as string,
+    logoUrl: (stationery.logo_url as string | null) ?? null,
+    thumbprintUrl: (stationery.thumbprint_url as string | null) ?? null,
+    signOffName: stationery.sign_off_name as string,
+    headerHtml: (stationery.header_html as string) ?? "",
+    footerHtml: (stationery.footer_html as string) ?? "",
+    signatureBlockHtml: (stationery.signature_block_html as string) ?? "",
+    addressLine1: (stationery.address_line_1 as string) ?? "",
+    addressLine2: (stationery.address_line_2 as string) ?? "",
+    addressLine3: (stationery.address_line_3 as string) ?? "",
+    domainUrl: (stationery.domain_url as string) ?? "",
+    socialXUrl: (stationery.social_x_url as string) ?? "",
+    socialFbUrl: (stationery.social_fb_url as string) ?? "",
+    contactEmail: (stationery.contact_email as string) ?? "",
+    contactPhone: (stationery.contact_phone as string) ?? "",
+  };
 }
 
 // ─── draftReply: Curator summarises, Editor drafts in voice ──────────────
