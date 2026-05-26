@@ -158,6 +158,8 @@ export function CeremonyScroll({ souls, rollups }: Props) {
               <div className="space-y-10">
                 <ConstitutionPanel />
                 <hr style={{ borderColor: "color-mix(in oklab, var(--dawn-gold) 40%, transparent)" }} />
+                <KingdomStationeryPanel />
+                <hr style={{ borderColor: "color-mix(in oklab, var(--dawn-gold) 40%, transparent)" }} />
                 <ProviderCompactPanel />
               </div>
             )}
