@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { CouncilTable } from "./CouncilTable";
 import { ConstitutionPanel } from "./ConstitutionPanel";
+import { KingdomStationeryPanel } from "./KingdomStationeryPanel";
 import { ProviderCompactPanel } from "./ProviderCompactPanel";
 import { InitiateCeremony } from "./InitiateCeremony";
 import { DeedsRollup } from "./DeedsRollup";
