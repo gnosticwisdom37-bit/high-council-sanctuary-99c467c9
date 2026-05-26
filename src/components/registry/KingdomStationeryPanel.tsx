@@ -23,6 +23,14 @@ type Stationery = {
   logo_url: string | null;
   thumbprint_url: string | null;
   sign_off_name: string;
+  address_line_1: string;
+  address_line_2: string;
+  address_line_3: string;
+  domain_url: string;
+  social_x_url: string;
+  social_fb_url: string;
+  contact_email: string;
+  contact_phone: string;
 };
 
 export function KingdomStationeryPanel() {
