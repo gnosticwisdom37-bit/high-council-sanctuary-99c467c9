@@ -713,16 +713,7 @@ export const sendReply = createServerFn({ method: "POST" })
     if (!threadRow) return { ok: false as const, error: "Thread not found." };
     if (!stationery) return { ok: false as const, error: "Stationery missing." };
 
-    const wrapped = wrapInStationery({
-      bodyHtml: data.body_html,
-      accent: stationery.accent_color as string,
-      logoUrl: (stationery.logo_url as string | null) ?? null,
-      thumbprintUrl: (stationery.thumbprint_url as string | null) ?? null,
-      signOffName: stationery.sign_off_name as string,
-      headerHtml: stationery.header_html as string,
-      footerHtml: stationery.footer_html as string,
-      signatureBlockHtml: stationery.signature_block_html as string,
-    });
+    const wrapped = wrapInStationery(stationeryArgs(stationery as Record<string, unknown>, data.body_html));
 
     // Extract reply-to addr (the "From" of the last inbound message)
     const replyTo = (lastInbound?.from_addr as string | undefined) ?? (threadRow.from_addr as string);
