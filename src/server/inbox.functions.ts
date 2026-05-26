@@ -653,16 +653,7 @@ export const draftReply = createServerFn({ method: "POST" })
     }
 
     // Wrap in stationery for preview
-    const wrappedHtml = wrapInStationery({
-      bodyHtml,
-      accent: stationery.accent_color as string,
-      logoUrl: (stationery.logo_url as string | null) ?? null,
-      thumbprintUrl: (stationery.thumbprint_url as string | null) ?? null,
-      signOffName: stationery.sign_off_name as string,
-      headerHtml: stationery.header_html as string,
-      footerHtml: stationery.footer_html as string,
-      signatureBlockHtml: stationery.signature_block_html as string,
-    });
+    const wrappedHtml = wrapInStationery(stationeryArgs(stationery as Record<string, unknown>, bodyHtml));
 
     // Bank ledger
     await supabaseAdmin.from("bank_ledger").insert({
