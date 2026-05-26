@@ -23,6 +23,14 @@ type Stationery = {
   logo_url: string | null;
   thumbprint_url: string | null;
   sign_off_name: string;
+  address_line_1: string;
+  address_line_2: string;
+  address_line_3: string;
+  domain_url: string;
+  social_x_url: string;
+  social_fb_url: string;
+  contact_email: string;
+  contact_phone: string;
 };
 
 export function KingdomStationeryPanel() {
@@ -70,6 +78,14 @@ export function KingdomStationeryPanel() {
         header_html: stationery.header_html,
         footer_html: stationery.footer_html,
         signature_block_html: stationery.signature_block_html,
+        address_line_1: stationery.address_line_1,
+        address_line_2: stationery.address_line_2,
+        address_line_3: stationery.address_line_3,
+        domain_url: stationery.domain_url,
+        social_x_url: stationery.social_x_url,
+        social_fb_url: stationery.social_fb_url,
+        contact_email: stationery.contact_email,
+        contact_phone: stationery.contact_phone,
       },
     });
     setSaving(false);
@@ -221,6 +237,53 @@ export function KingdomStationeryPanel() {
               style={inputStyle}
             />
           </Field>
+
+          {/* Address lines (left of brand row, italic) */}
+          <div className="space-y-2 rounded-md p-3" style={{ background: "color-mix(in oklab, var(--dawn-gold-bright) 8%, transparent)" }}>
+            <p className="text-[10px] uppercase tracking-[0.25em]" style={{ color: "color-mix(in oklab, var(--dawn-ink) 70%, transparent)" }}>
+              Address lines (beside logo)
+            </p>
+            {([1, 2, 3] as const).map((n) => {
+              const key = `address_line_${n}` as const;
+              return (
+                <input
+                  key={key}
+                  type="text"
+                  value={stationery[key]}
+                  onChange={(e) => setStationery({ ...stationery, [key]: e.target.value })}
+                  placeholder={`Line ${n}`}
+                  className="w-full rounded-md px-2 py-1.5 text-sm italic"
+                  style={inputStyle}
+                />
+              );
+            })}
+          </div>
+
+          {/* Contact stack (top-right) */}
+          <div className="space-y-2 rounded-md p-3" style={{ background: "color-mix(in oklab, var(--dawn-gold-bright) 8%, transparent)" }}>
+            <p className="text-[10px] uppercase tracking-[0.25em]" style={{ color: "color-mix(in oklab, var(--dawn-ink) 70%, transparent)" }}>
+              Contact stack (top right)
+            </p>
+            <Field label="Domain">
+              <input type="text" value={stationery.domain_url} onChange={(e) => setStationery({ ...stationery, domain_url: e.target.value })} placeholder="vondehnvisuals.com" className="w-full rounded-md px-2 py-1.5 text-sm" style={inputStyle} />
+            </Field>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="X (Twitter) URL">
+                <input type="text" value={stationery.social_x_url} onChange={(e) => setStationery({ ...stationery, social_x_url: e.target.value })} placeholder="https://x.com/…" className="w-full rounded-md px-2 py-1.5 text-xs" style={inputStyle} />
+              </Field>
+              <Field label="Facebook URL">
+                <input type="text" value={stationery.social_fb_url} onChange={(e) => setStationery({ ...stationery, social_fb_url: e.target.value })} placeholder="https://facebook.com/…" className="w-full rounded-md px-2 py-1.5 text-xs" style={inputStyle} />
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Email">
+                <input type="text" value={stationery.contact_email} onChange={(e) => setStationery({ ...stationery, contact_email: e.target.value })} placeholder="you@gmail.com" className="w-full rounded-md px-2 py-1.5 text-xs" style={inputStyle} />
+              </Field>
+              <Field label="Phone">
+                <input type="text" value={stationery.contact_phone} onChange={(e) => setStationery({ ...stationery, contact_phone: e.target.value })} placeholder="+1 …" className="w-full rounded-md px-2 py-1.5 text-xs" style={inputStyle} />
+              </Field>
+            </div>
+          </div>
 
           <Field label="Custom signature HTML (optional — overrides default)">
             <textarea
