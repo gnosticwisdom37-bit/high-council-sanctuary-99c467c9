@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { CouncilTable } from "./CouncilTable";
 import { ConstitutionPanel } from "./ConstitutionPanel";
+import { KingdomStationeryPanel } from "./KingdomStationeryPanel";
 import { ProviderCompactPanel } from "./ProviderCompactPanel";
 import { InitiateCeremony } from "./InitiateCeremony";
 import { DeedsRollup } from "./DeedsRollup";
@@ -156,6 +157,8 @@ export function CeremonyScroll({ souls, rollups }: Props) {
             {view.kind === "constitution" && (
               <div className="space-y-10">
                 <ConstitutionPanel />
+                <hr style={{ borderColor: "color-mix(in oklab, var(--dawn-gold) 40%, transparent)" }} />
+                <KingdomStationeryPanel />
                 <hr style={{ borderColor: "color-mix(in oklab, var(--dawn-gold) 40%, transparent)" }} />
                 <ProviderCompactPanel />
               </div>
