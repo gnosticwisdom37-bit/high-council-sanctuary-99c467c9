@@ -78,6 +78,14 @@ export function KingdomStationeryPanel() {
         header_html: stationery.header_html,
         footer_html: stationery.footer_html,
         signature_block_html: stationery.signature_block_html,
+        address_line_1: stationery.address_line_1,
+        address_line_2: stationery.address_line_2,
+        address_line_3: stationery.address_line_3,
+        domain_url: stationery.domain_url,
+        social_x_url: stationery.social_x_url,
+        social_fb_url: stationery.social_fb_url,
+        contact_email: stationery.contact_email,
+        contact_phone: stationery.contact_phone,
       },
     });
     setSaving(false);
