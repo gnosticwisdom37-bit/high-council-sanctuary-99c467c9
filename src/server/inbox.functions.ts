@@ -806,15 +806,6 @@ export const previewStationery = createServerFn({ method: "POST" })
 
     return {
       ok: true as const,
-      html: wrapInStationery({
-        bodyHtml: sample,
-        accent: stationery.accent_color as string,
-        logoUrl: (stationery.logo_url as string | null) ?? null,
-        thumbprintUrl: (stationery.thumbprint_url as string | null) ?? null,
-        signOffName: stationery.sign_off_name as string,
-        headerHtml: stationery.header_html as string,
-        footerHtml: stationery.footer_html as string,
-        signatureBlockHtml: stationery.signature_block_html as string,
-      }),
+      html: wrapInStationery(stationeryArgs(stationery as Record<string, unknown>, sample)),
     };
   });
