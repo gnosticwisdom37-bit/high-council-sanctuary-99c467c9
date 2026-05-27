@@ -34,6 +34,88 @@ function gmailHeaders() {
   } as Record<string, string>;
 }
 
+// Fetch the connected Gmail address (cached per-request via module scope)
+let _kingAddress: string | null = null;
+async function getKingAddress(headers: Record<string, string>): Promise<string | null> {
+  if (_kingAddress) return _kingAddress;
+  try {
+    const r = await fetch(`${GMAIL_GATEWAY}/users/me/profile`, { headers });
+    if (!r.ok) return null;
+    const j = (await r.json()) as { emailAddress?: string };
+    _kingAddress = j.emailAddress ?? null;
+    return _kingAddress;
+  } catch {
+    return null;
+  }
+}
+
+// Encode a UTF-8 string as wrapped base64 (76-char lines per RFC 2045)
+function base64BodyWrapped(body: string): string {
+  const bytes = new TextEncoder().encode(body);
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  const b64 = btoa(bin);
+  return b64.match(/.{1,76}/g)!.join("\r\n");
+}
+
+// MIME-encode a header value containing non-ASCII (RFC 2047 "Q"/"B")
+function encodeHeader(value: string): string {
+  if (/^[\x20-\x7e]*$/.test(value)) return value;
+  const bytes = new TextEncoder().encode(value);
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return `=?UTF-8?B?${btoa(bin)}?=`;
+}
+
+// Build a fully-encoded RFC 2822 message with HTML body
+function buildRfc2822(args: {
+  from?: string | null;
+  to: string;
+  cc?: string;
+  bcc?: string;
+  subject: string;
+  htmlBody: string;
+  inReplyTo?: string;
+  references?: string;
+}): string {
+  const lines: string[] = [];
+  if (args.from) lines.push(`From: ${args.from}`);
+  lines.push(`To: ${args.to}`);
+  if (args.cc?.trim()) lines.push(`Cc: ${args.cc}`);
+  if (args.bcc?.trim()) lines.push(`Bcc: ${args.bcc}`);
+  lines.push(`Subject: ${encodeHeader(args.subject)}`);
+  lines.push("MIME-Version: 1.0");
+  lines.push('Content-Type: text/html; charset="UTF-8"');
+  lines.push("Content-Transfer-Encoding: base64");
+  if (args.inReplyTo) lines.push(`In-Reply-To: ${args.inReplyTo}`);
+  if (args.references) lines.push(`References: ${args.references}`);
+  lines.push("");
+  lines.push(base64BodyWrapped(args.htmlBody));
+  return lines.join("\r\n");
+}
+
+// Send a fully-built RFC 2822 message through Gmail. Returns Gmail message id.
+async function sendGmailRaw(
+  headers: Record<string, string>,
+  rfc2822: string,
+  threadId?: string,
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const raw = b64urlEncode(rfc2822);
+  const body: Record<string, unknown> = { raw };
+  if (threadId) body.threadId = threadId;
+  const res = await fetch(`${GMAIL_GATEWAY}/users/me/messages/send`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const errBody = await res.text();
+    return { ok: false, error: `Send failed [${res.status}]: ${errBody.slice(0, 240)}` };
+  }
+  const sent = (await res.json()) as { id: string };
+  return { ok: true, id: sent.id };
+}
+
 function b64urlDecode(s: string): string {
   const pad = s.length % 4 === 0 ? "" : "=".repeat(4 - (s.length % 4));
   const b64 = s.replace(/-/g, "+").replace(/_/g, "/") + pad;
