@@ -743,6 +743,71 @@ export type Database = {
         }
         Relationships: []
       }
+      scheduled_emails: {
+        Row: {
+          bcc_addr: string
+          body_html: string
+          cc_addr: string
+          created_at: string
+          editor_soul_id: string
+          id: string
+          kind: string
+          last_error: string | null
+          send_at: string
+          sent_at: string | null
+          sent_gmail_id: string | null
+          status: string
+          subject: string
+          thread_id: string | null
+          to_addr: string
+          updated_at: string
+        }
+        Insert: {
+          bcc_addr?: string
+          body_html: string
+          cc_addr?: string
+          created_at?: string
+          editor_soul_id: string
+          id?: string
+          kind?: string
+          last_error?: string | null
+          send_at: string
+          sent_at?: string | null
+          sent_gmail_id?: string | null
+          status?: string
+          subject: string
+          thread_id?: string | null
+          to_addr: string
+          updated_at?: string
+        }
+        Update: {
+          bcc_addr?: string
+          body_html?: string
+          cc_addr?: string
+          created_at?: string
+          editor_soul_id?: string
+          id?: string
+          kind?: string
+          last_error?: string | null
+          send_at?: string
+          sent_at?: string | null
+          sent_gmail_id?: string | null
+          status?: string
+          subject?: string
+          thread_id?: string | null
+          to_addr?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_emails_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "email_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scheduled_posts: {
         Row: {
           body: string
