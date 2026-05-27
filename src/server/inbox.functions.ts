@@ -822,37 +822,28 @@ export const sendReply = createServerFn({ method: "POST" })
       }
     }
 
-    const rfc2822 = [
-      `To: ${replyTo}`,
-      `Subject: ${subject}`,
-      "MIME-Version: 1.0",
-      'Content-Type: text/html; charset="UTF-8"',
-      inReplyTo ? `In-Reply-To: ${inReplyTo}` : "",
-      references ? `References: ${references}` : "",
-      "",
-      wrapped,
-    ]
-      .filter(Boolean)
-      .join("\r\n");
+    const kingFrom = await getKingAddress(headers);
+    const fromHeader = kingFrom
+      ? `${encodeHeader(stationery.sign_off_name as string)} <${kingFrom}>`
+      : null;
 
-    const raw = b64urlEncode(rfc2822);
-
-    const sendRes = await fetch(`${GMAIL_GATEWAY}/users/me/messages/send`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ raw, threadId: threadRow.gmail_thread_id }),
+    const rfc2822 = buildRfc2822({
+      from: fromHeader,
+      to: replyTo,
+      subject,
+      htmlBody: wrapped,
+      inReplyTo: inReplyTo || undefined,
+      references: references || undefined,
     });
-    if (!sendRes.ok) {
-      const errBody = await sendRes.text();
-      return { ok: false as const, error: `Send failed [${sendRes.status}]: ${errBody.slice(0, 200)}` };
-    }
-    const sent = (await sendRes.json()) as { id: string };
+
+    const sendRes = await sendGmailRaw(headers, rfc2822, threadRow.gmail_thread_id as string);
+    if (!sendRes.ok) return { ok: false as const, error: sendRes.error };
 
     await supabaseAdmin.from("email_messages").insert({
       thread_id: threadRow.id,
-      gmail_message_id: sent.id,
+      gmail_message_id: sendRes.id,
       direction: "outbound",
-      from_addr: stationery.sign_off_name as string,
+      from_addr: kingFrom ?? (stationery.sign_off_name as string),
       to_addr: replyTo,
       subject,
       body_text: "",
@@ -868,6 +859,7 @@ export const sendReply = createServerFn({ method: "POST" })
 
     return { ok: true as const };
   });
+
 
 // ─── preview stationery (for the editor's live preview) ──────────────────
 export const previewStationery = createServerFn({ method: "POST" })
