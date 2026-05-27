@@ -19,6 +19,7 @@ import { Route as ChamberHighCouncilRouteImport } from './routes/chamber.high-co
 import { Route as ChamberSoulIdRouteImport } from './routes/chamber.$soulId'
 import { Route as SanctumChamberSoulIdRouteImport } from './routes/sanctum.chamber.$soulId'
 import { Route as ApiPublicWorkshopIntakeRouteImport } from './routes/api/public/workshop-intake'
+import { Route as ApiPublicDispatchScheduledMailRouteImport } from './routes/api/public/dispatch-scheduled-mail'
 
 const RealmRoute = RealmRouteImport.update({
   id: '/realm',
@@ -70,6 +71,12 @@ const ApiPublicWorkshopIntakeRoute = ApiPublicWorkshopIntakeRouteImport.update({
   path: '/api/public/workshop-intake',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicDispatchScheduledMailRoute =
+  ApiPublicDispatchScheduledMailRouteImport.update({
+    id: '/api/public/dispatch-scheduled-mail',
+    path: '/api/public/dispatch-scheduled-mail',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -80,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/pledge/$soulId': typeof PledgeSoulIdRoute
   '/sanctum/invocation': typeof SanctumInvocationRoute
   '/workshop/$buildingId': typeof WorkshopBuildingIdRoute
+  '/api/public/dispatch-scheduled-mail': typeof ApiPublicDispatchScheduledMailRoute
   '/api/public/workshop-intake': typeof ApiPublicWorkshopIntakeRoute
   '/sanctum/chamber/$soulId': typeof SanctumChamberSoulIdRoute
 }
@@ -92,6 +100,7 @@ export interface FileRoutesByTo {
   '/pledge/$soulId': typeof PledgeSoulIdRoute
   '/sanctum/invocation': typeof SanctumInvocationRoute
   '/workshop/$buildingId': typeof WorkshopBuildingIdRoute
+  '/api/public/dispatch-scheduled-mail': typeof ApiPublicDispatchScheduledMailRoute
   '/api/public/workshop-intake': typeof ApiPublicWorkshopIntakeRoute
   '/sanctum/chamber/$soulId': typeof SanctumChamberSoulIdRoute
 }
@@ -105,6 +114,7 @@ export interface FileRoutesById {
   '/pledge/$soulId': typeof PledgeSoulIdRoute
   '/sanctum/invocation': typeof SanctumInvocationRoute
   '/workshop/$buildingId': typeof WorkshopBuildingIdRoute
+  '/api/public/dispatch-scheduled-mail': typeof ApiPublicDispatchScheduledMailRoute
   '/api/public/workshop-intake': typeof ApiPublicWorkshopIntakeRoute
   '/sanctum/chamber/$soulId': typeof SanctumChamberSoulIdRoute
 }
@@ -119,6 +129,7 @@ export interface FileRouteTypes {
     | '/pledge/$soulId'
     | '/sanctum/invocation'
     | '/workshop/$buildingId'
+    | '/api/public/dispatch-scheduled-mail'
     | '/api/public/workshop-intake'
     | '/sanctum/chamber/$soulId'
   fileRoutesByTo: FileRoutesByTo
@@ -131,6 +142,7 @@ export interface FileRouteTypes {
     | '/pledge/$soulId'
     | '/sanctum/invocation'
     | '/workshop/$buildingId'
+    | '/api/public/dispatch-scheduled-mail'
     | '/api/public/workshop-intake'
     | '/sanctum/chamber/$soulId'
   id:
@@ -143,6 +155,7 @@ export interface FileRouteTypes {
     | '/pledge/$soulId'
     | '/sanctum/invocation'
     | '/workshop/$buildingId'
+    | '/api/public/dispatch-scheduled-mail'
     | '/api/public/workshop-intake'
     | '/sanctum/chamber/$soulId'
   fileRoutesById: FileRoutesById
@@ -156,6 +169,7 @@ export interface RootRouteChildren {
   PledgeSoulIdRoute: typeof PledgeSoulIdRoute
   SanctumInvocationRoute: typeof SanctumInvocationRoute
   WorkshopBuildingIdRoute: typeof WorkshopBuildingIdRoute
+  ApiPublicDispatchScheduledMailRoute: typeof ApiPublicDispatchScheduledMailRoute
   ApiPublicWorkshopIntakeRoute: typeof ApiPublicWorkshopIntakeRoute
   SanctumChamberSoulIdRoute: typeof SanctumChamberSoulIdRoute
 }
@@ -232,6 +246,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWorkshopIntakeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/dispatch-scheduled-mail': {
+      id: '/api/public/dispatch-scheduled-mail'
+      path: '/api/public/dispatch-scheduled-mail'
+      fullPath: '/api/public/dispatch-scheduled-mail'
+      preLoaderRoute: typeof ApiPublicDispatchScheduledMailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -244,9 +265,19 @@ const rootRouteChildren: RootRouteChildren = {
   PledgeSoulIdRoute: PledgeSoulIdRoute,
   SanctumInvocationRoute: SanctumInvocationRoute,
   WorkshopBuildingIdRoute: WorkshopBuildingIdRoute,
+  ApiPublicDispatchScheduledMailRoute: ApiPublicDispatchScheduledMailRoute,
   ApiPublicWorkshopIntakeRoute: ApiPublicWorkshopIntakeRoute,
   SanctumChamberSoulIdRoute: SanctumChamberSoulIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
