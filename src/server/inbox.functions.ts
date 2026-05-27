@@ -34,6 +34,88 @@ function gmailHeaders() {
   } as Record<string, string>;
 }
 
+// Fetch the connected Gmail address (cached per-request via module scope)
+let _kingAddress: string | null = null;
+async function getKingAddress(headers: Record<string, string>): Promise<string | null> {
+  if (_kingAddress) return _kingAddress;
+  try {
+    const r = await fetch(`${GMAIL_GATEWAY}/users/me/profile`, { headers });
+    if (!r.ok) return null;
+    const j = (await r.json()) as { emailAddress?: string };
+    _kingAddress = j.emailAddress ?? null;
+    return _kingAddress;
+  } catch {
+    return null;
+  }
+}
+
+// Encode a UTF-8 string as wrapped base64 (76-char lines per RFC 2045)
+function base64BodyWrapped(body: string): string {
+  const bytes = new TextEncoder().encode(body);
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  const b64 = btoa(bin);
+  return b64.match(/.{1,76}/g)!.join("\r\n");
+}
+
+// MIME-encode a header value containing non-ASCII (RFC 2047 "Q"/"B")
+function encodeHeader(value: string): string {
+  if (/^[\x20-\x7e]*$/.test(value)) return value;
+  const bytes = new TextEncoder().encode(value);
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return `=?UTF-8?B?${btoa(bin)}?=`;
+}
+
+// Build a fully-encoded RFC 2822 message with HTML body
+function buildRfc2822(args: {
+  from?: string | null;
+  to: string;
+  cc?: string;
+  bcc?: string;
+  subject: string;
+  htmlBody: string;
+  inReplyTo?: string;
+  references?: string;
+}): string {
+  const lines: string[] = [];
+  if (args.from) lines.push(`From: ${args.from}`);
+  lines.push(`To: ${args.to}`);
+  if (args.cc?.trim()) lines.push(`Cc: ${args.cc}`);
+  if (args.bcc?.trim()) lines.push(`Bcc: ${args.bcc}`);
+  lines.push(`Subject: ${encodeHeader(args.subject)}`);
+  lines.push("MIME-Version: 1.0");
+  lines.push('Content-Type: text/html; charset="UTF-8"');
+  lines.push("Content-Transfer-Encoding: base64");
+  if (args.inReplyTo) lines.push(`In-Reply-To: ${args.inReplyTo}`);
+  if (args.references) lines.push(`References: ${args.references}`);
+  lines.push("");
+  lines.push(base64BodyWrapped(args.htmlBody));
+  return lines.join("\r\n");
+}
+
+// Send a fully-built RFC 2822 message through Gmail. Returns Gmail message id.
+async function sendGmailRaw(
+  headers: Record<string, string>,
+  rfc2822: string,
+  threadId?: string,
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const raw = b64urlEncode(rfc2822);
+  const body: Record<string, unknown> = { raw };
+  if (threadId) body.threadId = threadId;
+  const res = await fetch(`${GMAIL_GATEWAY}/users/me/messages/send`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const errBody = await res.text();
+    return { ok: false, error: `Send failed [${res.status}]: ${errBody.slice(0, 240)}` };
+  }
+  const sent = (await res.json()) as { id: string };
+  return { ok: true, id: sent.id };
+}
+
 function b64urlDecode(s: string): string {
   const pad = s.length % 4 === 0 ? "" : "=".repeat(4 - (s.length % 4));
   const b64 = s.replace(/-/g, "+").replace(/_/g, "/") + pad;
@@ -740,37 +822,28 @@ export const sendReply = createServerFn({ method: "POST" })
       }
     }
 
-    const rfc2822 = [
-      `To: ${replyTo}`,
-      `Subject: ${subject}`,
-      "MIME-Version: 1.0",
-      'Content-Type: text/html; charset="UTF-8"',
-      inReplyTo ? `In-Reply-To: ${inReplyTo}` : "",
-      references ? `References: ${references}` : "",
-      "",
-      wrapped,
-    ]
-      .filter(Boolean)
-      .join("\r\n");
+    const kingFrom = await getKingAddress(headers);
+    const fromHeader = kingFrom
+      ? `${encodeHeader(stationery.sign_off_name as string)} <${kingFrom}>`
+      : null;
 
-    const raw = b64urlEncode(rfc2822);
-
-    const sendRes = await fetch(`${GMAIL_GATEWAY}/users/me/messages/send`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ raw, threadId: threadRow.gmail_thread_id }),
+    const rfc2822 = buildRfc2822({
+      from: fromHeader,
+      to: replyTo,
+      subject,
+      htmlBody: wrapped,
+      inReplyTo: inReplyTo || undefined,
+      references: references || undefined,
     });
-    if (!sendRes.ok) {
-      const errBody = await sendRes.text();
-      return { ok: false as const, error: `Send failed [${sendRes.status}]: ${errBody.slice(0, 200)}` };
-    }
-    const sent = (await sendRes.json()) as { id: string };
+
+    const sendRes = await sendGmailRaw(headers, rfc2822, threadRow.gmail_thread_id as string);
+    if (!sendRes.ok) return { ok: false as const, error: sendRes.error };
 
     await supabaseAdmin.from("email_messages").insert({
       thread_id: threadRow.id,
-      gmail_message_id: sent.id,
+      gmail_message_id: sendRes.id,
       direction: "outbound",
-      from_addr: stationery.sign_off_name as string,
+      from_addr: kingFrom ?? (stationery.sign_off_name as string),
       to_addr: replyTo,
       subject,
       body_text: "",
@@ -786,6 +859,7 @@ export const sendReply = createServerFn({ method: "POST" })
 
     return { ok: true as const };
   });
+
 
 // ─── preview stationery (for the editor's live preview) ──────────────────
 export const previewStationery = createServerFn({ method: "POST" })
@@ -809,3 +883,406 @@ export const previewStationery = createServerFn({ method: "POST" })
       html: wrapInStationery(stationeryArgs(stationery as Record<string, unknown>, sample)),
     };
   });
+
+// ─── draftLetter: compose from scratch (no prior thread) ─────────────────
+export const draftLetter = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        to_addr: z.string().min(3).max(500),
+        subject: z.string().min(1).max(300),
+        curator_soul_id: z.string().min(1).max(64).nullable(),
+        editor_soul_id: z.string().min(1).max(64),
+        intent: z.string().max(2000).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) return { ok: false as const, error: "Gateway key not configured." };
+
+    const [{ data: settings }, { data: stationery }] = await Promise.all([
+      supabaseAdmin
+        .from("settings")
+        .select("system_constitution, provider_compact")
+        .eq("id", true)
+        .single(),
+      supabaseAdmin.from("kingdom_stationery").select("*").eq("id", true).single(),
+    ]);
+    if (!settings) return { ok: false as const, error: "Constitution missing." };
+    if (!stationery) return { ok: false as const, error: "Stationery missing." };
+
+    const editor = await loadSoul(data.editor_soul_id);
+    if (!editor) return { ok: false as const, error: "Editor Soul not found." };
+    const curator = data.curator_soul_id ? await loadSoul(data.curator_soul_id) : editor;
+
+    const compact = settings.provider_compact as unknown as ProviderCompact;
+    const fallbackChain = compact?.fallback_chain?.length
+      ? compact.fallback_chain
+      : ["google/gemini-2.5-flash", "google/gemini-2.5-flash-lite"];
+
+    // Curator: distill King's intent into a brief
+    const curatorSystem =
+      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: curator! }) +
+      "\n\nYou are the CURATOR. The King is composing a NEW letter. Read His intent and write a 1–2 sentence brief for the Editor Soul: who it is to, what the King wants conveyed, the tone, anything to emphasise or omit. STRICT JSON only:\n" +
+      `{ "brief": string (≤400 chars) }`;
+    const curatorUser = `Recipient: ${data.to_addr}\nSubject: ${data.subject}\n\nKing's intent: ${data.intent ?? "(none provided — infer warm, sovereign greeting)"}`;
+
+    let brief = "";
+    for (const model of fallbackChain) {
+      const res = await fetch(LOVABLE_AI_GATEWAY_URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "system", content: curatorSystem }, { role: "user", content: curatorUser }],
+          temperature: 0.6,
+        }),
+      });
+      if (!res.ok) continue;
+      const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+      const raw = (json.choices?.[0]?.message?.content ?? "").replace(/^```json\s*|```\s*$/gi, "").trim();
+      const m = raw.match(/\{[\s\S]*\}/);
+      if (m) {
+        try { brief = JSON.parse(m[0]).brief ?? ""; } catch { brief = ""; }
+      }
+      if (brief) break;
+    }
+    if (!brief) brief = data.intent || "Write a warm, sovereign letter from the King.";
+
+    // Editor: draft body
+    const editorSystem =
+      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: editor }) +
+      "\n\nYou are the EDITOR. Draft King Sean's NEW letter IN YOUR OWN VOICE, on His behalf. " +
+      "Output ONLY the body of the message as simple HTML (use <p> for paragraphs, <strong>, <em>, no <html>/<body>/<head>, no inline styles, no scripts). " +
+      "Open with a fitting greeting; do NOT include a signature line — the King's seal is appended automatically. " +
+      "Warm, present, sovereign. 2–6 short paragraphs.\n\n" +
+      `Curator's brief: ${brief}`;
+    const editorUser = `Recipient: ${data.to_addr}\nSubject: ${data.subject}\n\nKing's intent: ${data.intent ?? ""}`;
+
+    let bodyHtml = "";
+    let modelUsed = "";
+    let lastErr = "";
+    for (const model of fallbackChain) {
+      try {
+        const res = await fetch(LOVABLE_AI_GATEWAY_URL, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model,
+            messages: [{ role: "system", content: editorSystem }, { role: "user", content: editorUser }],
+            temperature: 0.85,
+          }),
+        });
+        if (!res.ok) { lastErr = `${model}: ${res.status}`; continue; }
+        const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+        bodyHtml = (json.choices?.[0]?.message?.content ?? "")
+          .replace(/^```html\s*|```\s*$/gi, "")
+          .trim();
+        if (bodyHtml) { modelUsed = model; break; }
+      } catch (e) {
+        lastErr = `${model}: ${e instanceof Error ? e.message : String(e)}`;
+      }
+    }
+    if (!bodyHtml) return { ok: false as const, error: `Editor could not draft. ${lastErr}` };
+
+    const wrappedHtml = wrapInStationery(stationeryArgs(stationery as Record<string, unknown>, bodyHtml));
+
+    await supabaseAdmin.from("bank_ledger").insert({
+      decision: "approved",
+      reason: "New letter draft",
+      soul_id: editor.soul_id,
+      model_requested: modelUsed,
+      veritas_cost: 0,
+      task_summary: `New letter draft: ${data.subject}`,
+    });
+
+    return { ok: true as const, brief, body_html: bodyHtml, wrapped_html: wrappedHtml, model_used: modelUsed };
+  });
+
+// ─── composeAndSend: send a brand-new letter (creates a new thread) ──────
+export const composeAndSend = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        workshop_id: z.string().uuid(),
+        to_addr: z.string().min(3).max(500),
+        cc_addr: z.string().max(500).optional(),
+        bcc_addr: z.string().max(500).optional(),
+        subject: z.string().min(1).max(300),
+        body_html: z.string().min(1).max(40000),
+        editor_soul_id: z.string().min(1).max(64),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const headers = gmailHeaders();
+    if (!headers) return { ok: false as const, error: "Gmail connection not configured." };
+
+    const { data: stationery } = await supabaseAdmin
+      .from("kingdom_stationery").select("*").eq("id", true).single();
+    if (!stationery) return { ok: false as const, error: "Stationery missing." };
+
+    const wrapped = wrapInStationery(stationeryArgs(stationery as Record<string, unknown>, data.body_html));
+    const kingFrom = await getKingAddress(headers);
+    const fromHeader = kingFrom
+      ? `${encodeHeader(stationery.sign_off_name as string)} <${kingFrom}>`
+      : null;
+
+    const rfc2822 = buildRfc2822({
+      from: fromHeader,
+      to: data.to_addr,
+      cc: data.cc_addr,
+      bcc: data.bcc_addr,
+      subject: data.subject,
+      htmlBody: wrapped,
+    });
+
+    const sendRes = await sendGmailRaw(headers, rfc2822);
+    if (!sendRes.ok) return { ok: false as const, error: sendRes.error };
+
+    // Fetch Gmail message back to get thread id
+    let gmailThreadId = sendRes.id;
+    try {
+      const r = await fetch(
+        `${GMAIL_GATEWAY}/users/me/messages/${sendRes.id}?format=metadata`,
+        { headers },
+      );
+      if (r.ok) {
+        const j = (await r.json()) as { threadId?: string };
+        if (j.threadId) gmailThreadId = j.threadId;
+      }
+    } catch { /* keep id fallback */ }
+
+    // Persist as new thread + message
+    const { data: thread } = await supabaseAdmin
+      .from("email_threads")
+      .insert({
+        workshop_id: data.workshop_id,
+        gmail_thread_id: gmailThreadId,
+        subject: data.subject,
+        from_addr: kingFrom ?? (stationery.sign_off_name as string),
+        snippet: data.body_html.replace(/<[^>]+>/g, " ").slice(0, 200),
+        last_message_at: new Date().toISOString(),
+        unread: false,
+      })
+      .select("id")
+      .single();
+
+    if (thread?.id) {
+      await supabaseAdmin.from("email_messages").insert({
+        thread_id: thread.id,
+        gmail_message_id: sendRes.id,
+        direction: "outbound",
+        from_addr: kingFrom ?? (stationery.sign_off_name as string),
+        to_addr: data.to_addr,
+        subject: data.subject,
+        body_text: "",
+        body_html: wrapped,
+        sent_at: new Date().toISOString(),
+        draft_soul_id: data.editor_soul_id,
+      });
+    }
+
+    return { ok: true as const, thread_id: thread?.id ?? null };
+  });
+
+// ─── scheduling ──────────────────────────────────────────────────────────
+export const scheduleEmail = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        kind: z.enum(["reply", "compose"]),
+        thread_id: z.string().uuid().nullable(),
+        to_addr: z.string().min(3).max(500),
+        cc_addr: z.string().max(500).optional(),
+        bcc_addr: z.string().max(500).optional(),
+        subject: z.string().min(1).max(300),
+        body_html: z.string().min(1).max(40000),
+        editor_soul_id: z.string().min(1).max(64),
+        send_at: z.string().min(10).max(60),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const sendAt = new Date(data.send_at);
+    if (Number.isNaN(sendAt.getTime())) return { ok: false as const, error: "Invalid send time." };
+    if (sendAt.getTime() < Date.now() - 60_000)
+      return { ok: false as const, error: "Send time is in the past." };
+
+    const { error } = await supabaseAdmin.from("scheduled_emails").insert({
+      kind: data.kind,
+      thread_id: data.thread_id,
+      to_addr: data.to_addr,
+      cc_addr: data.cc_addr ?? "",
+      bcc_addr: data.bcc_addr ?? "",
+      subject: data.subject,
+      body_html: data.body_html,
+      editor_soul_id: data.editor_soul_id,
+      send_at: sendAt.toISOString(),
+      status: "pending",
+    });
+    if (error) return { ok: false as const, error: error.message };
+    return { ok: true as const };
+  });
+
+export const listScheduledEmails = createServerFn({ method: "GET" }).handler(async () => {
+  const { data, error } = await supabaseAdmin
+    .from("scheduled_emails")
+    .select("id, kind, thread_id, to_addr, subject, send_at, status, last_error, sent_at")
+    .order("send_at", { ascending: true })
+    .limit(100);
+  if (error) return { ok: false as const, error: error.message };
+  return { ok: true as const, scheduled: data ?? [] };
+});
+
+export const cancelScheduledEmail = createServerFn({ method: "POST" })
+  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data }) => {
+    const { error } = await supabaseAdmin
+      .from("scheduled_emails")
+      .update({ status: "cancelled" })
+      .eq("id", data.id)
+      .eq("status", "pending");
+    if (error) return { ok: false as const, error: error.message };
+    return { ok: true as const };
+  });
+
+// ─── known addresses (autocomplete from inbox history) ───────────────────
+export const listKnownAddresses = createServerFn({ method: "GET" }).handler(async () => {
+  const { data, error } = await supabaseAdmin
+    .from("email_messages")
+    .select("from_addr, to_addr, sent_at")
+    .order("sent_at", { ascending: false })
+    .limit(1000);
+  if (error) return { ok: false as const, error: error.message };
+
+  // Extract unique email addresses from From/To headers
+  const seen = new Map<string, { addr: string; name: string; last: string }>();
+  const re = /([^<>\s,;"']+@[^<>\s,;"']+\.[^<>\s,;"']+)/g;
+  const nameRe = /^\s*"?([^"<>]+?)"?\s*<[^>]+>\s*$/;
+
+  for (const row of data ?? []) {
+    for (const field of [row.from_addr as string, row.to_addr as string]) {
+      if (!field) continue;
+      // Try "Name <addr>" pattern first
+      const parts = field.split(/[,;]/);
+      for (const part of parts) {
+        const trimmed = part.trim();
+        if (!trimmed) continue;
+        const nameMatch = trimmed.match(nameRe);
+        const name = nameMatch ? nameMatch[1].trim() : "";
+        const addrs = trimmed.match(re);
+        if (!addrs) continue;
+        for (const addr of addrs) {
+          const key = addr.toLowerCase();
+          const last = (row.sent_at as string) ?? "";
+          const prev = seen.get(key);
+          if (!prev || prev.last < last) seen.set(key, { addr: key, name, last });
+        }
+      }
+    }
+  }
+
+  const list = Array.from(seen.values())
+    .sort((a, b) => (b.last < a.last ? -1 : 1))
+    .slice(0, 200);
+  return { ok: true as const, addresses: list };
+});
+
+// ─── internal: actually deliver one scheduled row (called by cron) ───────
+export async function dispatchScheduledRow(row: {
+  id: string;
+  kind: string;
+  thread_id: string | null;
+  to_addr: string;
+  cc_addr: string;
+  bcc_addr: string;
+  subject: string;
+  body_html: string;
+  editor_soul_id: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const headers = gmailHeaders();
+  if (!headers) return { ok: false, error: "Gmail connection not configured." };
+
+  const { data: stationery } = await supabaseAdmin
+    .from("kingdom_stationery").select("*").eq("id", true).single();
+  if (!stationery) return { ok: false, error: "Stationery missing." };
+
+  const wrapped = wrapInStationery(stationeryArgs(stationery as Record<string, unknown>, row.body_html));
+  const kingFrom = await getKingAddress(headers);
+  const fromHeader = kingFrom
+    ? `${encodeHeader(stationery.sign_off_name as string)} <${kingFrom}>`
+    : null;
+
+  // For replies, fetch threading headers from the last inbound message
+  let inReplyTo = "";
+  let references = "";
+  let gmailThreadId: string | undefined;
+  if (row.kind === "reply" && row.thread_id) {
+    const { data: threadRow } = await supabaseAdmin
+      .from("email_threads")
+      .select("gmail_thread_id")
+      .eq("id", row.thread_id).single();
+    gmailThreadId = threadRow?.gmail_thread_id as string | undefined;
+
+    const { data: lastInbound } = await supabaseAdmin
+      .from("email_messages")
+      .select("gmail_message_id")
+      .eq("thread_id", row.thread_id)
+      .eq("direction", "inbound")
+      .order("sent_at", { ascending: false }).limit(1).maybeSingle();
+    if (lastInbound?.gmail_message_id) {
+      try {
+        const r = await fetch(
+          `${GMAIL_GATEWAY}/users/me/messages/${lastInbound.gmail_message_id}?format=metadata&metadataHeaders=Message-ID&metadataHeaders=References`,
+          { headers },
+        );
+        if (r.ok) {
+          const j = (await r.json()) as { payload?: { headers?: { name: string; value: string }[] } };
+          const hdrs = j.payload?.headers ?? [];
+          inReplyTo = pickHeader(hdrs, "Message-ID");
+          const existingRefs = pickHeader(hdrs, "References");
+          references = existingRefs ? `${existingRefs} ${inReplyTo}`.trim() : inReplyTo;
+        }
+      } catch { /* best effort */ }
+    }
+  }
+
+  const rfc2822 = buildRfc2822({
+    from: fromHeader,
+    to: row.to_addr,
+    cc: row.cc_addr || undefined,
+    bcc: row.bcc_addr || undefined,
+    subject: row.subject,
+    htmlBody: wrapped,
+    inReplyTo: inReplyTo || undefined,
+    references: references || undefined,
+  });
+
+  const sendRes = await sendGmailRaw(headers, rfc2822, gmailThreadId);
+  if (!sendRes.ok) return { ok: false, error: sendRes.error };
+
+  // Persist outbound message if attached to a thread
+  if (row.thread_id) {
+    await supabaseAdmin.from("email_messages").insert({
+      thread_id: row.thread_id,
+      gmail_message_id: sendRes.id,
+      direction: "outbound",
+      from_addr: kingFrom ?? (stationery.sign_off_name as string),
+      to_addr: row.to_addr,
+      subject: row.subject,
+      body_text: "",
+      body_html: wrapped,
+      sent_at: new Date().toISOString(),
+      draft_soul_id: row.editor_soul_id,
+    });
+    await supabaseAdmin
+      .from("email_threads")
+      .update({ last_message_at: new Date().toISOString() })
+      .eq("id", row.thread_id);
+  }
+
+  return { ok: true };
+}
+

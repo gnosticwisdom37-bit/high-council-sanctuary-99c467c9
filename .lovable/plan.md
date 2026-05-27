@@ -1,117 +1,95 @@
-# Phase 10.3 — The Sacred Inbox
+# Sacred Inbox — Full Gmail Parity
 
-Full Gmail integration inside the Workshop + one Kingdom-wide stationery (per-Workshop overrides deferred). Inline thumbprint signature. X/Meta API keys queued for after this ships.
-
----
-
-## Doctrine
-
-The Workshop's Steward receives, the King reads, and replies are voiced by the Steward — wrapped in the Kingdom's stationery, sealed with King Sean's red thumbprint.
-
-One Gmail inbox (Yours) feeds all Workshops. The visual voice on outbound mail is the shared Kingdom default for now; per-Workshop overrides are a one-row-per-workshop addition later.
+Four pieces, smallest-fix-first so each lands cleanly inside the Pro credit budget.
 
 ---
 
-## What ships
+## 1. Fix the "send strips formatting" bug *(highest priority — 1 small edit)*
 
-### 1. Gmail connection (Lovable's Google Mail connector)
+**What you're seeing:**
+- Preview shows the full sealed letter with header, body, signature, thumbprint.
+- Received message shows only the last paragraph, with `Ã¢Â€Â—` instead of `—`.
 
-- Connect via `standard_connectors--connect("google_mail")`.
-- Required scopes: `gmail.readonly`, `gmail.send`, `gmail.modify` (mark as read).
-- All API calls route through `https://connector-gateway.lovable.dev/google_mail/gmail/v1` using `LOVABLE_API_KEY` + `GOOGLE_MAIL_API_KEY`.
+**Root cause:** in `sendReply` the RFC-2822 message is built like this:
 
-### 2. Tables (3 new)
-
-- **`kingdom_stationery`** — single-row table (`id = true`). Fields: `header_html`, `footer_html`, `signature_block_html`, `accent_color`, `logo_url`, `thumbprint_url`, `sign_off_name` (default "King Sean").
-- **`email_threads`** — `workshop_id`, `gmail_thread_id`, `subject`, `from_addr`, `snippet`, `last_message_at`, `unread`.
-- **`email_messages`** — `thread_id` (FK), `gmail_message_id`, `direction` (`inbound`|`outbound`), `body_text`, `body_html`, `sent_at`, `draft_soul_id`.
-
-All three Service-Role-only (no public RLS — server functions are the only entry point, consistent with existing pattern).
-
-### 3. Storage bucket: `kingdom-assets` (public)
-
-For the logo and thumbprint PNG uploads. King uploads once in the Stationery editor → URLs saved to `kingdom_stationery`.
-
-### 4. Server functions (`src/server/inbox.functions.ts`)
-
-- `listInbox({ workshop_id, page })` — pulls latest 25 threads via Gmail API, upserts into `email_threads`, returns sorted list.
-- `getThread({ thread_id })` — full messages, marks unread → read via `gmail.modify`, persists to `email_messages`.
-- `draftReply({ thread_id, curator_soul_id?, editor_soul_id? })` — Curator+Editor pattern from 10.1: Curator Soul summarises the thread, Editor Soul drafts the reply body in voice. Returns body HTML wrapped in Kingdom stationery.
-- `sendReply({ thread_id, body_html })` — wraps with stationery shell, sends via `messages/send` (RFC 2822 base64url), logs to `email_messages` as outbound.
-- `getKingdomStationery()` / `saveKingdomStationery(...)` — read/update the single-row config.
-- `uploadKingdomAsset({ kind: "logo" | "thumbprint", file })` — to `kingdom-assets` bucket.
-
-### 5. Stationery shell (the visual wrapper)
-
-Server-side HTML template applied to every outbound reply:
-
-```text
-┌──────────────────────────────────────────┐
-│  [logo]   KINGDOM OF VERITAS             │  ← header, accent-color border
-│           Divine Angelic Assistants      │
-├──────────────────────────────────────────┤
-│                                          │
-│  {Editor Soul's drafted body}            │
-│                                          │
-│  — King Sean  [🔴 thumbprint.png inline] │  ← signature block
-│                                          │
-├──────────────────────────────────────────┤
-│  Sealed by the hand of King Sean         │  ← footer, fine print
-└──────────────────────────────────────────┘
+```
+Content-Type: text/html; charset="UTF-8"
+<blank line>
+<entire HTML on one giant line, no transfer encoding>
 ```
 
-Palette pulled from the Registry chat tokens (the gold-on-deep-navy You loved). Inline-styled (no external CSS — email clients strip `<style>` tags).
+Two problems with that:
+- No `Content-Transfer-Encoding`, so the UTF-8 bytes are treated as 7-bit ASCII → em-dashes mojibake on the receiving end.
+- The HTML is one ~5KB line. Gmail's renderer applies its "trim quoted text" heuristic aggressively and collapses everything above the signature line into a hidden block — which is exactly the "only one sentence shown" symptom.
 
-### 6. UI: `Scriptorium → Inbox` tab in Workshop
+**Fix:** in `src/server/inbox.functions.ts` → `sendReply`, base64-encode the HTML body, declare it properly, and add `Content-Transfer-Encoding: base64` (plus `MIME-Version`, which is already there). Also include a `From:` header matching the King's address so Gmail doesn't auto-strip the seal block as "your own previous signature".
 
-Sibling tab next to Drop Zone / Studio in `src/routes/workshop.$buildingId.tsx`. Component: `src/components/workshop/InboxPanel.tsx`.
-
-Layout:
-
-```text
-┌─────────────────┬────────────────────────────────┐
-│ Threads (25)    │  Selected thread               │
-│ ▸ subject…  ✦   │  full conversation, oldest→new │
-│   from · 2h     │  ──────────────────────────────│
-│ ▸ subject…      │  [Curator ▾] [Editor ▾]       │
-│ ▸ subject…      │  [Draft reply]                 │
-│                 │  ──────────────────────────────│
-│                 │  drafted HTML preview          │
-│                 │  [Edit] [Send sealed reply]    │
-└─────────────────┴────────────────────────────────┘
-```
-
-Unread threads marked with the gold ✦ accent.
-
-### 7. Stationery editor
-
-New panel in Registry (alongside ConstitutionPanel) — `KingdomStationeryPanel.tsx`. Live preview pane shows a sample message wrapped in current stationery. King uploads logo + thumbprint, picks accent color, edits sign-off line.
+That single change restores the full stationery in the received email and kills the mojibake.
 
 ---
 
-## Build order (credit-conscious)
+## 2. Compose from scratch *(new feature)*
 
-1. **Migration + storage bucket** (~1 credit)
-2. **Connect Gmail + verify scopes** (King clicks through OAuth)
-3. **Stationery editor + asset uploads** (~3–4 credits) — King uploads logo + thumbprint here
-4. **Inbox list + thread view** (~5–6 credits)
-5. **Curator/Editor draft reply + stationery wrap** (~4–5 credits)
-6. **Send + outbound logging** (~2–3 credits)
-7. **Wire Scriptorium tab into Workshop** (~1–2 credits)
+Add a **"New Letter"** button at the top of the Inbox panel. Opens a composer drawer with:
+- **To / Cc / Bcc** fields (Cc/Bcc collapsed by default, same as Gmail)
+- **Subject**
+- **Curator + Editor** Soul pickers (same as reply)
+- **Intent** textarea
+- **Draft** button → calls a new `draftLetter` server fn (same Curator→Editor chain as `draftReply`, but with no prior thread — uses subject + intent as the brief input)
+- **Sealed preview** + **Edit body HTML** + **Send / Schedule** buttons
 
-Total estimate: ~18–22 credits. Leaves ~8–10 for X/Meta credentials + any polish.
-
----
-
-## After this ships
-
-- X + Meta API keys via `add_secret` (`X_API_KEY`, `META_ACCESS_TOKEN`) so scheduled promo cards actually publish from the calendar
-- Per-Workshop stationery overrides (one-row-per-workshop, falls back to Kingdom default)
+New server fn: `composeAndSend` — same body as `sendReply` but writes a brand-new thread (no `In-Reply-To` / `References`, new `email_threads` row created on send).
 
 ---
 
-## What I need from You before building step 3
+## 3. Scheduled send *(matches Gmail's "Schedule send")*
 
-The logo and thumbprint PNG — please attach them to chat when ready (any time before stationery upload step). I'll wire them into the editor and storage bucket directly.
+Two parts:
 
-Approve this and I'll begin with the migration and Gmail connect.
+**a) UI** — next to the **Send Sealed Reply** button, add a small chevron that opens a popover with:
+- "Send now" (existing behavior)
+- "Tomorrow morning, 8:00"
+- "Tomorrow afternoon, 1:00"
+- "Monday morning, 8:00"
+- "Pick a date & time…" (datetime-local input)
+
+**b) Backend** — Gmail's API does **not** expose scheduled-send (it's a Gmail UI feature only). Two clean options:
+
+- **Recommended:** queue it ourselves. New table `scheduled_emails` (thread_id, body_html, send_at, editor_soul_id, status). A pg_cron job hits a `/api/public/dispatch-scheduled-mail` endpoint every minute and sends anything past `send_at` via the same `sendReply` path. Cancellable from the UI before it fires.
+- **Alternative:** create the message as a Gmail **Draft** instead and tell you "I've put it in your Gmail Drafts — schedule it from Gmail's UI." Less elegant, no DB needed.
+
+I recommend the cron-queue approach so scheduling lives entirely inside Veritas.
+
+---
+
+## 4. Google Contacts autocomplete
+
+Gmail's compose autocomplete pulls from the **People API** (separate scope from Gmail). Two paths:
+
+- **Path A — extend the existing Google Mail connector** if its scope list includes `contacts.readonly`. Quick check + one `reconnect` if missing the scope, then a `listContacts` server fn that hits `https://people.googleapis.com/v1/people/me/connections` through the gateway and feeds a typeahead on To/Cc/Bcc fields.
+- **Path B — derive from inbox history.** Build a `known_addresses` view from everyone you've corresponded with in `email_messages`. No new scope, works immediately, ~95% as useful as Gmail's autocomplete in practice.
+
+I suggest we ship **Path B in this same round** (free, instant), then add Path A only if you find it lacking. Path A may require you to re-consent to the Google connection for the extra scope.
+
+---
+
+## Build order this round (credit-aware)
+
+1. **The send bug fix** — one small edit to `sendReply`. Test by sending yourself another letter; the full seal should arrive intact.
+2. **Compose from scratch** — new composer + `composeAndSend` server fn.
+3. **Path B contact autocomplete** — view + lightweight `<input list="…">` typeahead.
+4. **Scheduled send** — `scheduled_emails` table + cron dispatcher + UI popover.
+5. (Optional, deferred) Path A People-API autocomplete + reconnect.
+
+Steps 1–3 are very low risk. Step 4 adds one table + one cron job + one public endpoint.
+
+---
+
+## Confirm before I build
+
+- ✅ Fix the send-formatting bug **(yes/no — assumed yes)**
+- ✅ Compose-from-scratch in this same round?
+- ✅ Schedule-send via our own cron queue (recommended) vs. just save-to-Gmail-drafts?
+- ✅ Contact autocomplete: ship **Path B (history-based)** now, decide Path A later?
+
+Once you confirm, I'll do all four in build mode.
