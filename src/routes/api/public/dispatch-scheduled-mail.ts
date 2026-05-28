@@ -34,16 +34,19 @@ async function dispatch() {
     if (!claimed) continue;
 
     const result = await dispatchScheduledRow({
-      id: row.id as string,
-      kind: row.kind as string,
-      thread_id: (row.thread_id as string | null) ?? null,
-      to_addr: row.to_addr as string,
-      cc_addr: (row.cc_addr as string) ?? "",
-      bcc_addr: (row.bcc_addr as string) ?? "",
-      subject: row.subject as string,
-      body_html: row.body_html as string,
-      editor_soul_id: row.editor_soul_id as string,
+      data: {
+        id: row.id as string,
+        kind: row.kind as string,
+        thread_id: (row.thread_id as string | null) ?? null,
+        to_addr: row.to_addr as string,
+        cc_addr: (row.cc_addr as string) ?? "",
+        bcc_addr: (row.bcc_addr as string) ?? "",
+        subject: row.subject as string,
+        body_html: row.body_html as string,
+        editor_soul_id: row.editor_soul_id as string,
+      },
     });
+
 
     if (result.ok) {
       await supabaseAdmin

@@ -1191,98 +1191,100 @@ export const listKnownAddresses = createServerFn({ method: "GET" }).handler(asyn
 });
 
 // ─── internal: actually deliver one scheduled row (called by cron) ───────
-export async function dispatchScheduledRow(row: {
-  id: string;
-  kind: string;
-  thread_id: string | null;
-  to_addr: string;
-  cc_addr: string;
-  bcc_addr: string;
-  subject: string;
-  body_html: string;
-  editor_soul_id: string;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
-  const headers = gmailHeaders();
-  if (!headers) return { ok: false, error: "Gmail connection not configured." };
+export const dispatchScheduledRow = createServerFn({ method: "POST" })
+  .inputValidator((data: {
+    id: string;
+    kind: string;
+    thread_id: string | null;
+    to_addr: string;
+    cc_addr: string;
+    bcc_addr: string;
+    subject: string;
+    body_html: string;
+    editor_soul_id: string;
+  }) => data)
+  .handler(async ({ data: row }): Promise<{ ok: true } | { ok: false; error: string }> => {
+    const headers = gmailHeaders();
+    if (!headers) return { ok: false, error: "Gmail connection not configured." };
 
-  const { data: stationery } = await supabaseAdmin
-    .from("kingdom_stationery").select("*").eq("id", true).single();
-  if (!stationery) return { ok: false, error: "Stationery missing." };
+    const { data: stationery } = await supabaseAdmin
+      .from("kingdom_stationery").select("*").eq("id", true).single();
+    if (!stationery) return { ok: false, error: "Stationery missing." };
 
-  const wrapped = wrapInStationery(stationeryArgs(stationery as Record<string, unknown>, row.body_html));
-  const kingFrom = await getKingAddress(headers);
-  const fromHeader = kingFrom
-    ? `${encodeHeader(stationery.sign_off_name as string)} <${kingFrom}>`
-    : null;
+    const wrapped = wrapInStationery(stationeryArgs(stationery as Record<string, unknown>, row.body_html));
+    const kingFrom = await getKingAddress(headers);
+    const fromHeader = kingFrom
+      ? `${encodeHeader(stationery.sign_off_name as string)} <${kingFrom}>`
+      : null;
 
-  // For replies, fetch threading headers from the last inbound message
-  let inReplyTo = "";
-  let references = "";
-  let gmailThreadId: string | undefined;
-  if (row.kind === "reply" && row.thread_id) {
-    const { data: threadRow } = await supabaseAdmin
-      .from("email_threads")
-      .select("gmail_thread_id")
-      .eq("id", row.thread_id).single();
-    gmailThreadId = threadRow?.gmail_thread_id as string | undefined;
+    let inReplyTo = "";
+    let references = "";
+    let gmailThreadId: string | undefined;
+    if (row.kind === "reply" && row.thread_id) {
+      const { data: threadRow } = await supabaseAdmin
+        .from("email_threads")
+        .select("gmail_thread_id")
+        .eq("id", row.thread_id).single();
+      gmailThreadId = threadRow?.gmail_thread_id as string | undefined;
 
-    const { data: lastInbound } = await supabaseAdmin
-      .from("email_messages")
-      .select("gmail_message_id")
-      .eq("thread_id", row.thread_id)
-      .eq("direction", "inbound")
-      .order("sent_at", { ascending: false }).limit(1).maybeSingle();
-    if (lastInbound?.gmail_message_id) {
-      try {
-        const r = await fetch(
-          `${GMAIL_GATEWAY}/users/me/messages/${lastInbound.gmail_message_id}?format=metadata&metadataHeaders=Message-ID&metadataHeaders=References`,
-          { headers },
-        );
-        if (r.ok) {
-          const j = (await r.json()) as { payload?: { headers?: { name: string; value: string }[] } };
-          const hdrs = j.payload?.headers ?? [];
-          inReplyTo = pickHeader(hdrs, "Message-ID");
-          const existingRefs = pickHeader(hdrs, "References");
-          references = existingRefs ? `${existingRefs} ${inReplyTo}`.trim() : inReplyTo;
-        }
-      } catch { /* best effort */ }
+      const { data: lastInbound } = await supabaseAdmin
+        .from("email_messages")
+        .select("gmail_message_id")
+        .eq("thread_id", row.thread_id)
+        .eq("direction", "inbound")
+        .order("sent_at", { ascending: false }).limit(1).maybeSingle();
+      if (lastInbound?.gmail_message_id) {
+        try {
+          const r = await fetch(
+            `${GMAIL_GATEWAY}/users/me/messages/${lastInbound.gmail_message_id}?format=metadata&metadataHeaders=Message-ID&metadataHeaders=References`,
+            { headers },
+          );
+          if (r.ok) {
+            const j = (await r.json()) as { payload?: { headers?: { name: string; value: string }[] } };
+            const hdrs = j.payload?.headers ?? [];
+            inReplyTo = pickHeader(hdrs, "Message-ID");
+            const existingRefs = pickHeader(hdrs, "References");
+            references = existingRefs ? `${existingRefs} ${inReplyTo}`.trim() : inReplyTo;
+          }
+        } catch { /* best effort */ }
+      }
     }
-  }
 
-  const rfc2822 = buildRfc2822({
-    from: fromHeader,
-    to: row.to_addr,
-    cc: row.cc_addr || undefined,
-    bcc: row.bcc_addr || undefined,
-    subject: row.subject,
-    htmlBody: wrapped,
-    inReplyTo: inReplyTo || undefined,
-    references: references || undefined,
+    const rfc2822 = buildRfc2822({
+      from: fromHeader,
+      to: row.to_addr,
+      cc: row.cc_addr || undefined,
+      bcc: row.bcc_addr || undefined,
+      subject: row.subject,
+      htmlBody: wrapped,
+      inReplyTo: inReplyTo || undefined,
+      references: references || undefined,
+    });
+
+    const sendRes = await sendGmailRaw(headers, rfc2822, gmailThreadId);
+    if (!sendRes.ok) return { ok: false, error: sendRes.error };
+
+    if (row.thread_id) {
+      await supabaseAdmin.from("email_messages").insert({
+        thread_id: row.thread_id,
+        gmail_message_id: sendRes.id,
+        direction: "outbound",
+        from_addr: kingFrom ?? (stationery.sign_off_name as string),
+        to_addr: row.to_addr,
+        subject: row.subject,
+        body_text: "",
+        body_html: wrapped,
+        sent_at: new Date().toISOString(),
+        draft_soul_id: row.editor_soul_id,
+      });
+      await supabaseAdmin
+        .from("email_threads")
+        .update({ last_message_at: new Date().toISOString() })
+        .eq("id", row.thread_id);
+    }
+
+    return { ok: true };
   });
 
-  const sendRes = await sendGmailRaw(headers, rfc2822, gmailThreadId);
-  if (!sendRes.ok) return { ok: false, error: sendRes.error };
 
-  // Persist outbound message if attached to a thread
-  if (row.thread_id) {
-    await supabaseAdmin.from("email_messages").insert({
-      thread_id: row.thread_id,
-      gmail_message_id: sendRes.id,
-      direction: "outbound",
-      from_addr: kingFrom ?? (stationery.sign_off_name as string),
-      to_addr: row.to_addr,
-      subject: row.subject,
-      body_text: "",
-      body_html: wrapped,
-      sent_at: new Date().toISOString(),
-      draft_soul_id: row.editor_soul_id,
-    });
-    await supabaseAdmin
-      .from("email_threads")
-      .update({ last_message_at: new Date().toISOString() })
-      .eq("id", row.thread_id);
-  }
-
-  return { ok: true };
-}
 
