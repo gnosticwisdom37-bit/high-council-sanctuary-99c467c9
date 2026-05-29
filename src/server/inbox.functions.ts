@@ -1066,6 +1066,8 @@ export const composeAndSend = createServerFn({ method: "POST" })
         subject: z.string().min(1).max(300),
         body_html: z.string().min(1).max(40000),
         editor_soul_id: z.string().min(1).max(64),
+        ink_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+        notice_header_html: z.string().max(4000).optional(),
       })
       .parse(input),
   )
@@ -1077,7 +1079,13 @@ export const composeAndSend = createServerFn({ method: "POST" })
       .from("kingdom_stationery").select("*").eq("id", true).single();
     if (!stationery) return { ok: false as const, error: "Stationery missing." };
 
-    const wrapped = wrapInStationery(stationeryArgs(stationery as Record<string, unknown>, data.body_html));
+    const inkColor = data.ink_color ?? (await resolveDefaultInk());
+    const wrapped = wrapInStationery(
+      stationeryArgs(stationery as Record<string, unknown>, data.body_html, {
+        inkColor,
+        noticeHeaderHtml: data.notice_header_html,
+      }),
+    );
     const kingFrom = await getKingAddress(headers);
     const fromHeader = kingFrom
       ? `${encodeHeader(stationery.sign_off_name as string)} <${kingFrom}>`
