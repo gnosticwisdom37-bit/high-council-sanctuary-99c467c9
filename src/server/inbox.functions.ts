@@ -410,7 +410,7 @@ export const getThread = createServerFn({ method: "POST" })
 
     const messages = (j.messages ?? []).map((m) => {
       const hdrs = m.payload?.headers ?? [];
-      const acc = { text: "", html: "" };
+      const acc = { text: "", html: "", attachments: [] as AttachmentMeta[] };
       if (m.payload) walkParts(m.payload, acc);
       return {
         gmail_message_id: m.id,
@@ -419,6 +419,7 @@ export const getThread = createServerFn({ method: "POST" })
         subject: pickHeader(hdrs, "Subject"),
         body_text: acc.text.trim(),
         body_html: acc.html.trim(),
+        attachments: acc.attachments,
         sent_at: m.internalDate ? new Date(Number(m.internalDate)).toISOString() : null,
         unread: (m.labelIds ?? []).includes("UNREAD"),
       };
