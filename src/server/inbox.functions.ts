@@ -843,7 +843,13 @@ export const sendReply = createServerFn({ method: "POST" })
     if (!threadRow) return { ok: false as const, error: "Thread not found." };
     if (!stationery) return { ok: false as const, error: "Stationery missing." };
 
-    const wrapped = wrapInStationery(stationeryArgs(stationery as Record<string, unknown>, data.body_html));
+    const inkColor = data.ink_color ?? (await resolveDefaultInk());
+    const wrapped = wrapInStationery(
+      stationeryArgs(stationery as Record<string, unknown>, data.body_html, {
+        inkColor,
+        noticeHeaderHtml: data.notice_header_html,
+      }),
+    );
 
     // Extract reply-to addr (the "From" of the last inbound message)
     const replyTo = (lastInbound?.from_addr as string | undefined) ?? (threadRow.from_addr as string);
