@@ -1268,6 +1268,8 @@ export const dispatchScheduledRow = createServerFn({ method: "POST" })
     subject: string;
     body_html: string;
     editor_soul_id: string;
+    ink_color?: string;
+    notice_header_html?: string;
   }) => data)
   .handler(async ({ data: row }): Promise<{ ok: true } | { ok: false; error: string }> => {
     const headers = gmailHeaders();
@@ -1277,7 +1279,13 @@ export const dispatchScheduledRow = createServerFn({ method: "POST" })
       .from("kingdom_stationery").select("*").eq("id", true).single();
     if (!stationery) return { ok: false, error: "Stationery missing." };
 
-    const wrapped = wrapInStationery(stationeryArgs(stationery as Record<string, unknown>, row.body_html));
+    const inkColor = row.ink_color && row.ink_color.length > 0 ? row.ink_color : await resolveDefaultInk();
+    const wrapped = wrapInStationery(
+      stationeryArgs(stationery as Record<string, unknown>, row.body_html, {
+        inkColor,
+        noticeHeaderHtml: row.notice_header_html,
+      }),
+    );
     const kingFrom = await getKingAddress(headers);
     const fromHeader = kingFrom
       ? `${encodeHeader(stationery.sign_off_name as string)} <${kingFrom}>`
