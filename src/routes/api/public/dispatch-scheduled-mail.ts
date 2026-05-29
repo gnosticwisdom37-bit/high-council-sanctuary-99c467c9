@@ -44,6 +44,8 @@ async function dispatch() {
         subject: row.subject as string,
         body_html: row.body_html as string,
         editor_soul_id: row.editor_soul_id as string,
+        ink_color: (row.ink_color as string | undefined) ?? undefined,
+        notice_header_html: (row.notice_header_html as string | undefined) ?? undefined,
       },
     });
 
