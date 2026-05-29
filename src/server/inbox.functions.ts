@@ -134,15 +134,34 @@ function b64urlEncode(s: string): string {
 }
 
 type GmailPart = {
+  partId?: string;
   mimeType?: string;
   filename?: string;
-  body?: { data?: string; size?: number };
+  body?: { data?: string; size?: number; attachmentId?: string };
   parts?: GmailPart[];
   headers?: { name: string; value: string }[];
 };
 
-function walkParts(part: GmailPart, acc: { text: string; html: string }) {
-  if (part.body?.data) {
+type AttachmentMeta = {
+  attachment_id: string;
+  filename: string;
+  mime_type: string;
+  size: number;
+};
+
+function walkParts(
+  part: GmailPart,
+  acc: { text: string; html: string; attachments: AttachmentMeta[] },
+) {
+  // Attachment: has a filename and an attachmentId
+  if (part.filename && part.body?.attachmentId) {
+    acc.attachments.push({
+      attachment_id: part.body.attachmentId,
+      filename: part.filename,
+      mime_type: part.mimeType ?? "application/octet-stream",
+      size: part.body.size ?? 0,
+    });
+  } else if (part.body?.data) {
     const decoded = b64urlDecode(part.body.data);
     if (part.mimeType === "text/plain") acc.text += decoded;
     else if (part.mimeType === "text/html") acc.html += decoded;
