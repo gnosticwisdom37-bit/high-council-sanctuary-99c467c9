@@ -793,8 +793,10 @@ export type Database = {
           created_at: string
           editor_soul_id: string
           id: string
+          ink_color: string
           kind: string
           last_error: string | null
+          notice_header_html: string
           send_at: string
           sent_at: string | null
           sent_gmail_id: string | null
@@ -811,8 +813,10 @@ export type Database = {
           created_at?: string
           editor_soul_id: string
           id?: string
+          ink_color?: string
           kind?: string
           last_error?: string | null
+          notice_header_html?: string
           send_at: string
           sent_at?: string | null
           sent_gmail_id?: string | null
@@ -829,8 +833,10 @@ export type Database = {
           created_at?: string
           editor_soul_id?: string
           id?: string
+          ink_color?: string
           kind?: string
           last_error?: string | null
+          notice_header_html?: string
           send_at?: string
           sent_at?: string | null
           sent_gmail_id?: string | null
