@@ -10,7 +10,7 @@ async function dispatch() {
   const now = new Date().toISOString();
   const { data: due, error } = await supabaseAdmin
     .from("scheduled_emails")
-    .select("id, kind, thread_id, to_addr, cc_addr, bcc_addr, subject, body_html, editor_soul_id")
+    .select("id, kind, thread_id, to_addr, cc_addr, bcc_addr, subject, body_html, editor_soul_id, ink_color, notice_header_html")
     .eq("status", "pending")
     .lte("send_at", now)
     .limit(20);
