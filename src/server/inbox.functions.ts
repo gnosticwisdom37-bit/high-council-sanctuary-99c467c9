@@ -472,13 +472,18 @@ function wrapInStationery(args: {
   socialFbUrl: string;
   contactEmail: string;
   contactPhone: string;
+  inkColor?: string;
+  noticeHeaderHtml?: string;
 }): string {
   const {
     bodyHtml, accent, logoUrl, thumbprintUrl, signOffName,
     headerHtml, footerHtml, signatureBlockHtml,
     addressLine1, addressLine2, addressLine3,
     domainUrl, socialXUrl, socialFbUrl, contactEmail, contactPhone,
+    inkColor, noticeHeaderHtml,
   } = args;
+
+  const bodyColor = inkColor && /^#[0-9a-fA-F]{6}$/.test(inkColor) ? inkColor : "#2a2418";
 
   // Build address lines (italic, beside logo)
   const addressLines = [addressLine1, addressLine2, addressLine3]
@@ -547,7 +552,7 @@ function wrapInStationery(args: {
     : `
       <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:24px;">
         <tr>
-          <td valign="middle" style="font-family:Georgia,serif;font-size:15px;color:#2a2418;padding-right:12px;">
+          <td valign="middle" style="font-family:Georgia,serif;font-size:15px;color:${bodyColor};padding-right:12px;">
             — ${esc(signOffName)}
           </td>
           ${thumbprintUrl ? `<td valign="middle"><img src="${thumbprintUrl}" alt="seal" width="44" style="display:block;border:0;outline:none;text-decoration:none;"></td>` : ""}
@@ -558,6 +563,8 @@ function wrapInStationery(args: {
     ? footerHtml
     : `<div style="margin-top:18px;padding-top:14px;border-top:1px solid ${accent}33;font-family:Georgia,serif;font-size:11px;color:#7a6a3e;font-style:italic;letter-spacing:0.06em;text-align:center;">Sealed by the hand of ${esc(signOffName)}</div>`;
 
+  const noticeBlock = noticeHeaderHtml?.trim() ? noticeHeaderHtml : "";
+
   return `<!DOCTYPE html>
 <html><body style="margin:0;padding:0;background:#0c0a06;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0c0a06;padding:24px 12px;">
@@ -565,7 +572,8 @@ function wrapInStationery(args: {
       <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;background:#fbf6e7;border-radius:8px;padding:28px;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
         <tr><td>
           ${headerSection}
-          <div style="font-family:Georgia,serif;font-size:15px;line-height:1.65;color:#2a2418;">
+          ${noticeBlock}
+          <div style="font-family:Georgia,serif;font-size:15px;line-height:1.65;color:${bodyColor};">
             ${bodyHtml}
           </div>
           ${signatureSection}
@@ -577,8 +585,12 @@ function wrapInStationery(args: {
 </body></html>`;
 }
 
-// Helper: build wrapInStationery args from a stationery row
-function stationeryArgs(stationery: Record<string, unknown>, bodyHtml: string) {
+// Helper: build wrapInStationery args from a stationery row (+ optional ink/notice)
+function stationeryArgs(
+  stationery: Record<string, unknown>,
+  bodyHtml: string,
+  opts?: { inkColor?: string | null; noticeHeaderHtml?: string | null },
+) {
   return {
     bodyHtml,
     accent: stationery.accent_color as string,
@@ -596,8 +608,22 @@ function stationeryArgs(stationery: Record<string, unknown>, bodyHtml: string) {
     socialFbUrl: (stationery.social_fb_url as string) ?? "",
     contactEmail: (stationery.contact_email as string) ?? "",
     contactPhone: (stationery.contact_phone as string) ?? "",
+    inkColor: opts?.inkColor ?? undefined,
+    noticeHeaderHtml: opts?.noticeHeaderHtml ?? undefined,
   };
 }
+
+// Resolve King's default ink color (fallback purple)
+async function resolveDefaultInk(): Promise<string> {
+  const { data } = await supabaseAdmin
+    .from("settings")
+    .select("default_ink_color")
+    .eq("id", true)
+    .single();
+  const c = (data?.default_ink_color as string | undefined) ?? "#5b21b6";
+  return /^#[0-9a-fA-F]{6}$/.test(c) ? c : "#5b21b6";
+}
+
 
 // ─── draftReply: Curator summarises, Editor drafts in voice ──────────────
 export const draftReply = createServerFn({ method: "POST" })
