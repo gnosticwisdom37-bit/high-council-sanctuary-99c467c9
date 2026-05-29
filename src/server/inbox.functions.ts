@@ -1163,6 +1163,8 @@ export const scheduleEmail = createServerFn({ method: "POST" })
         body_html: z.string().min(1).max(40000),
         editor_soul_id: z.string().min(1).max(64),
         send_at: z.string().min(10).max(60),
+        ink_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+        notice_header_html: z.string().max(4000).optional(),
       })
       .parse(input),
   )
@@ -1183,6 +1185,8 @@ export const scheduleEmail = createServerFn({ method: "POST" })
       editor_soul_id: data.editor_soul_id,
       send_at: sendAt.toISOString(),
       status: "pending",
+      ink_color: data.ink_color ?? "",
+      notice_header_html: data.notice_header_html ?? "",
     });
     if (error) return { ok: false as const, error: error.message };
     return { ok: true as const };
