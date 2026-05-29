@@ -134,15 +134,34 @@ function b64urlEncode(s: string): string {
 }
 
 type GmailPart = {
+  partId?: string;
   mimeType?: string;
   filename?: string;
-  body?: { data?: string; size?: number };
+  body?: { data?: string; size?: number; attachmentId?: string };
   parts?: GmailPart[];
   headers?: { name: string; value: string }[];
 };
 
-function walkParts(part: GmailPart, acc: { text: string; html: string }) {
-  if (part.body?.data) {
+type AttachmentMeta = {
+  attachment_id: string;
+  filename: string;
+  mime_type: string;
+  size: number;
+};
+
+function walkParts(
+  part: GmailPart,
+  acc: { text: string; html: string; attachments: AttachmentMeta[] },
+) {
+  // Attachment: has a filename and an attachmentId
+  if (part.filename && part.body?.attachmentId) {
+    acc.attachments.push({
+      attachment_id: part.body.attachmentId,
+      filename: part.filename,
+      mime_type: part.mimeType ?? "application/octet-stream",
+      size: part.body.size ?? 0,
+    });
+  } else if (part.body?.data) {
     const decoded = b64urlDecode(part.body.data);
     if (part.mimeType === "text/plain") acc.text += decoded;
     else if (part.mimeType === "text/html") acc.html += decoded;
@@ -391,7 +410,7 @@ export const getThread = createServerFn({ method: "POST" })
 
     const messages = (j.messages ?? []).map((m) => {
       const hdrs = m.payload?.headers ?? [];
-      const acc = { text: "", html: "" };
+      const acc = { text: "", html: "", attachments: [] as AttachmentMeta[] };
       if (m.payload) walkParts(m.payload, acc);
       return {
         gmail_message_id: m.id,
@@ -400,6 +419,7 @@ export const getThread = createServerFn({ method: "POST" })
         subject: pickHeader(hdrs, "Subject"),
         body_text: acc.text.trim(),
         body_html: acc.html.trim(),
+        attachments: acc.attachments,
         sent_at: m.internalDate ? new Date(Number(m.internalDate)).toISOString() : null,
         unread: (m.labelIds ?? []).includes("UNREAD"),
       };
@@ -472,13 +492,18 @@ function wrapInStationery(args: {
   socialFbUrl: string;
   contactEmail: string;
   contactPhone: string;
+  inkColor?: string;
+  noticeHeaderHtml?: string;
 }): string {
   const {
     bodyHtml, accent, logoUrl, thumbprintUrl, signOffName,
     headerHtml, footerHtml, signatureBlockHtml,
     addressLine1, addressLine2, addressLine3,
     domainUrl, socialXUrl, socialFbUrl, contactEmail, contactPhone,
+    inkColor, noticeHeaderHtml,
   } = args;
+
+  const bodyColor = inkColor && /^#[0-9a-fA-F]{6}$/.test(inkColor) ? inkColor : "#2a2418";
 
   // Build address lines (italic, beside logo)
   const addressLines = [addressLine1, addressLine2, addressLine3]
@@ -547,7 +572,7 @@ function wrapInStationery(args: {
     : `
       <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:24px;">
         <tr>
-          <td valign="middle" style="font-family:Georgia,serif;font-size:15px;color:#2a2418;padding-right:12px;">
+          <td valign="middle" style="font-family:Georgia,serif;font-size:15px;color:${bodyColor};padding-right:12px;">
             — ${esc(signOffName)}
           </td>
           ${thumbprintUrl ? `<td valign="middle"><img src="${thumbprintUrl}" alt="seal" width="44" style="display:block;border:0;outline:none;text-decoration:none;"></td>` : ""}
@@ -558,6 +583,8 @@ function wrapInStationery(args: {
     ? footerHtml
     : `<div style="margin-top:18px;padding-top:14px;border-top:1px solid ${accent}33;font-family:Georgia,serif;font-size:11px;color:#7a6a3e;font-style:italic;letter-spacing:0.06em;text-align:center;">Sealed by the hand of ${esc(signOffName)}</div>`;
 
+  const noticeBlock = noticeHeaderHtml?.trim() ? noticeHeaderHtml : "";
+
   return `<!DOCTYPE html>
 <html><body style="margin:0;padding:0;background:#0c0a06;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0c0a06;padding:24px 12px;">
@@ -565,7 +592,8 @@ function wrapInStationery(args: {
       <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;background:#fbf6e7;border-radius:8px;padding:28px;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
         <tr><td>
           ${headerSection}
-          <div style="font-family:Georgia,serif;font-size:15px;line-height:1.65;color:#2a2418;">
+          ${noticeBlock}
+          <div style="font-family:Georgia,serif;font-size:15px;line-height:1.65;color:${bodyColor};">
             ${bodyHtml}
           </div>
           ${signatureSection}
@@ -577,8 +605,12 @@ function wrapInStationery(args: {
 </body></html>`;
 }
 
-// Helper: build wrapInStationery args from a stationery row
-function stationeryArgs(stationery: Record<string, unknown>, bodyHtml: string) {
+// Helper: build wrapInStationery args from a stationery row (+ optional ink/notice)
+function stationeryArgs(
+  stationery: Record<string, unknown>,
+  bodyHtml: string,
+  opts?: { inkColor?: string | null; noticeHeaderHtml?: string | null },
+) {
   return {
     bodyHtml,
     accent: stationery.accent_color as string,
@@ -596,8 +628,22 @@ function stationeryArgs(stationery: Record<string, unknown>, bodyHtml: string) {
     socialFbUrl: (stationery.social_fb_url as string) ?? "",
     contactEmail: (stationery.contact_email as string) ?? "",
     contactPhone: (stationery.contact_phone as string) ?? "",
+    inkColor: opts?.inkColor ?? undefined,
+    noticeHeaderHtml: opts?.noticeHeaderHtml ?? undefined,
   };
 }
+
+// Resolve King's default ink color (fallback purple)
+async function resolveDefaultInk(): Promise<string> {
+  const { data } = await supabaseAdmin
+    .from("settings")
+    .select("default_ink_color")
+    .eq("id", true)
+    .single();
+  const c = (data?.default_ink_color as string | undefined) ?? "#5b21b6";
+  return /^#[0-9a-fA-F]{6}$/.test(c) ? c : "#5b21b6";
+}
+
 
 // ─── draftReply: Curator summarises, Editor drafts in voice ──────────────
 export const draftReply = createServerFn({ method: "POST" })
@@ -764,6 +810,8 @@ export const sendReply = createServerFn({ method: "POST" })
         thread_id: z.string().uuid(),
         body_html: z.string().min(1).max(40000),
         editor_soul_id: z.string().min(1).max(64),
+        ink_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+        notice_header_html: z.string().max(4000).optional(),
       })
       .parse(input),
   )
@@ -795,7 +843,13 @@ export const sendReply = createServerFn({ method: "POST" })
     if (!threadRow) return { ok: false as const, error: "Thread not found." };
     if (!stationery) return { ok: false as const, error: "Stationery missing." };
 
-    const wrapped = wrapInStationery(stationeryArgs(stationery as Record<string, unknown>, data.body_html));
+    const inkColor = data.ink_color ?? (await resolveDefaultInk());
+    const wrapped = wrapInStationery(
+      stationeryArgs(stationery as Record<string, unknown>, data.body_html, {
+        inkColor,
+        noticeHeaderHtml: data.notice_header_html,
+      }),
+    );
 
     // Extract reply-to addr (the "From" of the last inbound message)
     const replyTo = (lastInbound?.from_addr as string | undefined) ?? (threadRow.from_addr as string);
@@ -1012,6 +1066,8 @@ export const composeAndSend = createServerFn({ method: "POST" })
         subject: z.string().min(1).max(300),
         body_html: z.string().min(1).max(40000),
         editor_soul_id: z.string().min(1).max(64),
+        ink_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+        notice_header_html: z.string().max(4000).optional(),
       })
       .parse(input),
   )
@@ -1023,7 +1079,13 @@ export const composeAndSend = createServerFn({ method: "POST" })
       .from("kingdom_stationery").select("*").eq("id", true).single();
     if (!stationery) return { ok: false as const, error: "Stationery missing." };
 
-    const wrapped = wrapInStationery(stationeryArgs(stationery as Record<string, unknown>, data.body_html));
+    const inkColor = data.ink_color ?? (await resolveDefaultInk());
+    const wrapped = wrapInStationery(
+      stationeryArgs(stationery as Record<string, unknown>, data.body_html, {
+        inkColor,
+        noticeHeaderHtml: data.notice_header_html,
+      }),
+    );
     const kingFrom = await getKingAddress(headers);
     const fromHeader = kingFrom
       ? `${encodeHeader(stationery.sign_off_name as string)} <${kingFrom}>`
@@ -1101,6 +1163,8 @@ export const scheduleEmail = createServerFn({ method: "POST" })
         body_html: z.string().min(1).max(40000),
         editor_soul_id: z.string().min(1).max(64),
         send_at: z.string().min(10).max(60),
+        ink_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+        notice_header_html: z.string().max(4000).optional(),
       })
       .parse(input),
   )
@@ -1121,6 +1185,8 @@ export const scheduleEmail = createServerFn({ method: "POST" })
       editor_soul_id: data.editor_soul_id,
       send_at: sendAt.toISOString(),
       status: "pending",
+      ink_color: data.ink_color ?? "",
+      notice_header_html: data.notice_header_html ?? "",
     });
     if (error) return { ok: false as const, error: error.message };
     return { ok: true as const };
@@ -1202,6 +1268,8 @@ export const dispatchScheduledRow = createServerFn({ method: "POST" })
     subject: string;
     body_html: string;
     editor_soul_id: string;
+    ink_color?: string;
+    notice_header_html?: string;
   }) => data)
   .handler(async ({ data: row }): Promise<{ ok: true } | { ok: false; error: string }> => {
     const headers = gmailHeaders();
@@ -1211,7 +1279,13 @@ export const dispatchScheduledRow = createServerFn({ method: "POST" })
       .from("kingdom_stationery").select("*").eq("id", true).single();
     if (!stationery) return { ok: false, error: "Stationery missing." };
 
-    const wrapped = wrapInStationery(stationeryArgs(stationery as Record<string, unknown>, row.body_html));
+    const inkColor = row.ink_color && row.ink_color.length > 0 ? row.ink_color : await resolveDefaultInk();
+    const wrapped = wrapInStationery(
+      stationeryArgs(stationery as Record<string, unknown>, row.body_html, {
+        inkColor,
+        noticeHeaderHtml: row.notice_header_html,
+      }),
+    );
     const kingFrom = await getKingAddress(headers);
     const fromHeader = kingFrom
       ? `${encodeHeader(stationery.sign_off_name as string)} <${kingFrom}>`

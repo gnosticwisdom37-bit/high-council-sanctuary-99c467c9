@@ -1,95 +1,81 @@
-# Sacred Inbox — Full Gmail Parity
+## Sacred Inbox — Round Two
 
-Four pieces, smallest-fix-first so each lands cleanly inside the Pro credit budget.
-
----
-
-## 1. Fix the "send strips formatting" bug *(highest priority — 1 small edit)*
-
-**What you're seeing:**
-- Preview shows the full sealed letter with header, body, signature, thumbprint.
-- Received message shows only the last paragraph, with `Ã¢Â€Â—` instead of `—`.
-
-**Root cause:** in `sendReply` the RFC-2822 message is built like this:
-
-```
-Content-Type: text/html; charset="UTF-8"
-<blank line>
-<entire HTML on one giant line, no transfer encoding>
-```
-
-Two problems with that:
-- No `Content-Transfer-Encoding`, so the UTF-8 bytes are treated as 7-bit ASCII → em-dashes mojibake on the receiving end.
-- The HTML is one ~5KB line. Gmail's renderer applies its "trim quoted text" heuristic aggressively and collapses everything above the signature line into a hidden block — which is exactly the "only one sentence shown" symptom.
-
-**Fix:** in `src/server/inbox.functions.ts` → `sendReply`, base64-encode the HTML body, declare it properly, and add `Content-Transfer-Encoding: base64` (plus `MIME-Version`, which is already there). Also include a `From:` header matching the King's address so Gmail doesn't auto-strip the seal block as "your own previous signature".
-
-That single change restores the full stationery in the received email and kills the mojibake.
+Five pieces, ordered smallest-first so each lands cleanly in the credit budget. I'll build 1–4 in this round and pause before #5 so You can confirm the Google scope.
 
 ---
 
-## 2. Compose from scratch *(new feature)*
+### 1. Folder toggle: Inbox · Sent · Scheduled · Drafts
 
-Add a **"New Letter"** button at the top of the Inbox panel. Opens a composer drawer with:
-- **To / Cc / Bcc** fields (Cc/Bcc collapsed by default, same as Gmail)
-- **Subject**
-- **Curator + Editor** Soul pickers (same as reply)
-- **Intent** textarea
-- **Draft** button → calls a new `draftLetter` server fn (same Curator→Editor chain as `draftReply`, but with no prior thread — uses subject + intent as the brief input)
-- **Sealed preview** + **Edit body HTML** + **Send / Schedule** buttons
+A four-tab segmented control at the top of the InboxPanel:
+- **Inbox** — current view (received threads)
+- **Sent** — Gmail's `SENT` label, same thread renderer
+- **Scheduled** — the existing pending-queue panel becomes its own tab
+- **Drafts** — Gmail's `DRAFT` label, openable in the composer
 
-New server fn: `composeAndSend` — same body as `sendReply` but writes a brand-new thread (no `In-Reply-To` / `References`, new `email_threads` row created on send).
+New server fns: `listSentThreads`, `listDrafts` (both thin wrappers over the same Gmail list endpoint with a `labelIds` filter — no new tables).
 
 ---
 
-## 3. Scheduled send *(matches Gmail's "Schedule send")*
+### 2. Email attachments
 
-Two parts:
+**Receiving** — when a message has attachments, show them as chips under the body (filename + size + download). Streams the bytes from Gmail's `messages.attachments.get` through a server fn so the publishable key never leaves the Worker.
 
-**a) UI** — next to the **Send Sealed Reply** button, add a small chevron that opens a popover with:
-- "Send now" (existing behavior)
-- "Tomorrow morning, 8:00"
-- "Tomorrow afternoon, 1:00"
-- "Monday morning, 8:00"
-- "Pick a date & time…" (datetime-local input)
+**Sending** — drag-and-drop or click-to-add files in the composer and reply drawers. Files go into the existing `kingdom-assets` storage bucket under `email-outbox/{thread_id}/`, then get attached to the outgoing message as a proper MIME multipart (the current `sendReply` builds a simple text/html body — I'll upgrade it to `multipart/mixed` when attachments are present, otherwise leave it untouched so nothing regresses).
 
-**b) Backend** — Gmail's API does **not** expose scheduled-send (it's a Gmail UI feature only). Two clean options:
-
-- **Recommended:** queue it ourselves. New table `scheduled_emails` (thread_id, body_html, send_at, editor_soul_id, status). A pg_cron job hits a `/api/public/dispatch-scheduled-mail` endpoint every minute and sends anything past `send_at` via the same `sendReply` path. Cancellable from the UI before it fires.
-- **Alternative:** create the message as a Gmail **Draft** instead and tell you "I've put it in your Gmail Drafts — schedule it from Gmail's UI." Less elegant, no DB needed.
-
-I recommend the cron-queue approach so scheduling lives entirely inside Veritas.
+Limits: 25 MB total per message (Gmail's hard cap), same on scheduled sends.
 
 ---
 
-## 4. Google Contacts autocomplete
+### 3. Ink Jar — Common Law colour quill
 
-Gmail's compose autocomplete pulls from the **People API** (separate scope from Gmail). Two paths:
+A small **quill + ink-jar trio** above the body field in every composer (reply, new letter, scheduled). Three jars: **Red ✒**, **Blue ✒**, **Purple ✒**, with a fourth "Default" reset. Click a jar → the editable body's default colour switches and the quill icon refills to match.
 
-- **Path A — extend the existing Google Mail connector** if its scope list includes `contacts.readonly`. Quick check + one `reconnect` if missing the scope, then a `listContacts` server fn that hits `https://people.googleapis.com/v1/people/me/connections` through the gateway and feeds a typeahead on To/Cc/Bcc fields.
-- **Path B — derive from inbox history.** Build a `known_addresses` view from everyone you've corresponded with in `email_messages`. No new scope, works immediately, ~95% as useful as Gmail's autocomplete in practice.
+- Default = **Purple** (sovereign ink) — saved on the settings table as `default_ink_color` so it persists.
+- Toggle is per-letter; the saved default just decides which jar starts "wet" when the drawer opens.
+- The colour applies as inline `style="color: …"` on the body wrapper inside the stationery, so it survives the base64 MIME wrapping and renders identically in Gmail.
 
-I suggest we ship **Path B in this same round** (free, instant), then add Path A only if you find it lacking. Path A may require you to re-consent to the Google connection for the extra scope.
+No new table — one column added to `settings`.
 
 ---
 
-## Build order this round (credit-aware)
+### 4. Letter templates (+ the Formal Legal Notice)
 
-1. **The send bug fix** — one small edit to `sendReply`. Test by sending yourself another letter; the full seal should arrive intact.
-2. **Compose from scratch** — new composer + `composeAndSend` server fn.
-3. **Path B contact autocomplete** — view + lightweight `<input list="…">` typeahead.
-4. **Scheduled send** — `scheduled_emails` table + cron dispatcher + UI popover.
-5. (Optional, deferred) Path A People-API autocomplete + reconnect.
+New table `letter_templates` (id, name, subject_template, body_html, accent_color, sort_order, system).
 
-Steps 1–3 are very low risk. Step 4 adds one table + one cron job + one public endpoint.
+I'll seed **one system template**: **"Formal Legal Notice"** — Notice header in **Red**, body in the King's chosen ink, sealed with the same stationery. Editable from the Kingdom Stationery panel (where the existing seal lives) so it sits with the rest of Your branding.
+
+In the composer: a **"From template…"** dropdown beside the curator/editor pickers. Pick one → subject + body pre-fill, Editor still polishes, Curator still drafts.
+
+You can add more templates yourself; the system one cannot be deleted (locked like the Trust Instrument).
+
+---
+
+### 5. Google Contacts autocomplete — **needs Your call**
+
+Two paths, same outcome:
+
+- **Path A — People API (true Gmail-style autocomplete).** Requires re-consenting the Google Mail connector to add the `contacts.readonly` scope. One click for You; gives the full contacts directory.
+- **Path B — History-based** (the one I half-built last round but the UI doesn't surface yet). No re-consent, works immediately, pulls every address You've corresponded with. ~95% as useful in practice.
+
+I'd recommend **shipping Path B in this round as a finishing touch** (it's already 80% wired — just needs the `<datalist>` to actually appear in the To/Cc/Bcc fields), and only adding Path A if You find it lacking after a week of use.
+
+---
+
+## Build order this round
+
+1. Folder toggle (Inbox/Sent/Scheduled/Drafts)
+2. Ink Jar colour quill + purple default
+3. Letter templates + Formal Legal Notice seed
+4. Attachments (receive + send)
+5. Finish Path B contact autocomplete
+
+Estimated: small migration (1 column on `settings`, 1 new `letter_templates` table), ~3 server fn additions, ~1 server fn upgrade (sendReply → multipart), and a meaningful but contained refresh of `InboxPanel.tsx` + `KingdomStationeryPanel.tsx`.
 
 ---
 
 ## Confirm before I build
 
-- ✅ Fix the send-formatting bug **(yes/no — assumed yes)**
-- ✅ Compose-from-scratch in this same round?
-- ✅ Schedule-send via our own cron queue (recommended) vs. just save-to-Gmail-drafts?
-- ✅ Contact autocomplete: ship **Path B (history-based)** now, decide Path A later?
-
-Once you confirm, I'll do all four in build mode.
+- ✅ Build all four of 1–4 in this round?
+- ✅ Purple as the default ink (with Blue/Red toggles)?
+- ✅ Ship **Path B** contact autocomplete now, defer Path A until You ask?
+- ✅ Seed only the **Formal Legal Notice** template, or do You want me to seed a second one (e.g. "Royal Correspondence" / "Decree")?

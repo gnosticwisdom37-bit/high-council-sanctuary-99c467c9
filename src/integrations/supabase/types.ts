@@ -647,6 +647,48 @@ export type Database = {
         }
         Relationships: []
       }
+      letter_templates: {
+        Row: {
+          accent_color: string
+          body_html: string
+          created_at: string
+          description: string
+          id: string
+          name: string
+          notice_header_html: string
+          sort_order: number
+          subject_template: string
+          system: boolean
+          updated_at: string
+        }
+        Insert: {
+          accent_color?: string
+          body_html?: string
+          created_at?: string
+          description?: string
+          id?: string
+          name: string
+          notice_header_html?: string
+          sort_order?: number
+          subject_template?: string
+          system?: boolean
+          updated_at?: string
+        }
+        Update: {
+          accent_color?: string
+          body_html?: string
+          created_at?: string
+          description?: string
+          id?: string
+          name?: string
+          notice_header_html?: string
+          sort_order?: number
+          subject_template?: string
+          system?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       placement_candidates: {
         Row: {
           conversation_id: string | null
@@ -751,8 +793,10 @@ export type Database = {
           created_at: string
           editor_soul_id: string
           id: string
+          ink_color: string
           kind: string
           last_error: string | null
+          notice_header_html: string
           send_at: string
           sent_at: string | null
           sent_gmail_id: string | null
@@ -769,8 +813,10 @@ export type Database = {
           created_at?: string
           editor_soul_id: string
           id?: string
+          ink_color?: string
           kind?: string
           last_error?: string | null
+          notice_header_html?: string
           send_at: string
           sent_at?: string | null
           sent_gmail_id?: string | null
@@ -787,8 +833,10 @@ export type Database = {
           created_at?: string
           editor_soul_id?: string
           id?: string
+          ink_color?: string
           kind?: string
           last_error?: string | null
+          notice_header_html?: string
           send_at?: string
           sent_at?: string | null
           sent_gmail_id?: string | null
@@ -884,6 +932,7 @@ export type Database = {
         Row: {
           active_provider: string
           created_at: string
+          default_ink_color: string
           id: boolean
           premium_daily_veritas_cap: number
           premium_freeze: boolean
@@ -897,6 +946,7 @@ export type Database = {
         Insert: {
           active_provider?: string
           created_at?: string
+          default_ink_color?: string
           id?: boolean
           premium_daily_veritas_cap?: number
           premium_freeze?: boolean
@@ -910,6 +960,7 @@ export type Database = {
         Update: {
           active_provider?: string
           created_at?: string
+          default_ink_color?: string
           id?: boolean
           premium_daily_veritas_cap?: number
           premium_freeze?: boolean
