@@ -680,6 +680,7 @@ export function InboxPanel({
           )}
         </div>
       </div>
+      )}
 
       {composeOpen && (
         <ComposeDrawer
