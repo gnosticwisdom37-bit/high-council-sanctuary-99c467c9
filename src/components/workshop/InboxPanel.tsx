@@ -56,6 +56,13 @@ type ThreadRow = {
   unread: boolean;
 };
 
+type AttachmentMeta = {
+  attachment_id: string;
+  filename: string;
+  mime_type: string;
+  size: number;
+};
+
 type ThreadMessage = {
   gmail_message_id: string;
   from_addr: string;
@@ -64,6 +71,14 @@ type ThreadMessage = {
   body_text: string;
   body_html: string;
   sent_at: string | null;
+  attachments?: AttachmentMeta[];
+};
+
+type OutgoingAttachment = {
+  filename: string;
+  mime_type: string;
+  size: number;
+  data_base64: string;
 };
 
 type CouncilSoul = {
