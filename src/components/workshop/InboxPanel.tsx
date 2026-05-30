@@ -576,7 +576,7 @@ export function InboxPanel({
                     color: "var(--dawn-ink)",
                   }}
                 />
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2 flex flex-wrap items-center gap-2">
                   <button
                     onClick={handleDraft}
                     disabled={drafting || !editorId}
@@ -590,6 +590,7 @@ export function InboxPanel({
                     {drafting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                     Draft reply
                   </button>
+                  <InkJar value={inkColor} onChange={setInkColor} defaultInk={defaultInk} />
                 </div>
               </div>
 
