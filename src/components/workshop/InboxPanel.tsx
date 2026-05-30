@@ -243,15 +243,21 @@ export function InboxPanel({
     if (!confirm("Send this sealed reply now?")) return;
     setSending(true); setNotice(null);
     const r = await sendReplyFn({
-      data: { thread_id: selected.id, body_html: draftHtml, editor_soul_id: editorId },
+      data: {
+        thread_id: selected.id,
+        body_html: draftHtml,
+        editor_soul_id: editorId,
+        ink_color: inkColor,
+        notice_header_html: noticeHeaderHtml || undefined,
+      },
     });
     setSending(false);
     if (r.ok) {
       setNotice({ kind: "ok", text: "Reply sealed and sent." });
-      setDraftHtml(""); setDraftPreview(""); setBrief(""); setIntent("");
+      setDraftHtml(""); setDraftPreview(""); setBrief(""); setIntent(""); setNoticeHeaderHtml("");
       await openThread(selected);
     } else setNotice({ kind: "err", text: r.error });
-  }, [selected, editorId, draftHtml, sendReplyFn, openThread]);
+  }, [selected, editorId, draftHtml, inkColor, noticeHeaderHtml, sendReplyFn, openThread]);
 
   const handleScheduleReply = useCallback(
     async (sendAtIso: string) => {
@@ -269,17 +275,19 @@ export function InboxPanel({
           body_html: draftHtml,
           editor_soul_id: editorId,
           send_at: sendAtIso,
+          ink_color: inkColor,
+          notice_header_html: noticeHeaderHtml || undefined,
         },
       });
       setSending(false);
       if (r.ok) {
         setNotice({ kind: "ok", text: `Scheduled for ${new Date(sendAtIso).toLocaleString()}.` });
-        setDraftHtml(""); setDraftPreview(""); setBrief(""); setIntent("");
+        setDraftHtml(""); setDraftPreview(""); setBrief(""); setIntent(""); setNoticeHeaderHtml("");
         setScheduleMenuOpen(false);
         void refreshScheduled();
       } else setNotice({ kind: "err", text: r.error });
     },
-    [selected, editorId, draftHtml, messages, scheduleEmailFn, refreshScheduled],
+    [selected, editorId, draftHtml, messages, inkColor, noticeHeaderHtml, scheduleEmailFn, refreshScheduled],
   );
 
   const soulLabel = useCallback(
