@@ -8,7 +8,7 @@
  * - Contact autocomplete from history
  * - Pending-queue panel with cancel
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Inbox,
@@ -24,6 +24,9 @@ import {
   Feather,
   FileText,
   Mail,
+  Paperclip,
+  Download,
+  ScrollText,
 } from "lucide-react";
 import {
   listInbox,
@@ -39,6 +42,7 @@ import {
   listKnownAddresses,
   listLetterTemplates,
   getDefaultInkColor,
+  getAttachment,
 } from "@/server/inbox.functions";
 import { listCouncilSouls } from "@/server/studio.functions";
 
