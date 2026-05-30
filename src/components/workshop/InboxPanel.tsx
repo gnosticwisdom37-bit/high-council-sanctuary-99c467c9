@@ -304,7 +304,7 @@ export function InboxPanel({
         boxShadow: "var(--shadow-celestial)",
       }}
     >
-      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h2
           className="flex items-center gap-2 text-sm uppercase tracking-[0.3em]"
           style={{ color: "var(--dawn-gold-bright)", fontFamily: "Cinzel, serif" }}
@@ -312,12 +312,6 @@ export function InboxPanel({
           <Inbox className="h-4 w-4" /> Scriptorium · Sacred Inbox
         </h2>
         <div className="flex items-center gap-2">
-          <p
-            className="text-[10px] uppercase tracking-[0.25em]"
-            style={{ color: "color-mix(in oklab, var(--dawn-parchment) 70%, transparent)" }}
-          >
-            {threads.length} threads · {unreadCount} unread
-          </p>
           <button
             onClick={() => setComposeOpen(true)}
             className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] uppercase tracking-[0.2em]"
@@ -331,29 +325,59 @@ export function InboxPanel({
             <Pencil className="h-3 w-3" /> New Letter
           </button>
           <button
-            onClick={() => setScheduledOpen((v) => !v)}
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] uppercase tracking-[0.2em]"
-            style={{
-              background: "color-mix(in oklab, var(--dawn-gold) 25%, transparent)",
-              color: "var(--dawn-ink)",
-              fontFamily: "Cinzel, serif",
+            onClick={() => {
+              if (folder === "inbox") void refreshInbox();
+              else if (folder === "sent") void refreshSent();
+              else void refreshScheduled();
             }}
-            title="Scheduled letters"
-          >
-            <Clock className="h-3 w-3" /> Pending ({pendingCount})
-          </button>
-          <button
-            onClick={() => void refreshInbox()}
             className="rounded-full p-1.5"
             style={{
               background: "color-mix(in oklab, var(--dawn-gold) 25%, transparent)",
               color: "var(--dawn-ink)",
             }}
-            title="Refresh inbox"
+            title="Refresh"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loadingList ? "animate-spin" : ""}`} />
           </button>
         </div>
+      </div>
+
+      {/* Folder tabs */}
+      <div className="mb-3 flex items-center gap-1 rounded-full p-1" style={{
+        background: "color-mix(in oklab, var(--dawn-parchment) 90%, transparent)",
+        border: "1px solid color-mix(in oklab, var(--dawn-gold) 35%, transparent)",
+        width: "fit-content",
+      }}>
+        {([
+          { key: "inbox" as const, label: "Inbox", icon: Inbox, count: unreadCount, countLabel: "unread" },
+          { key: "sent" as const, label: "Sent", icon: Mail, count: null, countLabel: "" },
+          { key: "scheduled" as const, label: "Scheduled", icon: Clock, count: pendingCount, countLabel: "pending" },
+        ]).map((tab) => {
+          const Icon = tab.icon;
+          const active = folder === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => { setFolder(tab.key); setSelected(null); }}
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] transition-all"
+              style={{
+                background: active
+                  ? "linear-gradient(135deg, var(--dawn-gold-bright), var(--dawn-ember))"
+                  : "transparent",
+                color: "var(--dawn-ink)",
+                fontFamily: "Cinzel, serif",
+                fontWeight: active ? 600 : 400,
+              }}
+            >
+              <Icon className="h-3 w-3" /> {tab.label}
+              {tab.count !== null && tab.count > 0 && (
+                <span className="ml-0.5 rounded-full px-1.5 text-[9px]" style={{
+                  background: active ? "color-mix(in oklab, var(--dawn-deep) 30%, transparent)" : "color-mix(in oklab, var(--dawn-gold) 30%, transparent)",
+                }}>{tab.count}</span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {notice && (
@@ -372,7 +396,7 @@ export function InboxPanel({
         </p>
       )}
 
-      {scheduledOpen && (
+      {folder === "scheduled" && (
         <ScheduledList
           rows={scheduled}
           onCancel={async (id) => {
@@ -381,6 +405,10 @@ export function InboxPanel({
             else setNotice({ kind: "err", text: r.error });
           }}
         />
+      )}
+
+      {folder === "sent" && (
+        <SentList rows={sentThreads} loading={loadingList} />
       )}
 
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
