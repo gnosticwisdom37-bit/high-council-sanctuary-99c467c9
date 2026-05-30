@@ -1414,3 +1414,104 @@ function InkJar({
   );
 }
 
+
+// ─── helpers: format file sizes, pick + carry attachments ───────────────
+function formatBytes(n: number): string {
+  if (!n) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let i = 0; let v = n;
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+  return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${units[i]}`;
+}
+
+const MAX_ATTACH_BYTES = 10 * 1024 * 1024; // 10 MB per file
+const MAX_ATTACH_COUNT = 5;
+
+async function fileToOutgoing(file: File): Promise<OutgoingAttachment> {
+  const buf = await file.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let bin = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + CHUNK)));
+  }
+  return {
+    filename: file.name,
+    mime_type: file.type || "application/octet-stream",
+    size: file.size,
+    data_base64: btoa(bin),
+  };
+}
+
+function AttachmentPicker({
+  attachments, onAdd, onRemove,
+}: {
+  attachments: OutgoingAttachment[];
+  onAdd: (a: OutgoingAttachment[]) => void;
+  onRemove: (index: number) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const handle = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setErr(null);
+    const room = MAX_ATTACH_COUNT - attachments.length;
+    if (room <= 0) { setErr(`Maximum ${MAX_ATTACH_COUNT} attachments.`); return; }
+    const picked = Array.from(files).slice(0, room);
+    const next: OutgoingAttachment[] = [];
+    for (const f of picked) {
+      if (f.size > MAX_ATTACH_BYTES) { setErr(`${f.name} is larger than 10 MB.`); continue; }
+      next.push(await fileToOutgoing(f));
+    }
+    if (next.length) onAdd(next);
+  };
+
+  return (
+    <div className="inline-flex flex-wrap items-center gap-1.5">
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(e) => { void handle(e.target.files); if (inputRef.current) inputRef.current.value = ""; }}
+      />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.2em]"
+        style={{
+          background: "color-mix(in oklab, var(--dawn-parchment) 95%, transparent)",
+          border: "1px solid color-mix(in oklab, var(--dawn-gold) 40%, transparent)",
+          color: "var(--dawn-ink)",
+          fontFamily: "Cinzel, serif",
+        }}
+        title="Attach files (max 10 MB each, 5 files)"
+      >
+        <Paperclip className="h-3 w-3" /> Attach
+      </button>
+      {attachments.map((a, i) => (
+        <span
+          key={`${a.filename}-${i}`}
+          className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px]"
+          style={{
+            background: "color-mix(in oklab, var(--dawn-gold) 18%, transparent)",
+            border: "1px solid color-mix(in oklab, var(--dawn-gold) 45%, transparent)",
+            color: "var(--dawn-ink)",
+            fontFamily: "Georgia, serif",
+          }}
+        >
+          <Paperclip className="h-3 w-3" />
+          <span className="max-w-[140px] truncate">{a.filename}</span>
+          <span style={{ color: "color-mix(in oklab, var(--dawn-ink) 55%, transparent)" }}>
+            · {formatBytes(a.size)}
+          </span>
+          <button onClick={() => onRemove(i)} title="Remove"><X className="h-3 w-3" /></button>
+        </span>
+      ))}
+      {err && (
+        <span className="text-[10px] italic" style={{ color: "var(--dawn-ember)" }}>{err}</span>
+      )}
+    </div>
+  );
+}
