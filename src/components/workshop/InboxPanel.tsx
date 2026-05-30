@@ -8,7 +8,7 @@
  * - Contact autocomplete from history
  * - Pending-queue panel with cancel
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Inbox,
@@ -22,8 +22,9 @@ import {
   X,
   CalendarClock,
   Feather,
-  FileText,
   Mail,
+  Paperclip,
+  Download,
 } from "lucide-react";
 import {
   listInbox,
@@ -39,6 +40,7 @@ import {
   listKnownAddresses,
   listLetterTemplates,
   getDefaultInkColor,
+  getAttachment,
 } from "@/server/inbox.functions";
 import { listCouncilSouls } from "@/server/studio.functions";
 
@@ -52,6 +54,13 @@ type ThreadRow = {
   unread: boolean;
 };
 
+type AttachmentMeta = {
+  attachment_id: string;
+  filename: string;
+  mime_type: string;
+  size: number;
+};
+
 type ThreadMessage = {
   gmail_message_id: string;
   from_addr: string;
@@ -60,6 +69,14 @@ type ThreadMessage = {
   body_text: string;
   body_html: string;
   sent_at: string | null;
+  attachments?: AttachmentMeta[];
+};
+
+type OutgoingAttachment = {
+  filename: string;
+  mime_type: string;
+  size: number;
+  data_base64: string;
 };
 
 type CouncilSoul = {
@@ -127,6 +144,7 @@ export function InboxPanel({
   const listKnownFn = useServerFn(listKnownAddresses);
   const listTemplatesFn = useServerFn(listLetterTemplates);
   const getDefaultInkFn = useServerFn(getDefaultInkColor);
+  const getAttachmentFn = useServerFn(getAttachment);
   const listSoulsFn = useServerFn(listCouncilSouls);
 
   const [folder, setFolder] = useState<Folder>("inbox");
@@ -154,6 +172,36 @@ export function InboxPanel({
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
   const [scheduleMenuOpen, setScheduleMenuOpen] = useState(false);
+  const [replyAttachments, setReplyAttachments] = useState<OutgoingAttachment[]>([]);
+
+  // Download an incoming attachment: fetch base64 via server fn, build a Blob, trigger save.
+  const downloadAttachment = useCallback(
+    async (m: ThreadMessage, a: AttachmentMeta) => {
+      try {
+        const r = await getAttachmentFn({
+          data: {
+            gmail_message_id: m.gmail_message_id,
+            attachment_id: a.attachment_id,
+            filename: a.filename,
+            mime_type: a.mime_type,
+          },
+        });
+        if (!r.ok) { setNotice({ kind: "err", text: r.error }); return; }
+        const bin = atob(r.data_base64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const blob = new Blob([bytes], { type: r.mime_type });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url; link.download = r.filename;
+        document.body.appendChild(link); link.click(); link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch (e) {
+        setNotice({ kind: "err", text: e instanceof Error ? e.message : String(e) });
+      }
+    },
+    [getAttachmentFn],
+  );
 
   // Load souls + contacts + scheduled + templates + default ink
   useEffect(() => {
@@ -210,6 +258,7 @@ export function InboxPanel({
       setSelected(t);
       setMessages([]);
       setDraftHtml(""); setDraftPreview(""); setBrief("");
+      setReplyAttachments([]);
       setNotice(null);
       setLoadingThread(true);
       const r = await getThreadFn({ data: { thread_id: t.id } });
@@ -249,15 +298,19 @@ export function InboxPanel({
         editor_soul_id: editorId,
         ink_color: inkColor,
         notice_header_html: noticeHeaderHtml || undefined,
+        attachments: replyAttachments.length
+          ? replyAttachments.map(({ filename, mime_type, data_base64 }) => ({ filename, mime_type, data_base64 }))
+          : undefined,
       },
     });
     setSending(false);
     if (r.ok) {
       setNotice({ kind: "ok", text: "Reply sealed and sent." });
       setDraftHtml(""); setDraftPreview(""); setBrief(""); setIntent(""); setNoticeHeaderHtml("");
+      setReplyAttachments([]);
       await openThread(selected);
     } else setNotice({ kind: "err", text: r.error });
-  }, [selected, editorId, draftHtml, inkColor, noticeHeaderHtml, sendReplyFn, openThread]);
+  }, [selected, editorId, draftHtml, inkColor, noticeHeaderHtml, replyAttachments, sendReplyFn, openThread]);
 
   const handleScheduleReply = useCallback(
     async (sendAtIso: string) => {
@@ -548,6 +601,31 @@ export function InboxPanel({
                       <p className="whitespace-pre-wrap text-xs leading-relaxed" style={{ fontFamily: "Georgia, serif" }}>
                         {(m.body_text || stripHtml(m.body_html)).slice(0, 1500)}
                       </p>
+                      {m.attachments && m.attachments.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {m.attachments.map((a) => (
+                            <button
+                              key={a.attachment_id}
+                              onClick={() => void downloadAttachment(m, a)}
+                              className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px]"
+                              style={{
+                                background: "color-mix(in oklab, var(--dawn-gold) 22%, transparent)",
+                                border: "1px solid color-mix(in oklab, var(--dawn-gold) 50%, transparent)",
+                                color: "var(--dawn-ink)",
+                                fontFamily: "Georgia, serif",
+                              }}
+                              title={`Download ${a.filename} (${formatBytes(a.size)})`}
+                            >
+                              <Paperclip className="h-3 w-3" />
+                              <span className="max-w-[160px] truncate">{a.filename}</span>
+                              <span style={{ color: "color-mix(in oklab, var(--dawn-ink) 55%, transparent)" }}>
+                                · {formatBytes(a.size)}
+                              </span>
+                              <Download className="h-3 w-3" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </article>
                   ))}
                 </div>
@@ -591,6 +669,11 @@ export function InboxPanel({
                     Draft reply
                   </button>
                   <InkJar value={inkColor} onChange={setInkColor} defaultInk={defaultInk} />
+                  <AttachmentPicker
+                    attachments={replyAttachments}
+                    onAdd={(a) => setReplyAttachments((p) => [...p, ...a])}
+                    onRemove={(i) => setReplyAttachments((p) => p.filter((_, idx) => idx !== i))}
+                  />
                 </div>
               </div>
 
@@ -1329,3 +1412,104 @@ function InkJar({
   );
 }
 
+
+// ─── helpers: format file sizes, pick + carry attachments ───────────────
+function formatBytes(n: number): string {
+  if (!n) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let i = 0; let v = n;
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+  return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${units[i]}`;
+}
+
+const MAX_ATTACH_BYTES = 10 * 1024 * 1024; // 10 MB per file
+const MAX_ATTACH_COUNT = 5;
+
+async function fileToOutgoing(file: File): Promise<OutgoingAttachment> {
+  const buf = await file.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let bin = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + CHUNK)));
+  }
+  return {
+    filename: file.name,
+    mime_type: file.type || "application/octet-stream",
+    size: file.size,
+    data_base64: btoa(bin),
+  };
+}
+
+function AttachmentPicker({
+  attachments, onAdd, onRemove,
+}: {
+  attachments: OutgoingAttachment[];
+  onAdd: (a: OutgoingAttachment[]) => void;
+  onRemove: (index: number) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const handle = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setErr(null);
+    const room = MAX_ATTACH_COUNT - attachments.length;
+    if (room <= 0) { setErr(`Maximum ${MAX_ATTACH_COUNT} attachments.`); return; }
+    const picked = Array.from(files).slice(0, room);
+    const next: OutgoingAttachment[] = [];
+    for (const f of picked) {
+      if (f.size > MAX_ATTACH_BYTES) { setErr(`${f.name} is larger than 10 MB.`); continue; }
+      next.push(await fileToOutgoing(f));
+    }
+    if (next.length) onAdd(next);
+  };
+
+  return (
+    <div className="inline-flex flex-wrap items-center gap-1.5">
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(e) => { void handle(e.target.files); if (inputRef.current) inputRef.current.value = ""; }}
+      />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.2em]"
+        style={{
+          background: "color-mix(in oklab, var(--dawn-parchment) 95%, transparent)",
+          border: "1px solid color-mix(in oklab, var(--dawn-gold) 40%, transparent)",
+          color: "var(--dawn-ink)",
+          fontFamily: "Cinzel, serif",
+        }}
+        title="Attach files (max 10 MB each, 5 files)"
+      >
+        <Paperclip className="h-3 w-3" /> Attach
+      </button>
+      {attachments.map((a, i) => (
+        <span
+          key={`${a.filename}-${i}`}
+          className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px]"
+          style={{
+            background: "color-mix(in oklab, var(--dawn-gold) 18%, transparent)",
+            border: "1px solid color-mix(in oklab, var(--dawn-gold) 45%, transparent)",
+            color: "var(--dawn-ink)",
+            fontFamily: "Georgia, serif",
+          }}
+        >
+          <Paperclip className="h-3 w-3" />
+          <span className="max-w-[140px] truncate">{a.filename}</span>
+          <span style={{ color: "color-mix(in oklab, var(--dawn-ink) 55%, transparent)" }}>
+            · {formatBytes(a.size)}
+          </span>
+          <button onClick={() => onRemove(i)} title="Remove"><X className="h-3 w-3" /></button>
+        </span>
+      ))}
+      {err && (
+        <span className="text-[10px] italic" style={{ color: "var(--dawn-ember)" }}>{err}</span>
+      )}
+    </div>
+  );
+}
