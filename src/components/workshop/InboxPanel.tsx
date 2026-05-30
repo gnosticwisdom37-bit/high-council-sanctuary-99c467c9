@@ -671,6 +671,11 @@ export function InboxPanel({
                     Draft reply
                   </button>
                   <InkJar value={inkColor} onChange={setInkColor} defaultInk={defaultInk} />
+                  <AttachmentPicker
+                    attachments={replyAttachments}
+                    onAdd={(a) => setReplyAttachments((p) => [...p, ...a])}
+                    onRemove={(i) => setReplyAttachments((p) => p.filter((_, idx) => idx !== i))}
+                  />
                 </div>
               </div>
 
