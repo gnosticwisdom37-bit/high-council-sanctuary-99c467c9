@@ -941,6 +941,7 @@ export const sendReply = createServerFn({ method: "POST" })
       htmlBody: wrapped,
       inReplyTo: inReplyTo || undefined,
       references: references || undefined,
+      attachments: data.attachments,
     });
 
     const sendRes = await sendGmailRaw(headers, rfc2822, threadRow.gmail_thread_id as string);
