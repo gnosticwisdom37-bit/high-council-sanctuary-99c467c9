@@ -191,7 +191,19 @@ export function InboxPanel({
     else setNotice({ kind: "err", text: r.error });
   }, [workshopId, listInboxFn]);
 
-  useEffect(() => { void refreshInbox(); }, [refreshInbox]);
+  const refreshSent = useCallback(async () => {
+    setLoadingList(true);
+    const r = await listSentFn({ data: { max_results: 25 } });
+    setLoadingList(false);
+    if (r.ok) setSentThreads(r.threads as SentThread[]);
+    else setNotice({ kind: "err", text: r.error });
+  }, [listSentFn]);
+
+  useEffect(() => {
+    if (folder === "inbox") void refreshInbox();
+    else if (folder === "sent") void refreshSent();
+    else if (folder === "scheduled") void refreshScheduled();
+  }, [folder, refreshInbox, refreshSent, refreshScheduled]);
 
   const openThread = useCallback(
     async (t: ThreadRow) => {
