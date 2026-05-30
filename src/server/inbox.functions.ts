@@ -864,6 +864,7 @@ export const sendReply = createServerFn({ method: "POST" })
         editor_soul_id: z.string().min(1).max(64),
         ink_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
         notice_header_html: z.string().max(4000).optional(),
+        attachments: outgoingAttachmentsSchema,
       })
       .parse(input),
   )
