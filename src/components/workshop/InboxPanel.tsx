@@ -73,6 +73,28 @@ type CouncilSoul = {
 
 type Contact = { addr: string; name: string; last: string };
 
+type SentThread = {
+  gmail_thread_id: string;
+  subject: string;
+  to_addr: string;
+  snippet: string;
+  last_message_at: string | null;
+};
+
+type LetterTemplate = {
+  id: string;
+  name: string;
+  description: string;
+  subject_template: string;
+  body_html: string;
+  accent_color: string;
+  notice_header_html: string;
+  system: boolean;
+  sort_order: number;
+};
+
+type Folder = "inbox" | "sent" | "scheduled";
+
 type Scheduled = {
   id: string;
   kind: string;
