@@ -22,11 +22,9 @@ import {
   X,
   CalendarClock,
   Feather,
-  FileText,
   Mail,
   Paperclip,
   Download,
-  ScrollText,
 } from "lucide-react";
 import {
   listInbox,
