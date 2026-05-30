@@ -603,6 +603,31 @@ export function InboxPanel({
                       <p className="whitespace-pre-wrap text-xs leading-relaxed" style={{ fontFamily: "Georgia, serif" }}>
                         {(m.body_text || stripHtml(m.body_html)).slice(0, 1500)}
                       </p>
+                      {m.attachments && m.attachments.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {m.attachments.map((a) => (
+                            <button
+                              key={a.attachment_id}
+                              onClick={() => void downloadAttachment(m, a)}
+                              className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px]"
+                              style={{
+                                background: "color-mix(in oklab, var(--dawn-gold) 22%, transparent)",
+                                border: "1px solid color-mix(in oklab, var(--dawn-gold) 50%, transparent)",
+                                color: "var(--dawn-ink)",
+                                fontFamily: "Georgia, serif",
+                              }}
+                              title={`Download ${a.filename} (${formatBytes(a.size)})`}
+                            >
+                              <Paperclip className="h-3 w-3" />
+                              <span className="max-w-[160px] truncate">{a.filename}</span>
+                              <span style={{ color: "color-mix(in oklab, var(--dawn-ink) 55%, transparent)" }}>
+                                · {formatBytes(a.size)}
+                              </span>
+                              <Download className="h-3 w-3" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </article>
                   ))}
                 </div>
