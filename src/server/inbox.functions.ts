@@ -1361,4 +1361,76 @@ export const dispatchScheduledRow = createServerFn({ method: "POST" })
   });
 
 
+// ─── Gmail: listSentThreads (read-only, lightweight) ──────────────────────
+export const listSentThreads = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z.object({ max_results: z.number().int().min(1).max(50).default(25) }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const headers = gmailHeaders();
+    if (!headers) return { ok: false as const, error: "Gmail connection not configured." };
+
+    const listRes = await fetch(
+      `${GMAIL_GATEWAY}/users/me/threads?maxResults=${data.max_results}&labelIds=SENT`,
+      { headers },
+    );
+    if (!listRes.ok) {
+      const body = await listRes.text();
+      return { ok: false as const, error: `Gmail list failed [${listRes.status}]: ${body.slice(0, 200)}` };
+    }
+    const listJson = (await listRes.json()) as { threads?: { id: string }[] };
+    const threadIds = (listJson.threads ?? []).map((t) => t.id);
+
+    const detailed = await Promise.all(
+      threadIds.map(async (tid) => {
+        const r = await fetch(
+          `${GMAIL_GATEWAY}/users/me/threads/${tid}?format=metadata&metadataHeaders=Subject&metadataHeaders=To&metadataHeaders=Date`,
+          { headers },
+        );
+        if (!r.ok) return null;
+        const j = (await r.json()) as {
+          id: string;
+          messages?: {
+            snippet?: string;
+            internalDate?: string;
+            payload?: { headers?: { name: string; value: string }[] };
+          }[];
+        };
+        const msgs = j.messages ?? [];
+        if (msgs.length === 0) return null;
+        const last = msgs[msgs.length - 1];
+        const hdrs = last.payload?.headers ?? [];
+        return {
+          gmail_thread_id: j.id,
+          subject: pickHeader(hdrs, "Subject") || "(no subject)",
+          to_addr: pickHeader(hdrs, "To"),
+          snippet: last.snippet ?? "",
+          last_message_at: last.internalDate
+            ? new Date(Number(last.internalDate)).toISOString()
+            : null,
+        };
+      }),
+    );
+
+    return {
+      ok: true as const,
+      threads: detailed.filter((x): x is NonNullable<typeof x> => !!x),
+    };
+  });
+
+// ─── Letter templates (read-only listing) ─────────────────────────────────
+export const listLetterTemplates = createServerFn({ method: "GET" }).handler(async () => {
+  const { data, error } = await supabaseAdmin
+    .from("letter_templates")
+    .select("id, name, description, subject_template, body_html, accent_color, notice_header_html, system, sort_order")
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+  if (error) return { ok: false as const, error: error.message };
+  return { ok: true as const, templates: data ?? [] };
+});
+
+// ─── Default ink color (for client to know which jar starts wet) ─────────
+export const getDefaultInkColor = createServerFn({ method: "GET" }).handler(async () => {
+  return { ok: true as const, ink_color: await resolveDefaultInk() };
+});
 

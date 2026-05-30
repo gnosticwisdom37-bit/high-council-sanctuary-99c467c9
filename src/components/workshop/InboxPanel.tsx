@@ -21,9 +21,13 @@ import {
   Clock,
   X,
   CalendarClock,
+  Feather,
+  FileText,
+  Mail,
 } from "lucide-react";
 import {
   listInbox,
+  listSentThreads,
   getThread,
   draftReply,
   sendReply,
@@ -33,6 +37,8 @@ import {
   listScheduledEmails,
   cancelScheduledEmail,
   listKnownAddresses,
+  listLetterTemplates,
+  getDefaultInkColor,
 } from "@/server/inbox.functions";
 import { listCouncilSouls } from "@/server/studio.functions";
 
@@ -67,6 +73,28 @@ type CouncilSoul = {
 
 type Contact = { addr: string; name: string; last: string };
 
+type SentThread = {
+  gmail_thread_id: string;
+  subject: string;
+  to_addr: string;
+  snippet: string;
+  last_message_at: string | null;
+};
+
+type LetterTemplate = {
+  id: string;
+  name: string;
+  description: string;
+  subject_template: string;
+  body_html: string;
+  accent_color: string;
+  notice_header_html: string;
+  system: boolean;
+  sort_order: number;
+};
+
+type Folder = "inbox" | "sent" | "scheduled";
+
 type Scheduled = {
   id: string;
   kind: string;
@@ -87,6 +115,7 @@ export function InboxPanel({
   stewardSoulId: string | null;
 }) {
   const listInboxFn = useServerFn(listInbox);
+  const listSentFn = useServerFn(listSentThreads);
   const getThreadFn = useServerFn(getThread);
   const draftReplyFn = useServerFn(draftReply);
   const sendReplyFn = useServerFn(sendReply);
@@ -96,9 +125,13 @@ export function InboxPanel({
   const listScheduledFn = useServerFn(listScheduledEmails);
   const cancelScheduledFn = useServerFn(cancelScheduledEmail);
   const listKnownFn = useServerFn(listKnownAddresses);
+  const listTemplatesFn = useServerFn(listLetterTemplates);
+  const getDefaultInkFn = useServerFn(getDefaultInkColor);
   const listSoulsFn = useServerFn(listCouncilSouls);
 
+  const [folder, setFolder] = useState<Folder>("inbox");
   const [threads, setThreads] = useState<ThreadRow[]>([]);
+  const [sentThreads, setSentThreads] = useState<SentThread[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [selected, setSelected] = useState<ThreadRow | null>(null);
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
@@ -106,6 +139,10 @@ export function InboxPanel({
   const [souls, setSouls] = useState<CouncilSoul[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [scheduled, setScheduled] = useState<Scheduled[]>([]);
+  const [templates, setTemplates] = useState<LetterTemplate[]>([]);
+  const [defaultInk, setDefaultInk] = useState<string>("#5b21b6");
+  const [inkColor, setInkColor] = useState<string>("#5b21b6");
+  const [noticeHeaderHtml, setNoticeHeaderHtml] = useState<string>("");
   const [curatorId, setCuratorId] = useState<string | null>(null);
   const [editorId, setEditorId] = useState<string | null>(null);
   const [intent, setIntent] = useState("");
@@ -116,10 +153,9 @@ export function InboxPanel({
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
-  const [scheduledOpen, setScheduledOpen] = useState(false);
   const [scheduleMenuOpen, setScheduleMenuOpen] = useState(false);
 
-  // Load souls + contacts + scheduled list
+  // Load souls + contacts + scheduled + templates + default ink
   useEffect(() => {
     void listSoulsFn({}).then((r) => {
       if (r.ok) {
@@ -136,7 +172,11 @@ export function InboxPanel({
     });
     void listKnownFn({}).then((r) => { if (r.ok) setContacts(r.addresses); });
     void listScheduledFn({}).then((r) => { if (r.ok) setScheduled(r.scheduled as Scheduled[]); });
-  }, [listSoulsFn, listKnownFn, listScheduledFn, stewardSoulId]);
+    void listTemplatesFn({}).then((r) => { if (r.ok) setTemplates(r.templates as LetterTemplate[]); });
+    void getDefaultInkFn({}).then((r) => {
+      if (r.ok) { setDefaultInk(r.ink_color); setInkColor(r.ink_color); }
+    });
+  }, [listSoulsFn, listKnownFn, listScheduledFn, listTemplatesFn, getDefaultInkFn, stewardSoulId]);
 
   const refreshScheduled = useCallback(async () => {
     const r = await listScheduledFn({});
@@ -151,7 +191,19 @@ export function InboxPanel({
     else setNotice({ kind: "err", text: r.error });
   }, [workshopId, listInboxFn]);
 
-  useEffect(() => { void refreshInbox(); }, [refreshInbox]);
+  const refreshSent = useCallback(async () => {
+    setLoadingList(true);
+    const r = await listSentFn({ data: { max_results: 25 } });
+    setLoadingList(false);
+    if (r.ok) setSentThreads(r.threads as SentThread[]);
+    else setNotice({ kind: "err", text: r.error });
+  }, [listSentFn]);
+
+  useEffect(() => {
+    if (folder === "inbox") void refreshInbox();
+    else if (folder === "sent") void refreshSent();
+    else if (folder === "scheduled") void refreshScheduled();
+  }, [folder, refreshInbox, refreshSent, refreshScheduled]);
 
   const openThread = useCallback(
     async (t: ThreadRow) => {
@@ -191,15 +243,21 @@ export function InboxPanel({
     if (!confirm("Send this sealed reply now?")) return;
     setSending(true); setNotice(null);
     const r = await sendReplyFn({
-      data: { thread_id: selected.id, body_html: draftHtml, editor_soul_id: editorId },
+      data: {
+        thread_id: selected.id,
+        body_html: draftHtml,
+        editor_soul_id: editorId,
+        ink_color: inkColor,
+        notice_header_html: noticeHeaderHtml || undefined,
+      },
     });
     setSending(false);
     if (r.ok) {
       setNotice({ kind: "ok", text: "Reply sealed and sent." });
-      setDraftHtml(""); setDraftPreview(""); setBrief(""); setIntent("");
+      setDraftHtml(""); setDraftPreview(""); setBrief(""); setIntent(""); setNoticeHeaderHtml("");
       await openThread(selected);
     } else setNotice({ kind: "err", text: r.error });
-  }, [selected, editorId, draftHtml, sendReplyFn, openThread]);
+  }, [selected, editorId, draftHtml, inkColor, noticeHeaderHtml, sendReplyFn, openThread]);
 
   const handleScheduleReply = useCallback(
     async (sendAtIso: string) => {
@@ -217,17 +275,19 @@ export function InboxPanel({
           body_html: draftHtml,
           editor_soul_id: editorId,
           send_at: sendAtIso,
+          ink_color: inkColor,
+          notice_header_html: noticeHeaderHtml || undefined,
         },
       });
       setSending(false);
       if (r.ok) {
         setNotice({ kind: "ok", text: `Scheduled for ${new Date(sendAtIso).toLocaleString()}.` });
-        setDraftHtml(""); setDraftPreview(""); setBrief(""); setIntent("");
+        setDraftHtml(""); setDraftPreview(""); setBrief(""); setIntent(""); setNoticeHeaderHtml("");
         setScheduleMenuOpen(false);
         void refreshScheduled();
       } else setNotice({ kind: "err", text: r.error });
     },
-    [selected, editorId, draftHtml, messages, scheduleEmailFn, refreshScheduled],
+    [selected, editorId, draftHtml, messages, inkColor, noticeHeaderHtml, scheduleEmailFn, refreshScheduled],
   );
 
   const soulLabel = useCallback(
@@ -252,7 +312,7 @@ export function InboxPanel({
         boxShadow: "var(--shadow-celestial)",
       }}
     >
-      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h2
           className="flex items-center gap-2 text-sm uppercase tracking-[0.3em]"
           style={{ color: "var(--dawn-gold-bright)", fontFamily: "Cinzel, serif" }}
@@ -260,12 +320,6 @@ export function InboxPanel({
           <Inbox className="h-4 w-4" /> Scriptorium · Sacred Inbox
         </h2>
         <div className="flex items-center gap-2">
-          <p
-            className="text-[10px] uppercase tracking-[0.25em]"
-            style={{ color: "color-mix(in oklab, var(--dawn-parchment) 70%, transparent)" }}
-          >
-            {threads.length} threads · {unreadCount} unread
-          </p>
           <button
             onClick={() => setComposeOpen(true)}
             className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] uppercase tracking-[0.2em]"
@@ -279,29 +333,59 @@ export function InboxPanel({
             <Pencil className="h-3 w-3" /> New Letter
           </button>
           <button
-            onClick={() => setScheduledOpen((v) => !v)}
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] uppercase tracking-[0.2em]"
-            style={{
-              background: "color-mix(in oklab, var(--dawn-gold) 25%, transparent)",
-              color: "var(--dawn-ink)",
-              fontFamily: "Cinzel, serif",
+            onClick={() => {
+              if (folder === "inbox") void refreshInbox();
+              else if (folder === "sent") void refreshSent();
+              else void refreshScheduled();
             }}
-            title="Scheduled letters"
-          >
-            <Clock className="h-3 w-3" /> Pending ({pendingCount})
-          </button>
-          <button
-            onClick={() => void refreshInbox()}
             className="rounded-full p-1.5"
             style={{
               background: "color-mix(in oklab, var(--dawn-gold) 25%, transparent)",
               color: "var(--dawn-ink)",
             }}
-            title="Refresh inbox"
+            title="Refresh"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loadingList ? "animate-spin" : ""}`} />
           </button>
         </div>
+      </div>
+
+      {/* Folder tabs */}
+      <div className="mb-3 flex items-center gap-1 rounded-full p-1" style={{
+        background: "color-mix(in oklab, var(--dawn-parchment) 90%, transparent)",
+        border: "1px solid color-mix(in oklab, var(--dawn-gold) 35%, transparent)",
+        width: "fit-content",
+      }}>
+        {([
+          { key: "inbox" as const, label: "Inbox", icon: Inbox, count: unreadCount, countLabel: "unread" },
+          { key: "sent" as const, label: "Sent", icon: Mail, count: null, countLabel: "" },
+          { key: "scheduled" as const, label: "Scheduled", icon: Clock, count: pendingCount, countLabel: "pending" },
+        ]).map((tab) => {
+          const Icon = tab.icon;
+          const active = folder === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => { setFolder(tab.key); setSelected(null); }}
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] transition-all"
+              style={{
+                background: active
+                  ? "linear-gradient(135deg, var(--dawn-gold-bright), var(--dawn-ember))"
+                  : "transparent",
+                color: "var(--dawn-ink)",
+                fontFamily: "Cinzel, serif",
+                fontWeight: active ? 600 : 400,
+              }}
+            >
+              <Icon className="h-3 w-3" /> {tab.label}
+              {tab.count !== null && tab.count > 0 && (
+                <span className="ml-0.5 rounded-full px-1.5 text-[9px]" style={{
+                  background: active ? "color-mix(in oklab, var(--dawn-deep) 30%, transparent)" : "color-mix(in oklab, var(--dawn-gold) 30%, transparent)",
+                }}>{tab.count}</span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {notice && (
@@ -320,7 +404,7 @@ export function InboxPanel({
         </p>
       )}
 
-      {scheduledOpen && (
+      {folder === "scheduled" && (
         <ScheduledList
           rows={scheduled}
           onCancel={async (id) => {
@@ -331,6 +415,11 @@ export function InboxPanel({
         />
       )}
 
+      {folder === "sent" && (
+        <SentList rows={sentThreads} loading={loadingList} />
+      )}
+
+      {folder === "inbox" && (
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
         {/* Thread list */}
         <div
@@ -487,7 +576,7 @@ export function InboxPanel({
                     color: "var(--dawn-ink)",
                   }}
                 />
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2 flex flex-wrap items-center gap-2">
                   <button
                     onClick={handleDraft}
                     disabled={drafting || !editorId}
@@ -501,6 +590,7 @@ export function InboxPanel({
                     {drafting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                     Draft reply
                   </button>
+                  <InkJar value={inkColor} onChange={setInkColor} defaultInk={defaultInk} />
                 </div>
               </div>
 
@@ -591,6 +681,7 @@ export function InboxPanel({
           )}
         </div>
       </div>
+      )}
 
       {composeOpen && (
         <ComposeDrawer
@@ -1150,3 +1241,91 @@ function stripHtml(html: string): string {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+// ─── Sent list ──────────────────────────────────────────────────────────
+function SentList({ rows, loading }: { rows: SentThread[]; loading: boolean }) {
+  if (loading && rows.length === 0) {
+    return (
+      <div className="flex justify-center py-6">
+        <Loader2 className="h-5 w-5 animate-spin" style={{ color: "var(--dawn-ink)" }} />
+      </div>
+    );
+  }
+  if (rows.length === 0) {
+    return (
+      <p className="rounded-md px-3 py-6 text-center text-xs italic" style={{
+        background: "color-mix(in oklab, var(--dawn-parchment) 92%, transparent)",
+        color: "color-mix(in oklab, var(--dawn-ink) 60%, transparent)",
+        border: "1px solid color-mix(in oklab, var(--dawn-gold) 30%, transparent)",
+      }}>
+        No sent letters yet.
+      </p>
+    );
+  }
+  return (
+    <div className="rounded-lg p-2" style={{
+      background: "color-mix(in oklab, var(--dawn-parchment) 92%, transparent)",
+      border: "1px solid color-mix(in oklab, var(--dawn-gold) 35%, transparent)",
+    }}>
+      <ul className="space-y-1">
+        {rows.map((s) => (
+          <li key={s.gmail_thread_id} className="rounded-md p-2" style={{ color: "var(--dawn-ink)" }}>
+            <p className="truncate text-xs" style={{ fontFamily: "Cinzel, serif", fontWeight: 600 }}>
+              {s.subject}
+            </p>
+            <p className="mt-0.5 truncate text-[10px]" style={{ color: "color-mix(in oklab, var(--dawn-ink) 60%, transparent)" }}>
+              → {s.to_addr.replace(/<.+>/, "").trim() || s.to_addr}
+              {s.last_message_at && ` · ${new Date(s.last_message_at).toLocaleString()}`}
+            </p>
+            <p className="mt-0.5 line-clamp-2 text-[10px] italic" style={{ color: "color-mix(in oklab, var(--dawn-ink) 55%, transparent)" }}>
+              {s.snippet}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ─── Ink Jar — common-law colour quill ──────────────────────────────────
+function InkJar({
+  value, onChange, defaultInk,
+}: {
+  value: string;
+  onChange: (hex: string) => void;
+  defaultInk: string;
+}) {
+  const jars: { hex: string; label: string }[] = [
+    { hex: "#b91c1c", label: "Red" },
+    { hex: "#1d4ed8", label: "Blue" },
+    { hex: "#5b21b6", label: "Purple" },
+  ];
+  return (
+    <div className="inline-flex items-center gap-1.5 rounded-full px-2 py-1" style={{
+      background: "color-mix(in oklab, var(--dawn-parchment) 95%, transparent)",
+      border: "1px solid color-mix(in oklab, var(--dawn-gold) 40%, transparent)",
+    }}>
+      <Feather className="h-3 w-3" style={{ color: value }} />
+      {jars.map((j) => {
+        const active = value.toLowerCase() === j.hex.toLowerCase();
+        return (
+          <button
+            key={j.hex}
+            type="button"
+            onClick={() => onChange(j.hex)}
+            title={`${j.label} ink${defaultInk.toLowerCase() === j.hex.toLowerCase() ? " (default)" : ""}`}
+            className="h-4 w-4 rounded-full transition-all"
+            style={{
+              background: j.hex,
+              boxShadow: active
+                ? `0 0 0 2px var(--dawn-parchment), 0 0 0 3px ${j.hex}`
+                : "0 1px 2px rgba(0,0,0,0.3)",
+              transform: active ? "scale(1.1)" : "scale(1)",
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
