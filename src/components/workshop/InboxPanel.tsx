@@ -146,6 +146,7 @@ export function InboxPanel({
   const listKnownFn = useServerFn(listKnownAddresses);
   const listTemplatesFn = useServerFn(listLetterTemplates);
   const getDefaultInkFn = useServerFn(getDefaultInkColor);
+  const getAttachmentFn = useServerFn(getAttachment);
   const listSoulsFn = useServerFn(listCouncilSouls);
 
   const [folder, setFolder] = useState<Folder>("inbox");
@@ -173,6 +174,36 @@ export function InboxPanel({
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
   const [scheduleMenuOpen, setScheduleMenuOpen] = useState(false);
+  const [replyAttachments, setReplyAttachments] = useState<OutgoingAttachment[]>([]);
+
+  // Download an incoming attachment: fetch base64 via server fn, build a Blob, trigger save.
+  const downloadAttachment = useCallback(
+    async (m: ThreadMessage, a: AttachmentMeta) => {
+      try {
+        const r = await getAttachmentFn({
+          data: {
+            gmail_message_id: m.gmail_message_id,
+            attachment_id: a.attachment_id,
+            filename: a.filename,
+            mime_type: a.mime_type,
+          },
+        });
+        if (!r.ok) { setNotice({ kind: "err", text: r.error }); return; }
+        const bin = atob(r.data_base64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const blob = new Blob([bytes], { type: r.mime_type });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url; link.download = r.filename;
+        document.body.appendChild(link); link.click(); link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch (e) {
+        setNotice({ kind: "err", text: e instanceof Error ? e.message : String(e) });
+      }
+    },
+    [getAttachmentFn],
+  );
 
   // Load souls + contacts + scheduled + templates + default ink
   useEffect(() => {
