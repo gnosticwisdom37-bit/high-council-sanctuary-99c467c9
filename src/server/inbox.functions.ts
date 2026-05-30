@@ -67,7 +67,15 @@ function encodeHeader(value: string): string {
   return `=?UTF-8?B?${btoa(bin)}?=`;
 }
 
-// Build a fully-encoded RFC 2822 message with HTML body
+// Build a fully-encoded RFC 2822 message. If `attachments` are provided,
+// the message is multipart/mixed (HTML body + each attachment); otherwise
+// a simple text/html body is sent.
+type OutgoingAttachment = {
+  filename: string;
+  mime_type: string;
+  data_base64: string; // raw base64 (no data: prefix)
+};
+
 function buildRfc2822(args: {
   from?: string | null;
   to: string;
@@ -77,24 +85,60 @@ function buildRfc2822(args: {
   htmlBody: string;
   inReplyTo?: string;
   references?: string;
+  attachments?: OutgoingAttachment[];
 }): string {
-  const lines: string[] = [];
-  if (args.from) lines.push(`From: ${args.from}`);
-  lines.push(`To: ${args.to}`);
-  if (args.cc?.trim()) lines.push(`Cc: ${args.cc}`);
-  if (args.bcc?.trim()) lines.push(`Bcc: ${args.bcc}`);
-  lines.push(`Subject: ${encodeHeader(args.subject)}`);
-  lines.push("MIME-Version: 1.0");
-  lines.push('Content-Type: text/html; charset="UTF-8"');
-  lines.push("Content-Transfer-Encoding: base64");
-  if (args.inReplyTo) lines.push(`In-Reply-To: ${args.inReplyTo}`);
-  if (args.references) lines.push(`References: ${args.references}`);
-  lines.push("");
-  lines.push(base64BodyWrapped(args.htmlBody));
-  return lines.join("\r\n");
+  const head: string[] = [];
+  if (args.from) head.push(`From: ${args.from}`);
+  head.push(`To: ${args.to}`);
+  if (args.cc?.trim()) head.push(`Cc: ${args.cc}`);
+  if (args.bcc?.trim()) head.push(`Bcc: ${args.bcc}`);
+  head.push(`Subject: ${encodeHeader(args.subject)}`);
+  head.push("MIME-Version: 1.0");
+  if (args.inReplyTo) head.push(`In-Reply-To: ${args.inReplyTo}`);
+  if (args.references) head.push(`References: ${args.references}`);
+
+  const atts = args.attachments ?? [];
+  if (atts.length === 0) {
+    head.push('Content-Type: text/html; charset="UTF-8"');
+    head.push("Content-Transfer-Encoding: base64");
+    head.push("");
+    head.push(base64BodyWrapped(args.htmlBody));
+    return head.join("\r\n");
+  }
+
+  const boundary = `=_VIS_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+  head.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
+  head.push("");
+  head.push("This is a multi-part message in MIME format.");
+
+  const parts: string[] = [];
+  parts.push(
+    [
+      `--${boundary}`,
+      'Content-Type: text/html; charset="UTF-8"',
+      "Content-Transfer-Encoding: base64",
+      "",
+      base64BodyWrapped(args.htmlBody),
+    ].join("\r\n"),
+  );
+  for (const a of atts) {
+    const safeName = encodeHeader(a.filename || "attachment");
+    const wrapped = a.data_base64.replace(/\s+/g, "").match(/.{1,76}/g)?.join("\r\n") ?? "";
+    parts.push(
+      [
+        `--${boundary}`,
+        `Content-Type: ${a.mime_type || "application/octet-stream"}; name="${safeName}"`,
+        `Content-Disposition: attachment; filename="${safeName}"`,
+        "Content-Transfer-Encoding: base64",
+        "",
+        wrapped,
+      ].join("\r\n"),
+    );
+  }
+  parts.push(`--${boundary}--`);
+  return head.join("\r\n") + "\r\n" + parts.join("\r\n");
 }
 
-// Send a fully-built RFC 2822 message through Gmail. Returns Gmail message id.
 async function sendGmailRaw(
   headers: Record<string, string>,
   rfc2822: string,
@@ -115,6 +159,14 @@ async function sendGmailRaw(
   const sent = (await res.json()) as { id: string };
   return { ok: true, id: sent.id };
 }
+
+// Zod schema for outgoing attachments (≤10 MB raw bytes / file, ≤5 files)
+const outgoingAttachmentSchema = z.object({
+  filename: z.string().min(1).max(255),
+  mime_type: z.string().min(1).max(200),
+  data_base64: z.string().min(1).max(14_000_000),
+});
+const outgoingAttachmentsSchema = z.array(outgoingAttachmentSchema).max(5).optional();
 
 function b64urlDecode(s: string): string {
   const pad = s.length % 4 === 0 ? "" : "=".repeat(4 - (s.length % 4));
