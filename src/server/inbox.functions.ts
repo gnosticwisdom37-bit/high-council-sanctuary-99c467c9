@@ -1490,3 +1490,41 @@ export const getDefaultInkColor = createServerFn({ method: "GET" }).handler(asyn
   return { ok: true as const, ink_color: await resolveDefaultInk() };
 });
 
+
+// ─── getAttachment: stream a Gmail attachment back as base64 ─────────────
+// The browser builds a Blob from the bytes and triggers a download — the
+// publishable / connector keys never leave the Worker.
+export const getAttachment = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        gmail_message_id: z.string().min(1).max(120).regex(/^[a-zA-Z0-9_-]+$/),
+        attachment_id: z.string().min(1).max(2000),
+        filename: z.string().min(1).max(255),
+        mime_type: z.string().min(1).max(200),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const headers = gmailHeaders();
+    if (!headers) return { ok: false as const, error: "Gmail connection not configured." };
+    const r = await fetch(
+      `${GMAIL_GATEWAY}/users/me/messages/${data.gmail_message_id}/attachments/${data.attachment_id}`,
+      { headers },
+    );
+    if (!r.ok) {
+      const body = await r.text();
+      return { ok: false as const, error: `Attachment fetch failed [${r.status}]: ${body.slice(0, 200)}` };
+    }
+    const j = (await r.json()) as { data?: string; size?: number };
+    if (!j.data) return { ok: false as const, error: "Empty attachment." };
+    // Gmail returns base64url; convert to standard base64 for the browser.
+    const std = j.data.replace(/-/g, "+").replace(/_/g, "/");
+    const pad = std.length % 4 === 0 ? "" : "=".repeat(4 - (std.length % 4));
+    return {
+      ok: true as const,
+      filename: data.filename,
+      mime_type: data.mime_type,
+      data_base64: std + pad,
+    };
+  });
