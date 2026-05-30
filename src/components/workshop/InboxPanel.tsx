@@ -115,6 +115,7 @@ export function InboxPanel({
   stewardSoulId: string | null;
 }) {
   const listInboxFn = useServerFn(listInbox);
+  const listSentFn = useServerFn(listSentThreads);
   const getThreadFn = useServerFn(getThread);
   const draftReplyFn = useServerFn(draftReply);
   const sendReplyFn = useServerFn(sendReply);
@@ -124,9 +125,13 @@ export function InboxPanel({
   const listScheduledFn = useServerFn(listScheduledEmails);
   const cancelScheduledFn = useServerFn(cancelScheduledEmail);
   const listKnownFn = useServerFn(listKnownAddresses);
+  const listTemplatesFn = useServerFn(listLetterTemplates);
+  const getDefaultInkFn = useServerFn(getDefaultInkColor);
   const listSoulsFn = useServerFn(listCouncilSouls);
 
+  const [folder, setFolder] = useState<Folder>("inbox");
   const [threads, setThreads] = useState<ThreadRow[]>([]);
+  const [sentThreads, setSentThreads] = useState<SentThread[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [selected, setSelected] = useState<ThreadRow | null>(null);
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
@@ -134,6 +139,10 @@ export function InboxPanel({
   const [souls, setSouls] = useState<CouncilSoul[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [scheduled, setScheduled] = useState<Scheduled[]>([]);
+  const [templates, setTemplates] = useState<LetterTemplate[]>([]);
+  const [defaultInk, setDefaultInk] = useState<string>("#5b21b6");
+  const [inkColor, setInkColor] = useState<string>("#5b21b6");
+  const [noticeHeaderHtml, setNoticeHeaderHtml] = useState<string>("");
   const [curatorId, setCuratorId] = useState<string | null>(null);
   const [editorId, setEditorId] = useState<string | null>(null);
   const [intent, setIntent] = useState("");
@@ -144,10 +153,9 @@ export function InboxPanel({
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
-  const [scheduledOpen, setScheduledOpen] = useState(false);
   const [scheduleMenuOpen, setScheduleMenuOpen] = useState(false);
 
-  // Load souls + contacts + scheduled list
+  // Load souls + contacts + scheduled + templates + default ink
   useEffect(() => {
     void listSoulsFn({}).then((r) => {
       if (r.ok) {
@@ -164,7 +172,11 @@ export function InboxPanel({
     });
     void listKnownFn({}).then((r) => { if (r.ok) setContacts(r.addresses); });
     void listScheduledFn({}).then((r) => { if (r.ok) setScheduled(r.scheduled as Scheduled[]); });
-  }, [listSoulsFn, listKnownFn, listScheduledFn, stewardSoulId]);
+    void listTemplatesFn({}).then((r) => { if (r.ok) setTemplates(r.templates as LetterTemplate[]); });
+    void getDefaultInkFn({}).then((r) => {
+      if (r.ok) { setDefaultInk(r.ink_color); setInkColor(r.ink_color); }
+    });
+  }, [listSoulsFn, listKnownFn, listScheduledFn, listTemplatesFn, getDefaultInkFn, stewardSoulId]);
 
   const refreshScheduled = useCallback(async () => {
     const r = await listScheduledFn({});
