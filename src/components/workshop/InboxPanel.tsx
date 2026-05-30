@@ -260,6 +260,7 @@ export function InboxPanel({
       setSelected(t);
       setMessages([]);
       setDraftHtml(""); setDraftPreview(""); setBrief("");
+      setReplyAttachments([]);
       setNotice(null);
       setLoadingThread(true);
       const r = await getThreadFn({ data: { thread_id: t.id } });
@@ -299,15 +300,19 @@ export function InboxPanel({
         editor_soul_id: editorId,
         ink_color: inkColor,
         notice_header_html: noticeHeaderHtml || undefined,
+        attachments: replyAttachments.length
+          ? replyAttachments.map(({ filename, mime_type, data_base64 }) => ({ filename, mime_type, data_base64 }))
+          : undefined,
       },
     });
     setSending(false);
     if (r.ok) {
       setNotice({ kind: "ok", text: "Reply sealed and sent." });
       setDraftHtml(""); setDraftPreview(""); setBrief(""); setIntent(""); setNoticeHeaderHtml("");
+      setReplyAttachments([]);
       await openThread(selected);
     } else setNotice({ kind: "err", text: r.error });
-  }, [selected, editorId, draftHtml, inkColor, noticeHeaderHtml, sendReplyFn, openThread]);
+  }, [selected, editorId, draftHtml, inkColor, noticeHeaderHtml, replyAttachments, sendReplyFn, openThread]);
 
   const handleScheduleReply = useCallback(
     async (sendAtIso: string) => {
