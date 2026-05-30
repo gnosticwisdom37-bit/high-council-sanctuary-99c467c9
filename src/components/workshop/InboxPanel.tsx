@@ -21,9 +21,13 @@ import {
   Clock,
   X,
   CalendarClock,
+  Feather,
+  FileText,
+  Mail,
 } from "lucide-react";
 import {
   listInbox,
+  listSentThreads,
   getThread,
   draftReply,
   sendReply,
@@ -33,6 +37,8 @@ import {
   listScheduledEmails,
   cancelScheduledEmail,
   listKnownAddresses,
+  listLetterTemplates,
+  getDefaultInkColor,
 } from "@/server/inbox.functions";
 import { listCouncilSouls } from "@/server/studio.functions";
 
