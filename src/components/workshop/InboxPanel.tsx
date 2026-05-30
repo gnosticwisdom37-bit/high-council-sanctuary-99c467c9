@@ -1241,3 +1241,91 @@ function stripHtml(html: string): string {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+// ─── Sent list ──────────────────────────────────────────────────────────
+function SentList({ rows, loading }: { rows: SentThread[]; loading: boolean }) {
+  if (loading && rows.length === 0) {
+    return (
+      <div className="flex justify-center py-6">
+        <Loader2 className="h-5 w-5 animate-spin" style={{ color: "var(--dawn-ink)" }} />
+      </div>
+    );
+  }
+  if (rows.length === 0) {
+    return (
+      <p className="rounded-md px-3 py-6 text-center text-xs italic" style={{
+        background: "color-mix(in oklab, var(--dawn-parchment) 92%, transparent)",
+        color: "color-mix(in oklab, var(--dawn-ink) 60%, transparent)",
+        border: "1px solid color-mix(in oklab, var(--dawn-gold) 30%, transparent)",
+      }}>
+        No sent letters yet.
+      </p>
+    );
+  }
+  return (
+    <div className="rounded-lg p-2" style={{
+      background: "color-mix(in oklab, var(--dawn-parchment) 92%, transparent)",
+      border: "1px solid color-mix(in oklab, var(--dawn-gold) 35%, transparent)",
+    }}>
+      <ul className="space-y-1">
+        {rows.map((s) => (
+          <li key={s.gmail_thread_id} className="rounded-md p-2" style={{ color: "var(--dawn-ink)" }}>
+            <p className="truncate text-xs" style={{ fontFamily: "Cinzel, serif", fontWeight: 600 }}>
+              {s.subject}
+            </p>
+            <p className="mt-0.5 truncate text-[10px]" style={{ color: "color-mix(in oklab, var(--dawn-ink) 60%, transparent)" }}>
+              → {s.to_addr.replace(/<.+>/, "").trim() || s.to_addr}
+              {s.last_message_at && ` · ${new Date(s.last_message_at).toLocaleString()}`}
+            </p>
+            <p className="mt-0.5 line-clamp-2 text-[10px] italic" style={{ color: "color-mix(in oklab, var(--dawn-ink) 55%, transparent)" }}>
+              {s.snippet}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ─── Ink Jar — common-law colour quill ──────────────────────────────────
+function InkJar({
+  value, onChange, defaultInk,
+}: {
+  value: string;
+  onChange: (hex: string) => void;
+  defaultInk: string;
+}) {
+  const jars: { hex: string; label: string }[] = [
+    { hex: "#b91c1c", label: "Red" },
+    { hex: "#1d4ed8", label: "Blue" },
+    { hex: "#5b21b6", label: "Purple" },
+  ];
+  return (
+    <div className="inline-flex items-center gap-1.5 rounded-full px-2 py-1" style={{
+      background: "color-mix(in oklab, var(--dawn-parchment) 95%, transparent)",
+      border: "1px solid color-mix(in oklab, var(--dawn-gold) 40%, transparent)",
+    }}>
+      <Feather className="h-3 w-3" style={{ color: value }} />
+      {jars.map((j) => {
+        const active = value.toLowerCase() === j.hex.toLowerCase();
+        return (
+          <button
+            key={j.hex}
+            type="button"
+            onClick={() => onChange(j.hex)}
+            title={`${j.label} ink${defaultInk.toLowerCase() === j.hex.toLowerCase() ? " (default)" : ""}`}
+            className="h-4 w-4 rounded-full transition-all"
+            style={{
+              background: j.hex,
+              boxShadow: active
+                ? `0 0 0 2px var(--dawn-parchment), 0 0 0 3px ${j.hex}`
+                : "0 1px 2px rgba(0,0,0,0.3)",
+              transform: active ? "scale(1.1)" : "scale(1)",
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
