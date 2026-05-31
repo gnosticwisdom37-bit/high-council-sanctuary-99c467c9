@@ -913,6 +913,8 @@ function ComposeDrawer({
         body_html: bodyHtml,
         editor_soul_id: editorId,
         send_at: iso,
+        ink_color: inkColor,
+        notice_header_html: noticeHeaderHtml || undefined,
       },
     });
     setSending(false);
