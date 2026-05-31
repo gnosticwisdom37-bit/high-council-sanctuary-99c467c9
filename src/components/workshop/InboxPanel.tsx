@@ -25,6 +25,7 @@ import {
   Mail,
   Paperclip,
   Download,
+  Trash2,
 } from "lucide-react";
 import {
   listInbox,
