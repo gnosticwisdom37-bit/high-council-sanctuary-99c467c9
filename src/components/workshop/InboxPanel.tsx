@@ -800,6 +800,8 @@ export function InboxPanel({
 function ComposeDrawer({
   souls,
   contacts,
+  templates,
+  inkColor,
   defaultEditorId,
   defaultCuratorId,
   soulLabel,
@@ -813,6 +815,8 @@ function ComposeDrawer({
 }: {
   souls: CouncilSoul[];
   contacts: Contact[];
+  templates: LetterTemplate[];
+  inkColor: string;
   defaultEditorId: string | null;
   defaultCuratorId: string | null;
   soulLabel: (id: string | null) => string;
