@@ -846,6 +846,17 @@ function ComposeDrawer({
   const [brief, setBrief] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [scheduleMenuOpen, setScheduleMenuOpen] = useState(false);
+  const [templateId, setTemplateId] = useState<string>("");
+  const [noticeHeaderHtml, setNoticeHeaderHtml] = useState<string>("");
+
+  const applyTemplate = (id: string) => {
+    setTemplateId(id);
+    const t = templates.find((x) => x.id === id);
+    if (!t) { setNoticeHeaderHtml(""); return; }
+    if (t.subject_template && !subject.trim()) setSubject(t.subject_template);
+    if (t.description && !intent.trim()) setIntent(t.description);
+    setNoticeHeaderHtml(t.notice_header_html || "");
+  };
 
   const draft = async () => {
     if (!editorId || !to.trim() || !subject.trim()) {
