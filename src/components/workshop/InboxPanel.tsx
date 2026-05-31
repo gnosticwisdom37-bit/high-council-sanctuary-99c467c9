@@ -770,6 +770,8 @@ export function InboxPanel({
         <ComposeDrawer
           souls={souls}
           contacts={contacts}
+          templates={templates}
+          inkColor={inkColor}
           defaultEditorId={editorId}
           defaultCuratorId={curatorId}
           soulLabel={soulLabel}
