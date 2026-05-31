@@ -150,16 +150,6 @@ export function InboxPanel({
   const listSoulsFn = useServerFn(listCouncilSouls);
   const trashThreadFn = useServerFn(trashThread);
 
-  const handleTrash = useCallback(async (t: ThreadRow) => {
-    if (!confirm(`Move "${t.subject}" to Trash? Gmail keeps it 30 days, then deletes.`)) return;
-    const r = await trashThreadFn({ data: { thread_id: t.id } });
-    if (r.ok) {
-      setThreads((arr) => arr.filter((x) => x.id !== t.id));
-      if (selected?.id === t.id) { setSelected(null); setMessages([]); }
-      setNotice({ kind: "ok", text: "Letter moved to Trash." });
-    } else setNotice({ kind: "err", text: r.error });
-  }, [trashThreadFn, selected]);
-
   const [folder, setFolder] = useState<Folder>("inbox");
   const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [sentThreads, setSentThreads] = useState<SentThread[]>([]);
@@ -186,6 +176,17 @@ export function InboxPanel({
   const [composeOpen, setComposeOpen] = useState(false);
   const [scheduleMenuOpen, setScheduleMenuOpen] = useState(false);
   const [replyAttachments, setReplyAttachments] = useState<OutgoingAttachment[]>([]);
+
+  const handleTrash = useCallback(async (t: ThreadRow) => {
+    if (!confirm(`Move "${t.subject}" to Trash? Gmail keeps it 30 days, then deletes.`)) return;
+    const r = await trashThreadFn({ data: { thread_id: t.id } });
+    if (r.ok) {
+      setThreads((arr) => arr.filter((x) => x.id !== t.id));
+      if (selected?.id === t.id) { setSelected(null); setMessages([]); }
+      setNotice({ kind: "ok", text: "Letter moved to Trash." });
+    } else setNotice({ kind: "err", text: r.error });
+  }, [trashThreadFn, selected]);
+
 
   // Download an incoming attachment: fetch base64 via server fn, build a Blob, trigger save.
   const downloadAttachment = useCallback(
