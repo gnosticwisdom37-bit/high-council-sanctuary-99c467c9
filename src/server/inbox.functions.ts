@@ -16,6 +16,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   LOVABLE_AI_GATEWAY_URL,
   buildSystemPrompt,
+  loadKingsLexicon,
   type ProviderCompact,
   type SoulIdentity,
 } from "./ai-shared.server";
@@ -763,9 +764,11 @@ export const draftReply = createServerFn({ method: "POST" })
       })
       .join("\n\n");
 
+    const lexicon = await loadKingsLexicon(supabaseAdmin);
+
     // STEP 1 — Curator brief
     const curatorSystem =
-      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: curator! }) +
+      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: curator!, lexicon }) +
       "\n\nYou are the CURATOR. Read the email thread and write a 1\u20132 sentence brief for the Editor Soul: what the sender wants, the tone called for, and what the King would have us emphasise or omit. STRICT JSON only:\n" +
       `{ "brief": string (\u2264400 chars) }`;
     const curatorUser = `Thread subject: ${threadRow.subject}\nFrom: ${threadRow.from_addr}\n\nTranscript:\n${transcript}\n\n${data.intent ? `King's intent: ${data.intent}` : ""}`;
@@ -794,7 +797,7 @@ export const draftReply = createServerFn({ method: "POST" })
 
     // STEP 2 — Editor draft (body HTML only; wrapper added after)
     const editorSystem =
-      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: editor }) +
+      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: editor, lexicon }) +
       "\n\nYou are the EDITOR. Draft King Sean's reply to this email IN YOUR OWN VOICE, on the King's behalf. " +
       "Output ONLY the body of the message as simple HTML (use <p> for paragraphs, <strong>, <em>, no <html>/<body>/<head>, no inline styles, no scripts). " +
       "Do NOT include any greeting like 'Dear ___' unless it fits naturally; do NOT include a signature line — the King's seal is appended automatically. " +
@@ -1032,9 +1035,11 @@ export const draftLetter = createServerFn({ method: "POST" })
       ? compact.fallback_chain
       : ["google/gemini-2.5-flash", "google/gemini-2.5-flash-lite"];
 
+    const lexicon = await loadKingsLexicon(supabaseAdmin);
+
     // Curator: distill King's intent into a brief
     const curatorSystem =
-      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: curator! }) +
+      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: curator!, lexicon }) +
       "\n\nYou are the CURATOR. The King is composing a NEW letter. Read His intent and write a 1–2 sentence brief for the Editor Soul: who it is to, what the King wants conveyed, the tone, anything to emphasise or omit. STRICT JSON only:\n" +
       `{ "brief": string (≤400 chars) }`;
     const curatorUser = `Recipient: ${data.to_addr}\nSubject: ${data.subject}\n\nKing's intent: ${data.intent ?? "(none provided — infer warm, sovereign greeting)"}`;
@@ -1063,7 +1068,7 @@ export const draftLetter = createServerFn({ method: "POST" })
 
     // Editor: draft body
     const editorSystem =
-      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: editor }) +
+      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: editor, lexicon }) +
       "\n\nYou are the EDITOR. Draft King Sean's NEW letter IN YOUR OWN VOICE, on His behalf. " +
       "Output ONLY the body of the message as simple HTML (use <p> for paragraphs, <strong>, <em>, no <html>/<body>/<head>, no inline styles, no scripts). " +
       "Open with a fitting greeting; do NOT include a signature line — the King's seal is appended automatically. " +
@@ -1530,4 +1535,166 @@ export const getAttachment = createServerFn({ method: "POST" })
       mime_type: data.mime_type,
       data_base64: std + pad,
     };
+  });
+
+
+// ─── trashThread: move a Gmail thread to Trash (reversible, 30-day) ──────
+export const trashThread = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z.object({ thread_id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const headers = gmailHeaders();
+    if (!headers) return { ok: false as const, error: "Gmail connection not configured." };
+
+    const { data: threadRow } = await supabaseAdmin
+      .from("email_threads")
+      .select("id, gmail_thread_id")
+      .eq("id", data.thread_id)
+      .single();
+    if (!threadRow) return { ok: false as const, error: "Thread not found." };
+
+    const r = await fetch(
+      `${GMAIL_GATEWAY}/users/me/threads/${threadRow.gmail_thread_id}/trash`,
+      { method: "POST", headers },
+    );
+    if (!r.ok) {
+      const body = await r.text();
+      return { ok: false as const, error: `Trash failed [${r.status}]: ${body.slice(0, 200)}` };
+    }
+
+    // Remove local row + cascade messages
+    await supabaseAdmin.from("email_messages").delete().eq("thread_id", threadRow.id);
+    await supabaseAdmin.from("email_threads").delete().eq("id", threadRow.id);
+    return { ok: true as const };
+  });
+
+// ─── openSentThread: bring a Sent Gmail thread into local store ──────────
+// Upserts the thread row for this workshop so the same Inbox UI (reply,
+// attachments, ink, schedule) works for follow-ups from Sent.
+export const openSentThread = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z.object({
+      workshop_id: z.string().uuid(),
+      gmail_thread_id: z.string().min(1).max(120).regex(/^[a-zA-Z0-9_-]+$/),
+    }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const headers = gmailHeaders();
+    if (!headers) return { ok: false as const, error: "Gmail connection not configured." };
+
+    // Pull minimal metadata to seed the row
+    const metaRes = await fetch(
+      `${GMAIL_GATEWAY}/users/me/threads/${data.gmail_thread_id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Date`,
+      { headers },
+    );
+    if (!metaRes.ok) {
+      const body = await metaRes.text();
+      return { ok: false as const, error: `Gmail get failed [${metaRes.status}]: ${body.slice(0, 200)}` };
+    }
+    const j = (await metaRes.json()) as {
+      id: string;
+      messages?: {
+        snippet?: string;
+        internalDate?: string;
+        payload?: { headers?: { name: string; value: string }[] };
+      }[];
+    };
+    const msgs = j.messages ?? [];
+    if (msgs.length === 0) return { ok: false as const, error: "Empty thread." };
+    const first = msgs[0];
+    const last = msgs[msgs.length - 1];
+    const subject = pickHeader(first.payload?.headers ?? [], "Subject") || "(no subject)";
+    const fromAddr = pickHeader(first.payload?.headers ?? [], "From") || "";
+    const lastDateMs = last.internalDate ? Number(last.internalDate) : Date.now();
+
+    await supabaseAdmin
+      .from("email_threads")
+      .upsert(
+        {
+          workshop_id: data.workshop_id,
+          gmail_thread_id: data.gmail_thread_id,
+          subject,
+          from_addr: fromAddr,
+          snippet: last.snippet ?? "",
+          last_message_at: new Date(lastDateMs).toISOString(),
+          unread: false,
+        },
+        { onConflict: "workshop_id,gmail_thread_id" },
+      );
+
+    const { data: stored } = await supabaseAdmin
+      .from("email_threads")
+      .select("id, gmail_thread_id, subject, from_addr, snippet, last_message_at, unread")
+      .eq("workshop_id", data.workshop_id)
+      .eq("gmail_thread_id", data.gmail_thread_id)
+      .single();
+    return { ok: true as const, thread: stored };
+  });
+
+// ─── getScheduledEmail: full row + wrapped preview HTML for cancel modal ─
+export const getScheduledEmail = createServerFn({ method: "POST" })
+  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data }) => {
+    const [{ data: row }, { data: stationery }] = await Promise.all([
+      supabaseAdmin
+        .from("scheduled_emails")
+        .select("id, kind, thread_id, to_addr, cc_addr, bcc_addr, subject, body_html, send_at, status, ink_color, notice_header_html, editor_soul_id")
+        .eq("id", data.id)
+        .single(),
+      supabaseAdmin.from("kingdom_stationery").select("*").eq("id", true).single(),
+    ]);
+    if (!row) return { ok: false as const, error: "Scheduled letter not found." };
+    if (!stationery) return { ok: false as const, error: "Stationery missing." };
+
+    const inkColor = (row.ink_color as string | null) || (await resolveDefaultInk());
+    const wrapped = wrapInStationery(
+      stationeryArgs(stationery as Record<string, unknown>, row.body_html as string, {
+        inkColor,
+        noticeHeaderHtml: (row.notice_header_html as string | null) ?? undefined,
+      }),
+    );
+    // Strip dark outer frame for in-app preview
+    const previewHtml = wrapped
+      .replace(/background:#0c0a06;/g, "background:#fbf6e7;")
+      .replace(/padding:24px 12px;/g, "padding:8px;")
+      .replace(/max-width:640px;/g, "max-width:100%;");
+
+    return { ok: true as const, row, preview_html: previewHtml };
+  });
+
+// ─── King's Lexicon (custom dictionary) CRUD ─────────────────────────────
+export const listKingsLexicon = createServerFn({ method: "GET" }).handler(async () => {
+  const { data, error } = await supabaseAdmin
+    .from("kings_dictionary")
+    .select("id, term, note, added_at")
+    .order("term", { ascending: true });
+  if (error) return { ok: false as const, error: error.message };
+  return { ok: true as const, terms: data ?? [] };
+});
+
+export const addKingsLexiconTerm = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z.object({
+      term: z.string().min(1).max(120),
+      note: z.string().max(400).optional(),
+    }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { error } = await supabaseAdmin
+      .from("kings_dictionary")
+      .insert({ term: data.term.trim(), note: data.note?.trim() ?? "" });
+    if (error) return { ok: false as const, error: error.message };
+    return { ok: true as const };
+  });
+
+export const removeKingsLexiconTerm = createServerFn({ method: "POST" })
+  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data }) => {
+    const { error } = await supabaseAdmin
+      .from("kings_dictionary")
+      .delete()
+      .eq("id", data.id);
+    if (error) return { ok: false as const, error: error.message };
+    return { ok: true as const };
   });

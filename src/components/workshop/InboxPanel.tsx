@@ -25,6 +25,7 @@ import {
   Mail,
   Paperclip,
   Download,
+  Trash2,
 } from "lucide-react";
 import {
   listInbox,
@@ -41,6 +42,7 @@ import {
   listLetterTemplates,
   getDefaultInkColor,
   getAttachment,
+  trashThread,
 } from "@/server/inbox.functions";
 import { listCouncilSouls } from "@/server/studio.functions";
 
@@ -146,6 +148,17 @@ export function InboxPanel({
   const getDefaultInkFn = useServerFn(getDefaultInkColor);
   const getAttachmentFn = useServerFn(getAttachment);
   const listSoulsFn = useServerFn(listCouncilSouls);
+  const trashThreadFn = useServerFn(trashThread);
+
+  const handleTrash = useCallback(async (t: ThreadRow) => {
+    if (!confirm(`Move "${t.subject}" to Trash? Gmail keeps it 30 days, then deletes.`)) return;
+    const r = await trashThreadFn({ data: { thread_id: t.id } });
+    if (r.ok) {
+      setThreads((arr) => arr.filter((x) => x.id !== t.id));
+      if (selected?.id === t.id) { setSelected(null); setMessages([]); }
+      setNotice({ kind: "ok", text: "Letter moved to Trash." });
+    } else setNotice({ kind: "err", text: r.error });
+  }, [trashThreadFn, selected]);
 
   const [folder, setFolder] = useState<Folder>("inbox");
   const [threads, setThreads] = useState<ThreadRow[]>([]);

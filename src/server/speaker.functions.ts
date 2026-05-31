@@ -12,6 +12,7 @@ import { petitionBankImpl } from "./bank.server";
 import {
   LOVABLE_AI_GATEWAY_URL,
   buildSystemPrompt,
+  loadKingsLexicon,
   type ProviderCompact,
   type SoulIdentity,
 } from "./ai-shared.server";
@@ -429,10 +430,12 @@ export const speakAsSoul = createServerFn({ method: "POST" })
         knownBlock
       : "";
 
+    const lexicon = await loadKingsLexicon(supabaseAdmin);
     const baseSystemPrompt = buildSystemPrompt({
       constitution: settings.system_constitution,
       soul,
       memoirs,
+      lexicon,
     });
     const systemPrompt =
       baseSystemPrompt + knownNote + deedSystemNote + itemSystemNote + buildingSystemNote;

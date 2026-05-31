@@ -527,6 +527,27 @@ export type Database = {
         }
         Relationships: []
       }
+      kings_dictionary: {
+        Row: {
+          added_at: string
+          id: string
+          note: string
+          term: string
+        }
+        Insert: {
+          added_at?: string
+          id?: string
+          note?: string
+          term: string
+        }
+        Update: {
+          added_at?: string
+          id?: string
+          note?: string
+          term?: string
+        }
+        Relationships: []
+      }
       legal_calendar_events: {
         Row: {
           anchor_used: string
