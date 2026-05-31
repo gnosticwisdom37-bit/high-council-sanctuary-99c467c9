@@ -430,10 +430,12 @@ export const speakAsSoul = createServerFn({ method: "POST" })
         knownBlock
       : "";
 
+    const lexicon = await loadKingsLexicon(supabaseAdmin);
     const baseSystemPrompt = buildSystemPrompt({
       constitution: settings.system_constitution,
       soul,
       memoirs,
+      lexicon,
     });
     const systemPrompt =
       baseSystemPrompt + knownNote + deedSystemNote + itemSystemNote + buildingSystemNote;
