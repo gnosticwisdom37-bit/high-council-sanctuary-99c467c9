@@ -764,9 +764,11 @@ export const draftReply = createServerFn({ method: "POST" })
       })
       .join("\n\n");
 
+    const lexicon = await loadKingsLexicon(supabaseAdmin);
+
     // STEP 1 — Curator brief
     const curatorSystem =
-      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: curator! }) +
+      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: curator!, lexicon }) +
       "\n\nYou are the CURATOR. Read the email thread and write a 1\u20132 sentence brief for the Editor Soul: what the sender wants, the tone called for, and what the King would have us emphasise or omit. STRICT JSON only:\n" +
       `{ "brief": string (\u2264400 chars) }`;
     const curatorUser = `Thread subject: ${threadRow.subject}\nFrom: ${threadRow.from_addr}\n\nTranscript:\n${transcript}\n\n${data.intent ? `King's intent: ${data.intent}` : ""}`;
@@ -795,7 +797,7 @@ export const draftReply = createServerFn({ method: "POST" })
 
     // STEP 2 — Editor draft (body HTML only; wrapper added after)
     const editorSystem =
-      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: editor }) +
+      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: editor, lexicon }) +
       "\n\nYou are the EDITOR. Draft King Sean's reply to this email IN YOUR OWN VOICE, on the King's behalf. " +
       "Output ONLY the body of the message as simple HTML (use <p> for paragraphs, <strong>, <em>, no <html>/<body>/<head>, no inline styles, no scripts). " +
       "Do NOT include any greeting like 'Dear ___' unless it fits naturally; do NOT include a signature line — the King's seal is appended automatically. " +
