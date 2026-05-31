@@ -12,6 +12,7 @@ import { petitionBankImpl } from "./bank.server";
 import {
   LOVABLE_AI_GATEWAY_URL,
   buildSystemPrompt,
+  loadKingsLexicon,
   type ProviderCompact,
   type SoulIdentity,
 } from "./ai-shared.server";
