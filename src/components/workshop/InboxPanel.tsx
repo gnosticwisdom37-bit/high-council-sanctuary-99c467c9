@@ -41,6 +41,7 @@ import {
   listLetterTemplates,
   getDefaultInkColor,
   getAttachment,
+  trashThread,
 } from "@/server/inbox.functions";
 import { listCouncilSouls } from "@/server/studio.functions";
 
