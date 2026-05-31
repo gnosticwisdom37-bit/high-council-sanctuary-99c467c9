@@ -1035,9 +1035,11 @@ export const draftLetter = createServerFn({ method: "POST" })
       ? compact.fallback_chain
       : ["google/gemini-2.5-flash", "google/gemini-2.5-flash-lite"];
 
+    const lexicon = await loadKingsLexicon(supabaseAdmin);
+
     // Curator: distill King's intent into a brief
     const curatorSystem =
-      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: curator! }) +
+      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: curator!, lexicon }) +
       "\n\nYou are the CURATOR. The King is composing a NEW letter. Read His intent and write a 1–2 sentence brief for the Editor Soul: who it is to, what the King wants conveyed, the tone, anything to emphasise or omit. STRICT JSON only:\n" +
       `{ "brief": string (≤400 chars) }`;
     const curatorUser = `Recipient: ${data.to_addr}\nSubject: ${data.subject}\n\nKing's intent: ${data.intent ?? "(none provided — infer warm, sovereign greeting)"}`;
@@ -1066,7 +1068,7 @@ export const draftLetter = createServerFn({ method: "POST" })
 
     // Editor: draft body
     const editorSystem =
-      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: editor }) +
+      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: editor, lexicon }) +
       "\n\nYou are the EDITOR. Draft King Sean's NEW letter IN YOUR OWN VOICE, on His behalf. " +
       "Output ONLY the body of the message as simple HTML (use <p> for paragraphs, <strong>, <em>, no <html>/<body>/<head>, no inline styles, no scripts). " +
       "Open with a fitting greeting; do NOT include a signature line — the King's seal is appended automatically. " +
