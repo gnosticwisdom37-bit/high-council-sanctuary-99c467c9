@@ -997,6 +997,33 @@ function ComposeDrawer({
               </Field>
             </>
           )}
+          {templates.length > 0 && (
+            <Field label="Template (optional)">
+              <select
+                value={templateId}
+                onChange={(e) => applyTemplate(e.target.value)}
+                className="w-full rounded-md px-2 py-1.5 text-xs"
+                style={inputStyle}
+              >
+                <option value="">— None (free-form letter) —</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </Field>
+          )}
+          {noticeHeaderHtml && (
+            <div
+              className="rounded-md p-2 text-[10px]"
+              style={{
+                background: "color-mix(in oklab, var(--dawn-ember) 12%, transparent)",
+                border: "1px solid color-mix(in oklab, var(--dawn-ember) 50%, transparent)",
+                color: "var(--dawn-ink)",
+              }}
+            >
+              Notice header will be prepended to this letter.
+            </div>
+          )}
           <Field label="Subject">
             <input
               value={subject}
