@@ -890,6 +890,8 @@ function ComposeDrawer({
         subject: subject.trim(),
         body_html: bodyHtml,
         editor_soul_id: editorId,
+        ink_color: inkColor,
+        notice_header_html: noticeHeaderHtml || undefined,
       },
     });
     setSending(false);
