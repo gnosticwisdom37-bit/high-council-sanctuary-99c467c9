@@ -96,14 +96,15 @@ export function buildSystemPrompt(args: {
  * Safe to call on every Soul invocation — tiny table, cached at the DB layer.
  */
 export async function loadKingsLexicon(
-  supabaseAdmin: { from: (t: string) => { select: (s: string) => { order: (c: string, o: { ascending: boolean }) => Promise<{ data: { term: string }[] | null }> } } },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabaseAdmin: any,
 ): Promise<string[]> {
   try {
     const { data } = await supabaseAdmin
       .from("kings_dictionary")
       .select("term")
       .order("term", { ascending: true });
-    return (data ?? []).map((r) => r.term).filter(Boolean);
+    return ((data ?? []) as { term: string }[]).map((r) => r.term).filter(Boolean);
   } catch {
     return [];
   }
