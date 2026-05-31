@@ -986,10 +986,13 @@ export const previewStationery = createServerFn({ method: "POST" })
       data.sample_body_html ??
       "<p>Beloved friend,</p><p>I write on behalf of King Sean to acknowledge your message. We have read every word with care and will respond in full at the right hour.</p><p>Be well, and Walk in Truth.</p>";
 
-    return {
-      ok: true as const,
-      html: wrapInStationery(stationeryArgs(stationery as Record<string, unknown>, sample)),
-    };
+    const wrapped = wrapInStationery(stationeryArgs(stationery as Record<string, unknown>, sample));
+    // Strip the dark outer frame for preview so the parchment fills the iframe.
+    const previewHtml = wrapped
+      .replace(/background:#0c0a06;/g, "background:#fbf6e7;")
+      .replace(/padding:24px 12px;/g, "padding:8px;")
+      .replace(/max-width:640px;/g, "max-width:100%;");
+    return { ok: true as const, html: previewHtml };
   });
 
 // ─── draftLetter: compose from scratch (no prior thread) ─────────────────

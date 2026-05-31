@@ -345,8 +345,9 @@ export function KingdomStationeryPanel() {
             <iframe
               srcDoc={previewHtml}
               title="Stationery preview"
-              className="h-[480px] w-full bg-transparent"
-              sandbox=""
+              className="h-[600px] w-full"
+              style={{ background: "#fbf6e7" }}
+              sandbox="allow-same-origin"
             />
           </div>
         </div>

@@ -770,6 +770,8 @@ export function InboxPanel({
         <ComposeDrawer
           souls={souls}
           contacts={contacts}
+          templates={templates}
+          inkColor={inkColor}
           defaultEditorId={editorId}
           defaultCuratorId={curatorId}
           soulLabel={soulLabel}
@@ -798,6 +800,8 @@ export function InboxPanel({
 function ComposeDrawer({
   souls,
   contacts,
+  templates,
+  inkColor,
   defaultEditorId,
   defaultCuratorId,
   soulLabel,
@@ -811,6 +815,8 @@ function ComposeDrawer({
 }: {
   souls: CouncilSoul[];
   contacts: Contact[];
+  templates: LetterTemplate[];
+  inkColor: string;
   defaultEditorId: string | null;
   defaultCuratorId: string | null;
   soulLabel: (id: string | null) => string;
@@ -840,6 +846,17 @@ function ComposeDrawer({
   const [brief, setBrief] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [scheduleMenuOpen, setScheduleMenuOpen] = useState(false);
+  const [templateId, setTemplateId] = useState<string>("");
+  const [noticeHeaderHtml, setNoticeHeaderHtml] = useState<string>("");
+
+  const applyTemplate = (id: string) => {
+    setTemplateId(id);
+    const t = templates.find((x) => x.id === id);
+    if (!t) { setNoticeHeaderHtml(""); return; }
+    if (t.subject_template && !subject.trim()) setSubject(t.subject_template);
+    if (t.description && !intent.trim()) setIntent(t.description);
+    setNoticeHeaderHtml(t.notice_header_html || "");
+  };
 
   const draft = async () => {
     if (!editorId || !to.trim() || !subject.trim()) {
@@ -873,6 +890,8 @@ function ComposeDrawer({
         subject: subject.trim(),
         body_html: bodyHtml,
         editor_soul_id: editorId,
+        ink_color: inkColor,
+        notice_header_html: noticeHeaderHtml || undefined,
       },
     });
     setSending(false);
@@ -894,6 +913,8 @@ function ComposeDrawer({
         body_html: bodyHtml,
         editor_soul_id: editorId,
         send_at: iso,
+        ink_color: inkColor,
+        notice_header_html: noticeHeaderHtml || undefined,
       },
     });
     setSending(false);
@@ -975,6 +996,33 @@ function ComposeDrawer({
                 />
               </Field>
             </>
+          )}
+          {templates.length > 0 && (
+            <Field label="Template (optional)">
+              <select
+                value={templateId}
+                onChange={(e) => applyTemplate(e.target.value)}
+                className="w-full rounded-md px-2 py-1.5 text-xs"
+                style={inputStyle}
+              >
+                <option value="">— None (free-form letter) —</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </Field>
+          )}
+          {noticeHeaderHtml && (
+            <div
+              className="rounded-md p-2 text-[10px]"
+              style={{
+                background: "color-mix(in oklab, var(--dawn-ember) 12%, transparent)",
+                border: "1px solid color-mix(in oklab, var(--dawn-ember) 50%, transparent)",
+                color: "var(--dawn-ink)",
+              }}
+            >
+              Notice header will be prepended to this letter.
+            </div>
           )}
           <Field label="Subject">
             <input
