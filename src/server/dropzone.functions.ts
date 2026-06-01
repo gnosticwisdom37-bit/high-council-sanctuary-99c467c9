@@ -322,17 +322,23 @@ export const listBlogArchive = createServerFn({ method: "POST" })
     z.object({
       workshop_id: z.string().uuid(),
       sort: z.enum(["recent", "top-views"]).default("recent"),
-      limit: z.number().int().min(1).max(200).default(50),
+      limit: z.number().int().min(1).max(2000).default(50),
+      query: z.string().trim().max(200).optional(),
     }).parse(input),
   )
   .handler(async ({ data }) => {
-    const q = supabaseAdmin
+    let q = supabaseAdmin
       .from("blog_archive")
       .select(
         "id, title, url, published_at, excerpt, tags, categories, views, comments, source_filename, created_at",
       )
       .eq("workshop_id", data.workshop_id)
       .limit(data.limit);
+    if (data.query && data.query.length > 0) {
+      // Escape PostgREST wildcards so user input can't break ILIKE
+      const safe = data.query.replace(/[%_]/g, (m) => `\\${m}`);
+      q = q.ilike("title", `%${safe}%`);
+    }
     const { data: rows, error } =
       data.sort === "top-views"
         ? await q.order("views", { ascending: false, nullsFirst: false })
