@@ -56,7 +56,14 @@ export function CouncilTable({ souls, onVisit, onToggleAttendance, attendanceIds
   );
   const presentSet = new Set(attendanceIds);
 
-  const season = currentSeasonTint();
+  // Compute the season on the client only — server and client time zones can
+  // disagree across a month boundary and cause a hydration mismatch.
+  const [season, setSeason] = useState<{ name: string; color: string } | null>(null);
+  useEffect(() => {
+    setSeason(currentSeasonTint());
+  }, []);
+  const seasonName = season?.name ?? "";
+  const seasonColor = season?.color ?? "var(--dawn-gold)";
 
   // SVG geometry — a 600×600 viewBox keeps it crisp at any width.
   const size = 600;
