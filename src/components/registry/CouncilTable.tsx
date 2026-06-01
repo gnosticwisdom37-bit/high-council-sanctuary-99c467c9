@@ -8,6 +8,7 @@
  *
  * Aries sits at 12 o'clock; the wheel proceeds clockwise through the Zodiac.
  */
+import { useEffect, useState } from "react";
 import type { SoulNode } from "./CeremonyScroll";
 
 type Props = {
