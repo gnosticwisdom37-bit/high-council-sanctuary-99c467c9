@@ -93,7 +93,7 @@ export function CouncilTable({ souls, onVisit, onToggleAttendance, attendanceIds
           <radialGradient id="hcc-aura" cx="50%" cy="50%" r="50%">
             <stop
               offset="0%"
-              stopColor={season.color}
+              stopColor={seasonColor}
               stopOpacity="0.35"
             />
             <stop offset="70%" stopColor="var(--dawn-gold)" stopOpacity="0.08" />
