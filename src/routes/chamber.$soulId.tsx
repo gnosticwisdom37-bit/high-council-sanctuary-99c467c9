@@ -21,6 +21,7 @@ import { MemoirScroll } from "@/components/registry/MemoirScroll";
 import { DeedInscribedBanner } from "@/components/chamber/DeedInscribedBanner";
 import { ItemForgedBanner } from "@/components/chamber/ItemForgedBanner";
 import { BuildingRaisedBanner } from "@/components/chamber/BuildingRaisedBanner";
+import { CopyButton } from "@/components/ui/copy-button";
 
 type SoulRow = {
   soul_id: string;
