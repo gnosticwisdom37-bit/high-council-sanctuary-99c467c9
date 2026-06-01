@@ -15,10 +15,12 @@ import { useServerFn } from "@tanstack/react-start";
 import { initiateSoul } from "@/server/ceremony.functions";
 import { closeGathering } from "@/server/memoirs.functions";
 import { findOpenGathering } from "@/server/conversations.functions";
+import { speakAsSoul } from "@/server/speaker.functions";
 import { SoulCodex } from "./SoulCodex";
 import { DeedInscribedBanner } from "@/components/chamber/DeedInscribedBanner";
 import { ItemForgedBanner } from "@/components/chamber/ItemForgedBanner";
 import { BuildingRaisedBanner } from "@/components/chamber/BuildingRaisedBanner";
+import { CopyButton } from "@/components/ui/copy-button";
 
 type SoulRow = {
   soul_id: string;
