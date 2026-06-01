@@ -583,6 +583,9 @@ function NewPostTab({
 
   const [posts, setPosts] = useState<BlogRow[]>([]);
   const [sourceId, setSourceId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [searchAll, setSearchAll] = useState(false);
+  const [loadingPosts, setLoadingPosts] = useState(false);
   const [brief, setBrief] = useState("");
   const [draft, setDraft] = useState<NewPostDraft | null>(null);
   const [drafting, setDrafting] = useState(false);
@@ -597,10 +600,29 @@ function NewPostTab({
 
   useEffect(() => {
     void refreshLink();
-    void listBlog({ data: { workshop_id: workshopId, sort: "recent", limit: 30 } }).then(
-      (r) => { if (r.ok) setPosts(r.posts as BlogRow[]); },
-    );
-  }, [refreshLink, listBlog, workshopId]);
+  }, [refreshLink]);
+
+  // Debounced post-list refetch — re-runs whenever search/scope changes
+  useEffect(() => {
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      setLoadingPosts(true);
+      const r = await listBlog({
+        data: {
+          workshop_id: workshopId,
+          sort: "recent",
+          limit: searchAll ? 2000 : 100,
+          ...(search.trim() ? { query: search.trim() } : {}),
+        },
+      });
+      if (!cancelled && r.ok) setPosts(r.posts as BlogRow[]);
+      if (!cancelled) setLoadingPosts(false);
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [listBlog, workshopId, search, searchAll]);
 
   const openSitePicker = useCallback(async () => {
     setShowSitePicker(true);
