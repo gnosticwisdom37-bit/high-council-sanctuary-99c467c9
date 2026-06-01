@@ -605,13 +605,19 @@ export function InboxPanel({
                         color: "var(--dawn-ink)",
                       }}
                     >
-                      <p
-                        className="mb-1 text-[10px] uppercase tracking-[0.2em]"
-                        style={{ color: "color-mix(in oklab, var(--dawn-ink) 60%, transparent)" }}
-                      >
-                        {m.from_addr.replace(/<.+>/, "").trim() || m.from_addr}{" "}
-                        {m.sent_at && `· ${new Date(m.sent_at).toLocaleString()}`}
-                      </p>
+                      <div className="mb-1 flex items-center gap-2">
+                        <p
+                          className="text-[10px] uppercase tracking-[0.2em]"
+                          style={{ color: "color-mix(in oklab, var(--dawn-ink) 60%, transparent)" }}
+                        >
+                          {m.from_addr.replace(/<.+>/, "").trim() || m.from_addr}{" "}
+                          {m.sent_at && `· ${new Date(m.sent_at).toLocaleString()}`}
+                        </p>
+                        <CopyButton
+                          text={m.body_text || stripHtml(m.body_html)}
+                          className="ml-auto"
+                        />
+                      </div>
                       <p className="whitespace-pre-wrap text-xs leading-relaxed" style={{ fontFamily: "Georgia, serif" }}>
                         {(m.body_text || stripHtml(m.body_html)).slice(0, 1500)}
                       </p>
