@@ -45,6 +45,7 @@ import {
   trashThread,
 } from "@/server/inbox.functions";
 import { listCouncilSouls } from "@/server/studio.functions";
+import { CopyButton } from "@/components/ui/copy-button";
 
 type ThreadRow = {
   id: string;
