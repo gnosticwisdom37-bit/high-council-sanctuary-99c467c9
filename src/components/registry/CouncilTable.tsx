@@ -80,7 +80,7 @@ export function CouncilTable({ souls, onVisit, onToggleAttendance, attendanceIds
         className="mb-3 text-center text-[10px] uppercase tracking-[0.35em]"
         style={{ color: "color-mix(in oklab, var(--dawn-ink) 55%, transparent)" }}
       >
-        High Council Chamber · House of the Rising Sun · {season.name} accent
+        High Council Chamber · House of the Rising Sun{seasonName ? ` · ${seasonName} accent` : ""}
       </p>
 
       <svg
