@@ -761,7 +761,28 @@ function NewPostTab({
             onChange={(e) => setBrief(e.target.value)}
           />
           <p className="mt-3 text-[10px] uppercase tracking-[0.3em] opacity-70">— or pick an old post to rewrite —</p>
-          <ScrollList max={180}>
+          <div className="mt-1 flex items-center gap-1.5">
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search posts by title…"
+              spellCheck={false}
+              className="w-full rounded-md border border-black/10 bg-white/60 px-2 py-1 text-xs"
+            />
+            <label className="flex shrink-0 items-center gap-1 text-[10px] uppercase tracking-[0.15em] opacity-70">
+              <input
+                type="checkbox"
+                checked={searchAll}
+                onChange={(e) => setSearchAll(e.target.checked)}
+              />
+              Full archive
+            </label>
+          </div>
+          <p className="mt-1 text-[10px] opacity-50">
+            {loadingPosts ? "Loading…" : `${posts.length} post${posts.length === 1 ? "" : "s"} shown`}
+          </p>
+          <ScrollList max={320}>
             <li>
               <button
                 onClick={() => setSourceId(null)}
