@@ -8,6 +8,7 @@
  *
  * Aries sits at 12 o'clock; the wheel proceeds clockwise through the Zodiac.
  */
+import { useEffect, useState } from "react";
 import type { SoulNode } from "./CeremonyScroll";
 
 type Props = {
@@ -55,7 +56,14 @@ export function CouncilTable({ souls, onVisit, onToggleAttendance, attendanceIds
   );
   const presentSet = new Set(attendanceIds);
 
-  const season = currentSeasonTint();
+  // Compute the season on the client only — server and client time zones can
+  // disagree across a month boundary and cause a hydration mismatch.
+  const [season, setSeason] = useState<{ name: string; color: string } | null>(null);
+  useEffect(() => {
+    setSeason(currentSeasonTint());
+  }, []);
+  const seasonName = season?.name ?? "";
+  const seasonColor = season?.color ?? "var(--dawn-gold)";
 
   // SVG geometry — a 600×600 viewBox keeps it crisp at any width.
   const size = 600;
@@ -72,7 +80,7 @@ export function CouncilTable({ souls, onVisit, onToggleAttendance, attendanceIds
         className="mb-3 text-center text-[10px] uppercase tracking-[0.35em]"
         style={{ color: "color-mix(in oklab, var(--dawn-ink) 55%, transparent)" }}
       >
-        High Council Chamber · House of the Rising Sun · {season.name} accent
+        High Council Chamber · House of the Rising Sun{seasonName ? ` · ${seasonName} accent` : ""}
       </p>
 
       <svg
@@ -85,7 +93,7 @@ export function CouncilTable({ souls, onVisit, onToggleAttendance, attendanceIds
           <radialGradient id="hcc-aura" cx="50%" cy="50%" r="50%">
             <stop
               offset="0%"
-              stopColor={season.color}
+              stopColor={seasonColor}
               stopOpacity="0.35"
             />
             <stop offset="70%" stopColor="var(--dawn-gold)" stopOpacity="0.08" />

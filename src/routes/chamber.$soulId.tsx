@@ -21,6 +21,7 @@ import { MemoirScroll } from "@/components/registry/MemoirScroll";
 import { DeedInscribedBanner } from "@/components/chamber/DeedInscribedBanner";
 import { ItemForgedBanner } from "@/components/chamber/ItemForgedBanner";
 import { BuildingRaisedBanner } from "@/components/chamber/BuildingRaisedBanner";
+import { CopyButton } from "@/components/ui/copy-button";
 
 type SoulRow = {
   soul_id: string;
@@ -307,6 +308,7 @@ function ChamberPage() {
                         {turn.model && <span className="opacity-60">· {turn.model}</span>}
                       </>
                     )}
+                    <CopyButton text={turn.content} className="ml-auto" />
                   </p>
                   <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">{turn.content}</p>
                   {turn.role === "soul" && turn.deed && (
