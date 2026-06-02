@@ -697,8 +697,10 @@ export function InboxPanel({
                 <textarea
                   value={intent}
                   onChange={(e) => setIntent(e.target.value)}
-                  placeholder="(Optional) Your intent for this reply — tone, key points, anything to include or avoid."
-                  rows={2}
+                  placeholder={editorId === KING_SEAN_ID
+                    ? "Write Your exact reply — Your Words will be sent verbatim, wrapped in Kingdom stationery. Use blank lines to separate paragraphs."
+                    : "(Optional) Your intent for this reply — tone, key points, anything to include or avoid."}
+                  rows={editorId === KING_SEAN_ID ? 10 : 2}
                   className="mt-2 w-full rounded-md px-2 py-1.5 text-xs"
                   style={{
                     background: "color-mix(in oklab, var(--dawn-parchment) 95%, transparent)",
@@ -709,7 +711,7 @@ export function InboxPanel({
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <button
                     onClick={handleDraft}
-                    disabled={drafting || !editorId}
+                    disabled={drafting || !editorId || (editorId === KING_SEAN_ID && !intent.trim())}
                     className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-[0.2em] disabled:opacity-50"
                     style={{
                       background: "linear-gradient(135deg, var(--dawn-gold-bright), var(--dawn-ember))",
@@ -718,8 +720,9 @@ export function InboxPanel({
                     }}
                   >
                     {drafting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                    Draft reply
+                    {editorId === KING_SEAN_ID ? "Wrap My Words" : "Draft reply"}
                   </button>
+
                   <InkJar value={inkColor} onChange={setInkColor} defaultInk={defaultInk} />
                   <AttachmentPicker
                     attachments={replyAttachments}
