@@ -43,9 +43,22 @@ import {
   getDefaultInkColor,
   getAttachment,
   trashThread,
+  wrapKingsWords,
 } from "@/server/inbox.functions";
 import { listCouncilSouls } from "@/server/studio.functions";
 import { CopyButton } from "@/components/ui/copy-button";
+
+// Sentinel Editor: the King speaks directly — no Soul rewriting.
+const KING_SEAN_ID = "king-sean";
+const KING_SEAN_SOUL: CouncilSoul = {
+  soul_id: KING_SEAN_ID,
+  title: "King Sean",
+  house: "House von Dehn",
+  chosen_name: "King Sean (Your exact words)",
+  sigil: "👑",
+  initiated: true,
+};
+
 
 type ThreadRow = {
   id: string;
