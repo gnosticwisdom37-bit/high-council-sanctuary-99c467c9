@@ -674,7 +674,8 @@ export function InboxPanel({
               >
                 <div className="grid gap-2 sm:grid-cols-2">
                   <SoulPicker label="Curator" souls={souls} value={curatorId} onChange={setCuratorId} soulLabel={soulLabel} />
-                  <SoulPicker label="Editor" souls={souls} value={editorId} onChange={setEditorId} soulLabel={soulLabel} />
+                  <SoulPicker label="Editor" souls={[KING_SEAN_SOUL, ...souls]} value={editorId} onChange={setEditorId} soulLabel={soulLabel} />
+
                 </div>
                 <textarea
                   value={intent}
