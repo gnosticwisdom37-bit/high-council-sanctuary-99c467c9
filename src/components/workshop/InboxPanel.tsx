@@ -304,6 +304,20 @@ export function InboxPanel({
   const handleDraft = useCallback(async () => {
     if (!selected || !editorId) return;
     setDrafting(true); setNotice(null);
+    if (editorId === KING_SEAN_ID) {
+      // King speaks directly — no AI rewriting. Wrap His exact words in stationery.
+      const r = await wrapKingsWordsFn({
+        data: {
+          body_text: intent,
+          ink_color: inkColor,
+          notice_header_html: noticeHeaderHtml || undefined,
+        },
+      });
+      setDrafting(false);
+      if (r.ok) { setDraftHtml(r.body_html); setDraftPreview(r.wrapped_html); setBrief("King Sean's exact Words."); }
+      else setNotice({ kind: "err", text: r.error });
+      return;
+    }
     const r = await draftReplyFn({
       data: {
         thread_id: selected.id,
@@ -315,7 +329,8 @@ export function InboxPanel({
     setDrafting(false);
     if (r.ok) { setDraftHtml(r.body_html); setDraftPreview(r.wrapped_html); setBrief(r.brief); }
     else setNotice({ kind: "err", text: r.error });
-  }, [selected, editorId, curatorId, intent, draftReplyFn]);
+  }, [selected, editorId, curatorId, intent, draftReplyFn, wrapKingsWordsFn, inkColor, noticeHeaderHtml]);
+
 
   const handleSend = useCallback(async () => {
     if (!selected || !editorId || !draftHtml) return;
