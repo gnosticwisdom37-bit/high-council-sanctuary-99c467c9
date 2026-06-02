@@ -43,9 +43,22 @@ import {
   getDefaultInkColor,
   getAttachment,
   trashThread,
+  wrapKingsWords,
 } from "@/server/inbox.functions";
 import { listCouncilSouls } from "@/server/studio.functions";
 import { CopyButton } from "@/components/ui/copy-button";
+
+// Sentinel Editor: the King speaks directly — no Soul rewriting.
+const KING_SEAN_ID = "king-sean";
+const KING_SEAN_SOUL: CouncilSoul = {
+  soul_id: KING_SEAN_ID,
+  title: "King Sean",
+  house: "House von Dehn",
+  chosen_name: "King Sean (Your exact words)",
+  sigil: "👑",
+  initiated: true,
+};
+
 
 type ThreadRow = {
   id: string;
@@ -150,6 +163,8 @@ export function InboxPanel({
   const getAttachmentFn = useServerFn(getAttachment);
   const listSoulsFn = useServerFn(listCouncilSouls);
   const trashThreadFn = useServerFn(trashThread);
+  const wrapKingsWordsFn = useServerFn(wrapKingsWords);
+
 
   const [folder, setFolder] = useState<Folder>("inbox");
   const [threads, setThreads] = useState<ThreadRow[]>([]);
@@ -289,6 +304,20 @@ export function InboxPanel({
   const handleDraft = useCallback(async () => {
     if (!selected || !editorId) return;
     setDrafting(true); setNotice(null);
+    if (editorId === KING_SEAN_ID) {
+      // King speaks directly — no AI rewriting. Wrap His exact words in stationery.
+      const r = await wrapKingsWordsFn({
+        data: {
+          body_text: intent,
+          ink_color: inkColor,
+          notice_header_html: noticeHeaderHtml || undefined,
+        },
+      });
+      setDrafting(false);
+      if (r.ok) { setDraftHtml(r.body_html); setDraftPreview(r.wrapped_html); setBrief("King Sean's exact Words."); }
+      else setNotice({ kind: "err", text: r.error });
+      return;
+    }
     const r = await draftReplyFn({
       data: {
         thread_id: selected.id,
@@ -300,7 +329,8 @@ export function InboxPanel({
     setDrafting(false);
     if (r.ok) { setDraftHtml(r.body_html); setDraftPreview(r.wrapped_html); setBrief(r.brief); }
     else setNotice({ kind: "err", text: r.error });
-  }, [selected, editorId, curatorId, intent, draftReplyFn]);
+  }, [selected, editorId, curatorId, intent, draftReplyFn, wrapKingsWordsFn, inkColor, noticeHeaderHtml]);
+
 
   const handleSend = useCallback(async () => {
     if (!selected || !editorId || !draftHtml) return;
@@ -661,13 +691,16 @@ export function InboxPanel({
               >
                 <div className="grid gap-2 sm:grid-cols-2">
                   <SoulPicker label="Curator" souls={souls} value={curatorId} onChange={setCuratorId} soulLabel={soulLabel} />
-                  <SoulPicker label="Editor" souls={souls} value={editorId} onChange={setEditorId} soulLabel={soulLabel} />
+                  <SoulPicker label="Editor" souls={[KING_SEAN_SOUL, ...souls]} value={editorId} onChange={setEditorId} soulLabel={soulLabel} />
+
                 </div>
                 <textarea
                   value={intent}
                   onChange={(e) => setIntent(e.target.value)}
-                  placeholder="(Optional) Your intent for this reply — tone, key points, anything to include or avoid."
-                  rows={2}
+                  placeholder={editorId === KING_SEAN_ID
+                    ? "Write Your exact reply — Your Words will be sent verbatim, wrapped in Kingdom stationery. Use blank lines to separate paragraphs."
+                    : "(Optional) Your intent for this reply — tone, key points, anything to include or avoid."}
+                  rows={editorId === KING_SEAN_ID ? 10 : 2}
                   className="mt-2 w-full rounded-md px-2 py-1.5 text-xs"
                   style={{
                     background: "color-mix(in oklab, var(--dawn-parchment) 95%, transparent)",
@@ -678,7 +711,7 @@ export function InboxPanel({
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <button
                     onClick={handleDraft}
-                    disabled={drafting || !editorId}
+                    disabled={drafting || !editorId || (editorId === KING_SEAN_ID && !intent.trim())}
                     className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-[0.2em] disabled:opacity-50"
                     style={{
                       background: "linear-gradient(135deg, var(--dawn-gold-bright), var(--dawn-ember))",
@@ -687,8 +720,9 @@ export function InboxPanel({
                     }}
                   >
                     {drafting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                    Draft reply
+                    {editorId === KING_SEAN_ID ? "Wrap My Words" : "Draft reply"}
                   </button>
+
                   <InkJar value={inkColor} onChange={setInkColor} defaultInk={defaultInk} />
                   <AttachmentPicker
                     attachments={replyAttachments}
@@ -810,9 +844,11 @@ export function InboxPanel({
           draftLetterFn={draftLetterFn}
           composeAndSendFn={composeAndSendFn}
           scheduleEmailFn={scheduleEmailFn}
+          wrapKingsWordsFn={wrapKingsWordsFn}
           workshopId={workshopId}
         />
       )}
+
     </section>
   );
 }
@@ -832,6 +868,7 @@ function ComposeDrawer({
   draftLetterFn,
   composeAndSendFn,
   scheduleEmailFn,
+  wrapKingsWordsFn,
   workshopId,
 }: {
   souls: CouncilSoul[];
@@ -850,8 +887,11 @@ function ComposeDrawer({
   composeAndSendFn: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   scheduleEmailFn: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  wrapKingsWordsFn: any;
   workshopId: string;
 }) {
+
   const [to, setTo] = useState("");
   const [cc, setCc] = useState("");
   const [bcc, setBcc] = useState("");
@@ -881,9 +921,23 @@ function ComposeDrawer({
 
   const draft = async () => {
     if (!editorId || !to.trim() || !subject.trim()) {
-      setErr("Recipient, subject, and Editor Soul are required."); return;
+      setErr("Recipient, subject, and Editor are required."); return;
     }
     setDrafting(true); setErr(null);
+    if (editorId === KING_SEAN_ID) {
+      if (!intent.trim()) { setDrafting(false); setErr("Write Your Words below."); return; }
+      const r = await wrapKingsWordsFn({
+        data: {
+          body_text: intent,
+          ink_color: inkColor,
+          notice_header_html: noticeHeaderHtml || undefined,
+        },
+      });
+      setDrafting(false);
+      if (r.ok) { setBodyHtml(r.body_html); setPreviewHtml(r.wrapped_html); setBrief("King Sean's exact Words."); }
+      else setErr(r.error);
+      return;
+    }
     const r = await draftLetterFn({
       data: {
         to_addr: to.trim(),
@@ -897,6 +951,7 @@ function ComposeDrawer({
     if (r.ok) { setBodyHtml(r.body_html); setPreviewHtml(r.wrapped_html); setBrief(r.brief); }
     else setErr(r.error);
   };
+
 
   const send = async () => {
     if (!editorId || !bodyHtml) return;
@@ -1055,16 +1110,18 @@ function ComposeDrawer({
           </Field>
           <div className="grid gap-2 sm:grid-cols-2">
             <SoulPicker label="Curator" souls={souls} value={curatorId} onChange={setCuratorId} soulLabel={soulLabel} />
-            <SoulPicker label="Editor" souls={souls} value={editorId} onChange={setEditorId} soulLabel={soulLabel} />
+            <SoulPicker label="Editor" souls={[KING_SEAN_SOUL, ...souls]} value={editorId} onChange={setEditorId} soulLabel={soulLabel} />
           </div>
-          <Field label="Intent (what shall the letter say?)">
+          <Field label={editorId === KING_SEAN_ID ? "Your exact Words (sent verbatim, wrapped in stationery)" : "Intent (what shall the letter say?)"}>
             <textarea
               value={intent}
               onChange={(e) => setIntent(e.target.value)}
-              rows={4}
+              rows={editorId === KING_SEAN_ID ? 12 : 4}
               className="w-full rounded-md px-2 py-1.5 text-xs"
               style={inputStyle}
-              placeholder="Describe in your own words what you wish the letter to convey…"
+              placeholder={editorId === KING_SEAN_ID
+                ? "Write Your letter exactly as it should be sent. Blank lines separate paragraphs."
+                : "Describe in your own words what you wish the letter to convey…"}
             />
           </Field>
           <div>
@@ -1079,9 +1136,10 @@ function ComposeDrawer({
               }}
             >
               {drafting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-              Draft letter
+              {editorId === KING_SEAN_ID ? "Wrap My Words" : "Draft letter"}
             </button>
           </div>
+
         </div>
 
         {err && (
