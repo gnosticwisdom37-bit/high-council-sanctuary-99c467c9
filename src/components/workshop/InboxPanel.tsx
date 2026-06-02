@@ -844,9 +844,11 @@ export function InboxPanel({
           draftLetterFn={draftLetterFn}
           composeAndSendFn={composeAndSendFn}
           scheduleEmailFn={scheduleEmailFn}
+          wrapKingsWordsFn={wrapKingsWordsFn}
           workshopId={workshopId}
         />
       )}
+
     </section>
   );
 }
