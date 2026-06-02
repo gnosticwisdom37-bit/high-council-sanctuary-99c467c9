@@ -998,6 +998,58 @@ export const previewStationery = createServerFn({ method: "POST" })
     return { ok: true as const, html: previewHtml };
   });
 
+// ─── wrapKingsWords: King speaks directly — no AI rewriting ─────────────
+// Takes either raw plain text (auto-wrapped into <p>) or pre-formed body HTML
+// and returns the stationery-wrapped preview + the canonical body_html the
+// caller should keep in state for send/schedule.
+export const wrapKingsWords = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        body_text: z.string().max(40000).optional(),
+        body_html: z.string().max(40000).optional(),
+        ink_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+        notice_header_html: z.string().max(4000).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: stationery } = await supabaseAdmin
+      .from("kingdom_stationery")
+      .select("*")
+      .eq("id", true)
+      .single();
+    if (!stationery) return { ok: false as const, error: "Stationery missing." };
+
+    let bodyHtml = data.body_html?.trim() ?? "";
+    if (!bodyHtml && data.body_text) {
+      // Auto-wrap plain text into paragraphs, preserving line breaks within each.
+      const escape = (s: string) =>
+        s
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      bodyHtml = data.body_text
+        .split(/\n\s*\n/)
+        .map((p) => p.trim())
+        .filter(Boolean)
+        .map((p) => `<p>${escape(p).replace(/\n/g, "<br/>")}</p>`)
+        .join("\n");
+    }
+    if (!bodyHtml) return { ok: false as const, error: "No words to wrap." };
+
+    const inkColor = data.ink_color ?? (await resolveDefaultInk());
+    const wrappedHtml = wrapInStationery(
+      stationeryArgs(stationery as Record<string, unknown>, bodyHtml, {
+        inkColor,
+        noticeHeaderHtml: data.notice_header_html,
+      }),
+    );
+    return { ok: true as const, body_html: bodyHtml, wrapped_html: wrappedHtml };
+  });
+
+
+
 // ─── draftLetter: compose from scratch (no prior thread) ─────────────────
 export const draftLetter = createServerFn({ method: "POST" })
   .inputValidator((input) =>
