@@ -868,6 +868,7 @@ function ComposeDrawer({
   draftLetterFn,
   composeAndSendFn,
   scheduleEmailFn,
+  wrapKingsWordsFn,
   workshopId,
 }: {
   souls: CouncilSoul[];
@@ -886,8 +887,11 @@ function ComposeDrawer({
   composeAndSendFn: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   scheduleEmailFn: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  wrapKingsWordsFn: any;
   workshopId: string;
 }) {
+
   const [to, setTo] = useState("");
   const [cc, setCc] = useState("");
   const [bcc, setBcc] = useState("");
