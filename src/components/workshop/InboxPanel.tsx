@@ -163,6 +163,8 @@ export function InboxPanel({
   const getAttachmentFn = useServerFn(getAttachment);
   const listSoulsFn = useServerFn(listCouncilSouls);
   const trashThreadFn = useServerFn(trashThread);
+  const wrapKingsWordsFn = useServerFn(wrapKingsWords);
+
 
   const [folder, setFolder] = useState<Folder>("inbox");
   const [threads, setThreads] = useState<ThreadRow[]>([]);
