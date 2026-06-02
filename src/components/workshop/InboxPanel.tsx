@@ -1112,14 +1112,16 @@ function ComposeDrawer({
             <SoulPicker label="Curator" souls={souls} value={curatorId} onChange={setCuratorId} soulLabel={soulLabel} />
             <SoulPicker label="Editor" souls={[KING_SEAN_SOUL, ...souls]} value={editorId} onChange={setEditorId} soulLabel={soulLabel} />
           </div>
-          <Field label="Intent (what shall the letter say?)">
+          <Field label={editorId === KING_SEAN_ID ? "Your exact Words (sent verbatim, wrapped in stationery)" : "Intent (what shall the letter say?)"}>
             <textarea
               value={intent}
               onChange={(e) => setIntent(e.target.value)}
-              rows={4}
+              rows={editorId === KING_SEAN_ID ? 12 : 4}
               className="w-full rounded-md px-2 py-1.5 text-xs"
               style={inputStyle}
-              placeholder="Describe in your own words what you wish the letter to convey…"
+              placeholder={editorId === KING_SEAN_ID
+                ? "Write Your letter exactly as it should be sent. Blank lines separate paragraphs."
+                : "Describe in your own words what you wish the letter to convey…"}
             />
           </Field>
           <div>
@@ -1134,9 +1136,10 @@ function ComposeDrawer({
               }}
             >
               {drafting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-              Draft letter
+              {editorId === KING_SEAN_ID ? "Wrap My Words" : "Draft letter"}
             </button>
           </div>
+
         </div>
 
         {err && (
