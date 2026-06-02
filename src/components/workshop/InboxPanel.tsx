@@ -921,9 +921,23 @@ function ComposeDrawer({
 
   const draft = async () => {
     if (!editorId || !to.trim() || !subject.trim()) {
-      setErr("Recipient, subject, and Editor Soul are required."); return;
+      setErr("Recipient, subject, and Editor are required."); return;
     }
     setDrafting(true); setErr(null);
+    if (editorId === KING_SEAN_ID) {
+      if (!intent.trim()) { setDrafting(false); setErr("Write Your Words below."); return; }
+      const r = await wrapKingsWordsFn({
+        data: {
+          body_text: intent,
+          ink_color: inkColor,
+          notice_header_html: noticeHeaderHtml || undefined,
+        },
+      });
+      setDrafting(false);
+      if (r.ok) { setBodyHtml(r.body_html); setPreviewHtml(r.wrapped_html); setBrief("King Sean's exact Words."); }
+      else setErr(r.error);
+      return;
+    }
     const r = await draftLetterFn({
       data: {
         to_addr: to.trim(),
@@ -937,6 +951,7 @@ function ComposeDrawer({
     if (r.ok) { setBodyHtml(r.body_html); setPreviewHtml(r.wrapped_html); setBrief(r.brief); }
     else setErr(r.error);
   };
+
 
   const send = async () => {
     if (!editorId || !bodyHtml) return;
