@@ -1084,9 +1084,22 @@ function ComposeDrawer({
           >
             <Pencil className="h-4 w-4" /> New Letter
           </h3>
-          <button onClick={onClose} className="rounded-full p-1.5" style={{ color: "var(--dawn-ink)" }}>
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onOpenBook}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] uppercase tracking-[0.2em]"
+              style={{
+                color: "var(--dawn-ink)",
+                border: "1px solid color-mix(in oklab, var(--dawn-gold) 50%, transparent)",
+              }}
+              title="Open Kingdom Address Book"
+            >
+              <Users className="h-3 w-3" /> Book
+            </button>
+            <button onClick={onClose} className="rounded-full p-1.5" style={{ color: "var(--dawn-ink)" }}>
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         <datalist id="known-contacts">
