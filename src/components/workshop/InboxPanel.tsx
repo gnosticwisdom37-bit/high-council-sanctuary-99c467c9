@@ -45,9 +45,9 @@ import {
   getAttachment,
   trashThread,
   wrapKingsWords,
-} from "@/server/inbox.functions";
-import { listCouncilSouls } from "@/server/studio.functions";
-import { listAddressBook, expandRecipients } from "@/server/contacts.functions";
+} from "@/lib-server/inbox.functions";
+import { listCouncilSouls } from "@/lib-server/studio.functions";
+import { listAddressBook, expandRecipients } from "@/lib-server/contacts.functions";
 import { CopyButton } from "@/components/ui/copy-button";
 import { AddressBookPanel } from "@/components/workshop/AddressBookPanel";
 

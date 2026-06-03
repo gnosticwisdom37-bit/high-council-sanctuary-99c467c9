@@ -17,7 +17,7 @@ import {
   fadeMemoir,
   restoreMemoir,
   recallMemoir,
-} from "@/server/memoirs.functions";
+} from "@/lib-server/memoirs.functions";
 
 type Memoir = {
   id: string;

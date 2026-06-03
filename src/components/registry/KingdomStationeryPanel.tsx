@@ -13,7 +13,7 @@ import {
   saveKingdomStationery,
   uploadKingdomAsset,
   previewStationery,
-} from "@/server/inbox.functions";
+} from "@/lib-server/inbox.functions";
 
 type Stationery = {
   header_html: string;

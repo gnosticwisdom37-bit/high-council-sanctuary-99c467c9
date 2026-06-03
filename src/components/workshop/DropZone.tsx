@@ -15,7 +15,7 @@ import {
   Loader2,
   Upload,
 } from "lucide-react";
-import { processDroppedFile } from "@/server/dropzone.functions";
+import { processDroppedFile } from "@/lib-server/dropzone.functions";
 
 type Outcome =
   | { kind: "blog-archive" | "legal-document"; summary: string }

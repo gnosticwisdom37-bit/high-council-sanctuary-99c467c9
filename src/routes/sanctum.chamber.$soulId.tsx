@@ -13,7 +13,7 @@ import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { BrandMark } from "@/components/kingdom/BrandMark";
 import { supabase } from "@/integrations/supabase/client";
-import { speakAsSoul } from "@/server/speaker.functions";
+import { speakAsSoul } from "@/lib-server/speaker.functions";
 
 type Invocation = {
   id: string;

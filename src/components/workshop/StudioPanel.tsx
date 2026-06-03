@@ -21,26 +21,26 @@ import {
   Settings2,
   Sparkles,
 } from "lucide-react";
-import { listBlogArchive, listLegalDocuments } from "@/server/dropzone.functions";
+import { listBlogArchive, listLegalDocuments } from "@/lib-server/dropzone.functions";
 import {
   draftPromoFromBlog,
   draftNewPost,
   draftLegalCard,
   listCouncilSouls,
   curateBlogSources,
-} from "@/server/studio.functions";
-import { schedulePost } from "@/server/workshop.functions";
+} from "@/lib-server/studio.functions";
+import { schedulePost } from "@/lib-server/workshop.functions";
 import {
   listWpSites,
   getWorkshopWpLink,
   setWorkshopWpSite,
   createWpPost,
-} from "@/server/wordpress.functions";
+} from "@/lib-server/wordpress.functions";
 import {
   listCalendars,
   setWorkshopCalendar,
   createLegalEvent,
-} from "@/server/calendar.functions";
+} from "@/lib-server/calendar.functions";
 
 type TabKey = "promo" | "newpost" | "legal";
 
