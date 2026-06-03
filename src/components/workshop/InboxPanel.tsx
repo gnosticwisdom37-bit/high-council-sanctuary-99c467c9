@@ -918,6 +918,8 @@ function ComposeDrawer({
   composeAndSendFn,
   scheduleEmailFn,
   wrapKingsWordsFn,
+  expandRecipientsFn,
+  onOpenBook,
   workshopId,
 }: {
   souls: CouncilSoul[];
@@ -938,6 +940,9 @@ function ComposeDrawer({
   scheduleEmailFn: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   wrapKingsWordsFn: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  expandRecipientsFn: any;
+  onOpenBook: () => void;
   workshopId: string;
 }) {
 
