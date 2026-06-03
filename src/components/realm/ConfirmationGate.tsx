@@ -5,7 +5,7 @@ import {
   listPlacementCandidates,
   confirmPlacement,
   declinePlacement,
-} from "@/server/placement.functions";
+} from "@/lib-server/placement.functions";
 
 type Candidate = {
   id: string;

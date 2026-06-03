@@ -12,10 +12,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
-import { initiateSoul } from "@/server/ceremony.functions";
-import { closeGathering } from "@/server/memoirs.functions";
-import { findOpenGathering } from "@/server/conversations.functions";
-import { speakAsSoul } from "@/server/speaker.functions";
+import { initiateSoul } from "@/lib-server/ceremony.functions";
+import { closeGathering } from "@/lib-server/memoirs.functions";
+import { findOpenGathering } from "@/lib-server/conversations.functions";
+import { speakAsSoul } from "@/lib-server/speaker.functions";
 import { SoulCodex } from "./SoulCodex";
 import { DeedInscribedBanner } from "@/components/chamber/DeedInscribedBanner";
 import { ItemForgedBanner } from "@/components/chamber/ItemForgedBanner";

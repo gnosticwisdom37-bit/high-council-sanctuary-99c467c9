@@ -10,7 +10,7 @@
  */
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { reassignSteward, purgeArtefact } from "@/server/curation.functions";
+import { reassignSteward, purgeArtefact } from "@/lib-server/curation.functions";
 
 export type CurableTable = "deeds" | "items" | "buildings";
 

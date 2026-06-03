@@ -14,7 +14,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { extractText, getDocumentProxy } from "unpdf";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { extractLegal } from "@/server/legal-extractors";
+import { extractLegal } from "@/lib-server/legal-extractors";
 
 const MAX_BYTES = 6 * 1024 * 1024;
 

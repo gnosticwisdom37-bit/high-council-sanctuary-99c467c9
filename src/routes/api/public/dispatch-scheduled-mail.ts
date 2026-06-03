@@ -4,7 +4,7 @@
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { dispatchScheduledRow } from "@/server/inbox.functions";
+import { dispatchScheduledRow } from "@/lib-server/inbox.functions";
 
 async function dispatch() {
   const now = new Date().toISOString();

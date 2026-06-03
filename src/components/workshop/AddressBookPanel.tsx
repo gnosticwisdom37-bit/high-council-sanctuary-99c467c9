@@ -18,7 +18,7 @@ import {
   deleteGroup,
   type ContactRow,
   type GroupRow,
-} from "@/server/contacts.functions";
+} from "@/lib-server/contacts.functions";
 
 type Tab = "contacts" | "groups";
 
