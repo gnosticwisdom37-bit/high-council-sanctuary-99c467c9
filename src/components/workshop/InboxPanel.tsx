@@ -26,6 +26,7 @@ import {
   Paperclip,
   Download,
   Trash2,
+  Users,
 } from "lucide-react";
 import {
   listInbox,
@@ -46,7 +47,9 @@ import {
   wrapKingsWords,
 } from "@/server/inbox.functions";
 import { listCouncilSouls } from "@/server/studio.functions";
+import { listAddressBook, expandRecipients } from "@/server/contacts.functions";
 import { CopyButton } from "@/components/ui/copy-button";
+import { AddressBookPanel } from "@/components/workshop/AddressBookPanel";
 
 // Sentinel Editor: the King speaks directly — no Soul rewriting.
 const KING_SEAN_ID = "king-sean";
@@ -164,6 +167,8 @@ export function InboxPanel({
   const listSoulsFn = useServerFn(listCouncilSouls);
   const trashThreadFn = useServerFn(trashThread);
   const wrapKingsWordsFn = useServerFn(wrapKingsWords);
+  const listAddressBookFn = useServerFn(listAddressBook);
+  const expandRecipientsFn = useServerFn(expandRecipients);
 
 
   const [folder, setFolder] = useState<Folder>("inbox");
@@ -192,6 +197,28 @@ export function InboxPanel({
   const [composeOpen, setComposeOpen] = useState(false);
   const [scheduleMenuOpen, setScheduleMenuOpen] = useState(false);
   const [replyAttachments, setReplyAttachments] = useState<OutgoingAttachment[]>([]);
+  const [bookOpen, setBookOpen] = useState(false);
+  const [bookContacts, setBookContacts] = useState<Contact[]>([]);
+  const [groupTokens, setGroupTokens] = useState<Contact[]>([]);
+
+  const loadBook = useCallback(async () => {
+    const r = await listAddressBookFn({});
+    if (!r.ok) return;
+    setBookContacts(
+      r.contacts.map((c) => ({
+        addr: c.email,
+        name: c.display_name,
+        last: "",
+      })),
+    );
+    setGroupTokens(
+      r.groups.map((g) => ({
+        addr: `group:${g.name}`,
+        name: `${g.name} — ${g.member_count} ${g.member_count === 1 ? "member" : "members"}`,
+        last: "",
+      })),
+    );
+  }, [listAddressBookFn]);
 
   const handleTrash = useCallback(async (t: ThreadRow) => {
     if (!confirm(`Move "${t.subject}" to Trash? Gmail keeps it 30 days, then deletes.`)) return;
@@ -249,12 +276,26 @@ export function InboxPanel({
       }
     });
     void listKnownFn({}).then((r) => { if (r.ok) setContacts(r.addresses); });
+    void loadBook();
     void listScheduledFn({}).then((r) => { if (r.ok) setScheduled(r.scheduled as Scheduled[]); });
     void listTemplatesFn({}).then((r) => { if (r.ok) setTemplates(r.templates as LetterTemplate[]); });
     void getDefaultInkFn({}).then((r) => {
       if (r.ok) { setDefaultInk(r.ink_color); setInkColor(r.ink_color); }
     });
-  }, [listSoulsFn, listKnownFn, listScheduledFn, listTemplatesFn, getDefaultInkFn, stewardSoulId]);
+  }, [listSoulsFn, listKnownFn, loadBook, listScheduledFn, listTemplatesFn, getDefaultInkFn, stewardSoulId]);
+
+  // Merge Gmail-history contacts + Address Book contacts + group tokens for the datalist.
+  const allContacts = useMemo<Contact[]>(() => {
+    const seen = new Set<string>();
+    const out: Contact[] = [];
+    for (const c of [...groupTokens, ...bookContacts, ...contacts]) {
+      const key = c.addr.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(c);
+    }
+    return out;
+  }, [contacts, bookContacts, groupTokens]);
 
   const refreshScheduled = useCallback(async () => {
     const r = await listScheduledFn({});
@@ -824,7 +865,7 @@ export function InboxPanel({
       {composeOpen && (
         <ComposeDrawer
           souls={souls}
-          contacts={contacts}
+          contacts={allContacts}
           templates={templates}
           inkColor={inkColor}
           defaultEditorId={editorId}
@@ -845,9 +886,17 @@ export function InboxPanel({
           composeAndSendFn={composeAndSendFn}
           scheduleEmailFn={scheduleEmailFn}
           wrapKingsWordsFn={wrapKingsWordsFn}
+          expandRecipientsFn={expandRecipientsFn}
+          onOpenBook={() => setBookOpen(true)}
           workshopId={workshopId}
         />
       )}
+
+      <AddressBookPanel
+        open={bookOpen}
+        onClose={() => setBookOpen(false)}
+        onChanged={loadBook}
+      />
 
     </section>
   );
@@ -869,6 +918,8 @@ function ComposeDrawer({
   composeAndSendFn,
   scheduleEmailFn,
   wrapKingsWordsFn,
+  expandRecipientsFn,
+  onOpenBook,
   workshopId,
 }: {
   souls: CouncilSoul[];
@@ -889,6 +940,9 @@ function ComposeDrawer({
   scheduleEmailFn: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   wrapKingsWordsFn: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  expandRecipientsFn: any;
+  onOpenBook: () => void;
   workshopId: string;
 }) {
 
@@ -953,16 +1007,24 @@ function ComposeDrawer({
   };
 
 
+  // Expand any `group:Name` tokens before send/schedule.
+  const expand = async (raw: string): Promise<string> => {
+    if (!raw.trim() || !/group:/i.test(raw)) return raw.trim();
+    const r = await expandRecipientsFn({ data: { text: raw } });
+    return r.ok ? r.text : raw.trim();
+  };
+
   const send = async () => {
     if (!editorId || !bodyHtml) return;
     if (!confirm("Send this sealed letter now?")) return;
     setSending(true); setErr(null);
+    const [toX, ccX, bccX] = await Promise.all([expand(to), expand(cc), expand(bcc)]);
     const r = await composeAndSendFn({
       data: {
         workshop_id: workshopId,
-        to_addr: to.trim(),
-        cc_addr: cc.trim() || undefined,
-        bcc_addr: bcc.trim() || undefined,
+        to_addr: toX,
+        cc_addr: ccX || undefined,
+        bcc_addr: bccX || undefined,
         subject: subject.trim(),
         body_html: bodyHtml,
         editor_soul_id: editorId,
@@ -978,13 +1040,14 @@ function ComposeDrawer({
   const schedule = async (iso: string) => {
     if (!editorId || !bodyHtml) return;
     setSending(true); setErr(null);
+    const [toX, ccX, bccX] = await Promise.all([expand(to), expand(cc), expand(bcc)]);
     const r = await scheduleEmailFn({
       data: {
         kind: "compose",
         thread_id: null,
-        to_addr: to.trim(),
-        cc_addr: cc.trim() || undefined,
-        bcc_addr: bcc.trim() || undefined,
+        to_addr: toX,
+        cc_addr: ccX || undefined,
+        bcc_addr: bccX || undefined,
         subject: subject.trim(),
         body_html: bodyHtml,
         editor_soul_id: editorId,
@@ -1021,9 +1084,22 @@ function ComposeDrawer({
           >
             <Pencil className="h-4 w-4" /> New Letter
           </h3>
-          <button onClick={onClose} className="rounded-full p-1.5" style={{ color: "var(--dawn-ink)" }}>
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onOpenBook}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] uppercase tracking-[0.2em]"
+              style={{
+                color: "var(--dawn-ink)",
+                border: "1px solid color-mix(in oklab, var(--dawn-gold) 50%, transparent)",
+              }}
+              title="Open Kingdom Address Book"
+            >
+              <Users className="h-3 w-3" /> Book
+            </button>
+            <button onClick={onClose} className="rounded-full p-1.5" style={{ color: "var(--dawn-ink)" }}>
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         <datalist id="known-contacts">

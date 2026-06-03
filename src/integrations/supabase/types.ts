@@ -166,6 +166,108 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_group_members: {
+        Row: {
+          contact_id: string
+          created_at: string
+          group_id: string
+          id: string
+        }
+        Insert: {
+          contact_id: string
+          created_at?: string
+          group_id: string
+          id?: string
+        }
+        Update: {
+          contact_id?: string
+          created_at?: string
+          group_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_group_members_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "contact_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contact_groups: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      contacts: {
+        Row: {
+          address: string
+          created_at: string
+          display_name: string
+          email: string
+          id: string
+          notes: string
+          organization: string
+          phone: string
+          role_title: string
+          tags: string[]
+          updated_at: string
+        }
+        Insert: {
+          address?: string
+          created_at?: string
+          display_name: string
+          email: string
+          id?: string
+          notes?: string
+          organization?: string
+          phone?: string
+          role_title?: string
+          tags?: string[]
+          updated_at?: string
+        }
+        Update: {
+          address?: string
+          created_at?: string
+          display_name?: string
+          email?: string
+          id?: string
+          notes?: string
+          organization?: string
+          phone?: string
+          role_title?: string
+          tags?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       csv_intakes: {
         Row: {
           created_at: string
