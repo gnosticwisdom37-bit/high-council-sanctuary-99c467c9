@@ -26,6 +26,7 @@ import {
   Paperclip,
   Download,
   Trash2,
+  Users,
 } from "lucide-react";
 import {
   listInbox,
@@ -46,7 +47,9 @@ import {
   wrapKingsWords,
 } from "@/server/inbox.functions";
 import { listCouncilSouls } from "@/server/studio.functions";
+import { listAddressBook, expandRecipients } from "@/server/contacts.functions";
 import { CopyButton } from "@/components/ui/copy-button";
+import { AddressBookPanel } from "@/components/workshop/AddressBookPanel";
 
 // Sentinel Editor: the King speaks directly — no Soul rewriting.
 const KING_SEAN_ID = "king-sean";
