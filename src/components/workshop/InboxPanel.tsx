@@ -1007,16 +1007,24 @@ function ComposeDrawer({
   };
 
 
+  // Expand any `group:Name` tokens before send/schedule.
+  const expand = async (raw: string): Promise<string> => {
+    if (!raw.trim() || !/group:/i.test(raw)) return raw.trim();
+    const r = await expandRecipientsFn({ data: { text: raw } });
+    return r.ok ? r.text : raw.trim();
+  };
+
   const send = async () => {
     if (!editorId || !bodyHtml) return;
     if (!confirm("Send this sealed letter now?")) return;
     setSending(true); setErr(null);
+    const [toX, ccX, bccX] = await Promise.all([expand(to), expand(cc), expand(bcc)]);
     const r = await composeAndSendFn({
       data: {
         workshop_id: workshopId,
-        to_addr: to.trim(),
-        cc_addr: cc.trim() || undefined,
-        bcc_addr: bcc.trim() || undefined,
+        to_addr: toX,
+        cc_addr: ccX || undefined,
+        bcc_addr: bccX || undefined,
         subject: subject.trim(),
         body_html: bodyHtml,
         editor_soul_id: editorId,
@@ -1032,13 +1040,14 @@ function ComposeDrawer({
   const schedule = async (iso: string) => {
     if (!editorId || !bodyHtml) return;
     setSending(true); setErr(null);
+    const [toX, ccX, bccX] = await Promise.all([expand(to), expand(cc), expand(bcc)]);
     const r = await scheduleEmailFn({
       data: {
         kind: "compose",
         thread_id: null,
-        to_addr: to.trim(),
-        cc_addr: cc.trim() || undefined,
-        bcc_addr: bcc.trim() || undefined,
+        to_addr: toX,
+        cc_addr: ccX || undefined,
+        bcc_addr: bccX || undefined,
         subject: subject.trim(),
         body_html: bodyHtml,
         editor_soul_id: editorId,
