@@ -276,12 +276,26 @@ export function InboxPanel({
       }
     });
     void listKnownFn({}).then((r) => { if (r.ok) setContacts(r.addresses); });
+    void loadBook();
     void listScheduledFn({}).then((r) => { if (r.ok) setScheduled(r.scheduled as Scheduled[]); });
     void listTemplatesFn({}).then((r) => { if (r.ok) setTemplates(r.templates as LetterTemplate[]); });
     void getDefaultInkFn({}).then((r) => {
       if (r.ok) { setDefaultInk(r.ink_color); setInkColor(r.ink_color); }
     });
-  }, [listSoulsFn, listKnownFn, listScheduledFn, listTemplatesFn, getDefaultInkFn, stewardSoulId]);
+  }, [listSoulsFn, listKnownFn, loadBook, listScheduledFn, listTemplatesFn, getDefaultInkFn, stewardSoulId]);
+
+  // Merge Gmail-history contacts + Address Book contacts + group tokens for the datalist.
+  const allContacts = useMemo<Contact[]>(() => {
+    const seen = new Set<string>();
+    const out: Contact[] = [];
+    for (const c of [...groupTokens, ...bookContacts, ...contacts]) {
+      const key = c.addr.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(c);
+    }
+    return out;
+  }, [contacts, bookContacts, groupTokens]);
 
   const refreshScheduled = useCallback(async () => {
     const r = await listScheduledFn({});
