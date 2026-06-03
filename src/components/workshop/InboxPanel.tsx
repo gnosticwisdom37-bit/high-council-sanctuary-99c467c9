@@ -197,6 +197,28 @@ export function InboxPanel({
   const [composeOpen, setComposeOpen] = useState(false);
   const [scheduleMenuOpen, setScheduleMenuOpen] = useState(false);
   const [replyAttachments, setReplyAttachments] = useState<OutgoingAttachment[]>([]);
+  const [bookOpen, setBookOpen] = useState(false);
+  const [bookContacts, setBookContacts] = useState<Contact[]>([]);
+  const [groupTokens, setGroupTokens] = useState<Contact[]>([]);
+
+  const loadBook = useCallback(async () => {
+    const r = await listAddressBookFn({});
+    if (!r.ok) return;
+    setBookContacts(
+      r.contacts.map((c) => ({
+        addr: c.email,
+        name: c.display_name,
+        last: "",
+      })),
+    );
+    setGroupTokens(
+      r.groups.map((g) => ({
+        addr: `group:${g.name}`,
+        name: `${g.name} — ${g.member_count} ${g.member_count === 1 ? "member" : "members"}`,
+        last: "",
+      })),
+    );
+  }, [listAddressBookFn]);
 
   const handleTrash = useCallback(async (t: ThreadRow) => {
     if (!confirm(`Move "${t.subject}" to Trash? Gmail keeps it 30 days, then deletes.`)) return;
