@@ -865,7 +865,7 @@ export function InboxPanel({
       {composeOpen && (
         <ComposeDrawer
           souls={souls}
-          contacts={contacts}
+          contacts={allContacts}
           templates={templates}
           inkColor={inkColor}
           defaultEditorId={editorId}
@@ -886,9 +886,17 @@ export function InboxPanel({
           composeAndSendFn={composeAndSendFn}
           scheduleEmailFn={scheduleEmailFn}
           wrapKingsWordsFn={wrapKingsWordsFn}
+          expandRecipientsFn={expandRecipientsFn}
+          onOpenBook={() => setBookOpen(true)}
           workshopId={workshopId}
         />
       )}
+
+      <AddressBookPanel
+        open={bookOpen}
+        onClose={() => setBookOpen(false)}
+        onChanged={loadBook}
+      />
 
     </section>
   );
