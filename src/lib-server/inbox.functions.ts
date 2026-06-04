@@ -1750,3 +1750,16 @@ export const removeKingsLexiconTerm = createServerFn({ method: "POST" })
     if (error) return { ok: false as const, error: error.message };
     return { ok: true as const };
   });
+
+// Hard-delete a scheduled letter row (any status). Cancel only flips status
+// to "cancelled"; this removes the record entirely from the Scheduled folder.
+export const deleteScheduledEmail = createServerFn({ method: "POST" })
+  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data }) => {
+    const { error } = await supabaseAdmin
+      .from("scheduled_emails")
+      .delete()
+      .eq("id", data.id);
+    if (error) return { ok: false as const, error: error.message };
+    return { ok: true as const };
+  });
