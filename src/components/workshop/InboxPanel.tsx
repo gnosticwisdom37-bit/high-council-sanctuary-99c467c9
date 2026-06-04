@@ -39,6 +39,7 @@ import {
   scheduleEmail,
   listScheduledEmails,
   cancelScheduledEmail,
+  deleteScheduledEmail,
   listKnownAddresses,
   listLetterTemplates,
   getDefaultInkColor,
@@ -160,6 +161,7 @@ export function InboxPanel({
   const scheduleEmailFn = useServerFn(scheduleEmail);
   const listScheduledFn = useServerFn(listScheduledEmails);
   const cancelScheduledFn = useServerFn(cancelScheduledEmail);
+  const deleteScheduledFn = useServerFn(deleteScheduledEmail);
   const listKnownFn = useServerFn(listKnownAddresses);
   const listTemplatesFn = useServerFn(listLetterTemplates);
   const getDefaultInkFn = useServerFn(getDefaultInkColor);
@@ -551,6 +553,12 @@ export function InboxPanel({
             if (r.ok) { void refreshScheduled(); setNotice({ kind: "ok", text: "Letter cancelled." }); }
             else setNotice({ kind: "err", text: r.error });
           }}
+          onDelete={async (id) => {
+            if (!confirm("Permanently delete this scheduled letter from the list?")) return;
+            const r = await deleteScheduledFn({ data: { id } });
+            if (r.ok) { void refreshScheduled(); setNotice({ kind: "ok", text: "Letter removed." }); }
+            else setNotice({ kind: "err", text: r.error });
+          }}
         />
       )}
 
@@ -649,16 +657,31 @@ export function InboxPanel({
             </div>
           ) : (
             <>
-              <header>
-                <p
-                  className="text-[10px] uppercase tracking-[0.3em]"
-                  style={{ color: "color-mix(in oklab, var(--dawn-ink) 60%, transparent)" }}
+              <header className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p
+                    className="text-[10px] uppercase tracking-[0.3em]"
+                    style={{ color: "color-mix(in oklab, var(--dawn-ink) 60%, transparent)" }}
+                  >
+                    {selected.from_addr}
+                  </p>
+                  <h3 className="mt-1 text-base" style={{ color: "var(--dawn-ink)", fontFamily: "Cinzel, serif" }}>
+                    {selected.subject}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => void handleTrash(selected)}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.2em]"
+                  style={{
+                    background: "color-mix(in oklab, var(--dawn-ember) 25%, transparent)",
+                    border: "1px solid color-mix(in oklab, var(--dawn-ember) 50%, transparent)",
+                    color: "var(--dawn-ink)",
+                    fontFamily: "Cinzel, serif",
+                  }}
+                  title="Move to Trash"
                 >
-                  {selected.from_addr}
-                </p>
-                <h3 className="mt-1 text-base" style={{ color: "var(--dawn-ink)", fontFamily: "Cinzel, serif" }}>
-                  {selected.subject}
-                </h3>
+                  <Trash2 className="h-3 w-3" /> Trash
+                </button>
               </header>
 
               {loadingThread ? (
@@ -1396,7 +1419,15 @@ function ScheduleMenu({ onPick, onClose }: { onPick: (iso: string) => void; onCl
 }
 
 // ─── Scheduled list ─────────────────────────────────────────────────────
-function ScheduledList({ rows, onCancel }: { rows: Scheduled[]; onCancel: (id: string) => void | Promise<void> }) {
+function ScheduledList({
+  rows,
+  onCancel,
+  onDelete,
+}: {
+  rows: Scheduled[];
+  onCancel: (id: string) => void | Promise<void>;
+  onDelete: (id: string) => void | Promise<void>;
+}) {
   if (rows.length === 0) {
     return (
       <p
@@ -1451,6 +1482,17 @@ function ScheduledList({ rows, onCancel }: { rows: Scheduled[]; onCancel: (id: s
                 <X className="h-3 w-3" />
               </button>
             )}
+            <button
+              onClick={() => void onDelete(s.id)}
+              className="rounded-full p-1"
+              style={{
+                background: "color-mix(in oklab, var(--dawn-ink) 12%, transparent)",
+                color: "var(--dawn-ink)",
+              }}
+              title="Delete from list"
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
           </li>
         ))}
       </ul>
