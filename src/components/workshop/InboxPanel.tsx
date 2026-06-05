@@ -574,10 +574,50 @@ export function InboxPanel({
             border: "1px solid color-mix(in oklab, var(--dawn-gold) 35%, transparent)",
           }}
         >
-          {loadingList && threads.length === 0 ? (
+          {loadingList && threads.length === 0 && sentThreads.length === 0 ? (
             <div className="flex justify-center py-6">
               <Loader2 className="h-5 w-5 animate-spin" style={{ color: "var(--dawn-ink)" }} />
             </div>
+          ) : folder === "sent" ? (
+            sentThreads.length === 0 ? (
+              <p
+                className="px-2 py-6 text-center text-xs italic"
+                style={{ color: "color-mix(in oklab, var(--dawn-ink) 60%, transparent)" }}
+              >
+                No sent letters yet.
+              </p>
+            ) : (
+              <ul className="space-y-1">
+                {sentThreads.map((s) => {
+                  const active = selected?.gmail_thread_id === s.gmail_thread_id;
+                  return (
+                    <li key={s.gmail_thread_id}>
+                      <button
+                        onClick={() => void openSentRow(s)}
+                        className="w-full rounded-md p-2 text-left transition-all"
+                        style={{
+                          background: active
+                            ? "color-mix(in oklab, var(--dawn-gold-bright) 25%, transparent)"
+                            : "transparent",
+                          border: `1px solid ${active ? "color-mix(in oklab, var(--dawn-gold) 60%, transparent)" : "transparent"}`,
+                        }}
+                      >
+                        <p className="truncate text-xs" style={{ color: "var(--dawn-ink)", fontFamily: "Cinzel, serif", fontWeight: 600 }}>
+                          {s.subject}
+                        </p>
+                        <p className="mt-0.5 truncate text-[10px]" style={{ color: "color-mix(in oklab, var(--dawn-ink) 60%, transparent)" }}>
+                          → {s.to_addr.replace(/<.+>/, "").trim() || s.to_addr}
+                          {s.last_message_at && ` · ${new Date(s.last_message_at).toLocaleString()}`}
+                        </p>
+                        <p className="mt-0.5 line-clamp-2 text-[10px] italic" style={{ color: "color-mix(in oklab, var(--dawn-ink) 55%, transparent)" }}>
+                          {s.snippet}
+                        </p>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )
           ) : threads.length === 0 ? (
             <p
               className="px-2 py-6 text-center text-xs italic"
