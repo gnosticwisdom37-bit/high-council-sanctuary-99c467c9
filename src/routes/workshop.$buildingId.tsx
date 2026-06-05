@@ -394,8 +394,8 @@ function WorkshopPage() {
           </p>
 
           <div className="mt-4 flex flex-wrap justify-center gap-3 text-[10px] uppercase tracking-[0.25em]">
-            <button
-              onClick={() => router.history.back()}
+            <Link
+              to="/"
               className="inline-flex items-center gap-1 rounded-full px-3 py-1 hover:underline"
               style={{
                 color: "var(--dawn-gold-bright)",
@@ -403,8 +403,18 @@ function WorkshopPage() {
               }}
             >
               <ArrowLeft className="h-3 w-3" />
-              Back
-            </button>
+              Registry
+            </Link>
+            <Link
+              to="/realm"
+              className="inline-flex items-center gap-1 rounded-full px-3 py-1 hover:underline"
+              style={{
+                color: "var(--dawn-gold-bright)",
+                border: "1px solid color-mix(in oklab, var(--dawn-gold) 50%, transparent)",
+              }}
+            >
+              Realm
+            </Link>
           </div>
         </header>
 
