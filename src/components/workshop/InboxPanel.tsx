@@ -564,11 +564,7 @@ export function InboxPanel({
         />
       )}
 
-      {folder === "sent" && (
-        <SentList rows={sentThreads} loading={loadingList} />
-      )}
-
-      {folder === "inbox" && (
+      {(folder === "inbox" || folder === "sent") && (
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
         {/* Thread list */}
         <div
