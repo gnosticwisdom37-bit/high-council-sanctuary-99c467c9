@@ -46,6 +46,7 @@ import {
   getAttachment,
   trashThread,
   wrapKingsWords,
+  openSentThread,
 } from "@/lib-server/inbox.functions";
 import { listCouncilSouls } from "@/lib-server/studio.functions";
 import { listAddressBook, expandRecipients } from "@/lib-server/contacts.functions";
@@ -169,6 +170,7 @@ export function InboxPanel({
   const listSoulsFn = useServerFn(listCouncilSouls);
   const trashThreadFn = useServerFn(trashThread);
   const wrapKingsWordsFn = useServerFn(wrapKingsWords);
+  const openSentThreadFn = useServerFn(openSentThread);
   const listAddressBookFn = useServerFn(listAddressBook);
   const expandRecipientsFn = useServerFn(expandRecipients);
 
@@ -342,6 +344,29 @@ export function InboxPanel({
       } else setNotice({ kind: "err", text: r.error });
     },
     [getThreadFn],
+  );
+
+  const openSentRow = useCallback(
+    async (s: SentThread) => {
+      setNotice(null);
+      const r = await openSentThreadFn({
+        data: { workshop_id: workshopId, gmail_thread_id: s.gmail_thread_id },
+      });
+      if (!r.ok || !r.thread) {
+        setNotice({ kind: "err", text: r.ok ? "Could not open thread." : r.error });
+        return;
+      }
+      await openThread({
+        id: r.thread.id,
+        gmail_thread_id: r.thread.gmail_thread_id,
+        subject: r.thread.subject,
+        from_addr: r.thread.from_addr,
+        snippet: r.thread.snippet ?? "",
+        last_message_at: r.thread.last_message_at,
+        unread: false,
+      });
+    },
+    [openSentThreadFn, openThread, workshopId],
   );
 
   const handleDraft = useCallback(async () => {
@@ -562,11 +587,7 @@ export function InboxPanel({
         />
       )}
 
-      {folder === "sent" && (
-        <SentList rows={sentThreads} loading={loadingList} />
-      )}
-
-      {folder === "inbox" && (
+      {(folder === "inbox" || folder === "sent") && (
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
         {/* Thread list */}
         <div
@@ -576,10 +597,50 @@ export function InboxPanel({
             border: "1px solid color-mix(in oklab, var(--dawn-gold) 35%, transparent)",
           }}
         >
-          {loadingList && threads.length === 0 ? (
+          {loadingList && threads.length === 0 && sentThreads.length === 0 ? (
             <div className="flex justify-center py-6">
               <Loader2 className="h-5 w-5 animate-spin" style={{ color: "var(--dawn-ink)" }} />
             </div>
+          ) : folder === "sent" ? (
+            sentThreads.length === 0 ? (
+              <p
+                className="px-2 py-6 text-center text-xs italic"
+                style={{ color: "color-mix(in oklab, var(--dawn-ink) 60%, transparent)" }}
+              >
+                No sent letters yet.
+              </p>
+            ) : (
+              <ul className="space-y-1">
+                {sentThreads.map((s) => {
+                  const active = selected?.gmail_thread_id === s.gmail_thread_id;
+                  return (
+                    <li key={s.gmail_thread_id}>
+                      <button
+                        onClick={() => void openSentRow(s)}
+                        className="w-full rounded-md p-2 text-left transition-all"
+                        style={{
+                          background: active
+                            ? "color-mix(in oklab, var(--dawn-gold-bright) 25%, transparent)"
+                            : "transparent",
+                          border: `1px solid ${active ? "color-mix(in oklab, var(--dawn-gold) 60%, transparent)" : "transparent"}`,
+                        }}
+                      >
+                        <p className="truncate text-xs" style={{ color: "var(--dawn-ink)", fontFamily: "Cinzel, serif", fontWeight: 600 }}>
+                          {s.subject}
+                        </p>
+                        <p className="mt-0.5 truncate text-[10px]" style={{ color: "color-mix(in oklab, var(--dawn-ink) 60%, transparent)" }}>
+                          → {s.to_addr.replace(/<.+>/, "").trim() || s.to_addr}
+                          {s.last_message_at && ` · ${new Date(s.last_message_at).toLocaleString()}`}
+                        </p>
+                        <p className="mt-0.5 line-clamp-2 text-[10px] italic" style={{ color: "color-mix(in oklab, var(--dawn-ink) 55%, transparent)" }}>
+                          {s.snippet}
+                        </p>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )
           ) : threads.length === 0 ? (
             <p
               className="px-2 py-6 text-center text-xs italic"
@@ -1444,7 +1505,7 @@ function ScheduledList({
   }
   return (
     <div
-      className="mb-3 max-h-48 overflow-y-auto rounded-md p-2"
+      className="mb-3 max-h-48 overflow-hidden overflow-y-auto rounded-md p-2"
       style={{
         background: "color-mix(in oklab, var(--dawn-parchment) 92%, transparent)",
         border: "1px solid color-mix(in oklab, var(--dawn-gold) 35%, transparent)",
@@ -1454,7 +1515,7 @@ function ScheduledList({
         {rows.map((s) => (
           <li
             key={s.id}
-            className="flex items-center justify-between gap-2 rounded p-1.5 text-xs"
+            className="flex min-w-0 items-center justify-between gap-2 rounded p-1.5 text-xs"
             style={{ color: "var(--dawn-ink)" }}
           >
             <div className="min-w-0 flex-1">
@@ -1472,7 +1533,7 @@ function ScheduledList({
             {s.status === "pending" && (
               <button
                 onClick={() => void onCancel(s.id)}
-                className="rounded-full p-1"
+                className="shrink-0 rounded-full p-1"
                 style={{
                   background: "color-mix(in oklab, var(--dawn-ember) 30%, transparent)",
                   color: "var(--dawn-ink)",
@@ -1484,7 +1545,7 @@ function ScheduledList({
             )}
             <button
               onClick={() => void onDelete(s.id)}
-              className="rounded-full p-1"
+              className="shrink-0 rounded-full p-1"
               style={{
                 background: "color-mix(in oklab, var(--dawn-ink) 12%, transparent)",
                 color: "var(--dawn-ink)",
