@@ -46,6 +46,7 @@ import {
   getAttachment,
   trashThread,
   wrapKingsWords,
+  openSentThread,
 } from "@/lib-server/inbox.functions";
 import { listCouncilSouls } from "@/lib-server/studio.functions";
 import { listAddressBook, expandRecipients } from "@/lib-server/contacts.functions";
