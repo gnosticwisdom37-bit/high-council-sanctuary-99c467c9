@@ -346,6 +346,29 @@ export function InboxPanel({
     [getThreadFn],
   );
 
+  const openSentRow = useCallback(
+    async (s: SentThread) => {
+      setNotice(null);
+      const r = await openSentThreadFn({
+        data: { workshop_id: workshopId, gmail_thread_id: s.gmail_thread_id },
+      });
+      if (!r.ok || !r.thread) {
+        setNotice({ kind: "err", text: r.ok ? "Could not open thread." : r.error });
+        return;
+      }
+      await openThread({
+        id: r.thread.id,
+        gmail_thread_id: r.thread.gmail_thread_id,
+        subject: r.thread.subject,
+        from_addr: r.thread.from_addr,
+        snippet: r.thread.snippet ?? "",
+        last_message_at: r.thread.last_message_at,
+        unread: false,
+      });
+    },
+    [openSentThreadFn, openThread, workshopId],
+  );
+
   const handleDraft = useCallback(async () => {
     if (!selected || !editorId) return;
     setDrafting(true); setNotice(null);
