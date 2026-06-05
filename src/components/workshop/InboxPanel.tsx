@@ -1505,7 +1505,7 @@ function ScheduledList({
   }
   return (
     <div
-      className="mb-3 max-h-48 overflow-y-auto rounded-md p-2"
+      className="mb-3 max-h-48 overflow-hidden overflow-y-auto rounded-md p-2"
       style={{
         background: "color-mix(in oklab, var(--dawn-parchment) 92%, transparent)",
         border: "1px solid color-mix(in oklab, var(--dawn-gold) 35%, transparent)",
@@ -1515,7 +1515,7 @@ function ScheduledList({
         {rows.map((s) => (
           <li
             key={s.id}
-            className="flex items-center justify-between gap-2 rounded p-1.5 text-xs"
+            className="flex min-w-0 items-center justify-between gap-2 rounded p-1.5 text-xs"
             style={{ color: "var(--dawn-ink)" }}
           >
             <div className="min-w-0 flex-1">
@@ -1533,7 +1533,7 @@ function ScheduledList({
             {s.status === "pending" && (
               <button
                 onClick={() => void onCancel(s.id)}
-                className="rounded-full p-1"
+                className="shrink-0 rounded-full p-1"
                 style={{
                   background: "color-mix(in oklab, var(--dawn-ember) 30%, transparent)",
                   color: "var(--dawn-ink)",
@@ -1545,7 +1545,7 @@ function ScheduledList({
             )}
             <button
               onClick={() => void onDelete(s.id)}
-              className="rounded-full p-1"
+              className="shrink-0 rounded-full p-1"
               style={{
                 background: "color-mix(in oklab, var(--dawn-ink) 12%, transparent)",
                 color: "var(--dawn-ink)",
