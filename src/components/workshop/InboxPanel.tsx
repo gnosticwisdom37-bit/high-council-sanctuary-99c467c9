@@ -170,6 +170,7 @@ export function InboxPanel({
   const listSoulsFn = useServerFn(listCouncilSouls);
   const trashThreadFn = useServerFn(trashThread);
   const wrapKingsWordsFn = useServerFn(wrapKingsWords);
+  const openSentThreadFn = useServerFn(openSentThread);
   const listAddressBookFn = useServerFn(listAddressBook);
   const expandRecipientsFn = useServerFn(expandRecipients);
 
