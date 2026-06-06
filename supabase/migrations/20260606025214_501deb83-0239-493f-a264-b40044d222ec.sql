@@ -1,0 +1,2 @@
+ALTER TABLE public.toolbox_models DROP CONSTRAINT IF EXISTS toolbox_models_tier_check;
+ALTER TABLE public.toolbox_models ADD CONSTRAINT toolbox_models_tier_check CHECK (tier = ANY (ARRAY['free-premium'::text, 'premium'::text, 'image'::text]));
