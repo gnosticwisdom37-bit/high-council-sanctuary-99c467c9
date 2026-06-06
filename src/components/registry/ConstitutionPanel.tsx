@@ -14,6 +14,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { TRUST_INSTRUMENT } from "@/lib/trust-instrument";
 import { VeniceHealthCheck } from "./VeniceHealthCheck";
+import { VeniceRegistryPanel } from "./VeniceRegistryPanel";
+
 
 
 type Settings = {
@@ -214,6 +216,10 @@ export function ConstitutionPanel() {
       </section>
 
       <VeniceHealthCheck />
+
+      <VeniceRegistryPanel />
+
+
 
 
 
