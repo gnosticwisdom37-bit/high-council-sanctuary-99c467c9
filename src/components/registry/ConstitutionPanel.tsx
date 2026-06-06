@@ -13,6 +13,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { TRUST_INSTRUMENT } from "@/lib/trust-instrument";
+import { VeniceHealthCheck } from "./VeniceHealthCheck";
+
 
 type Settings = {
   system_constitution: string;
@@ -210,6 +212,10 @@ export function ConstitutionPanel() {
           note="Per region; expand at any edge."
         />
       </section>
+
+      <VeniceHealthCheck />
+
+
 
       <p
         className="text-center text-[10px] uppercase tracking-[0.3em]"
