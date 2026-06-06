@@ -1,42 +1,61 @@
-Three small Scriptorium polish fixes — all front-end / wiring, no schema or send-pipeline changes.
+# Venice Key Health Check — one-time ping
 
-## 1. Sent tab — make letters openable (reply / forward)
+A small, single-purpose tool sealed inside the Constitution panel. Press once, find out whether `VENICE_API_KEY` is alive, what tier it grants, and how long the round-trip took. No data stored, no settings changed, no Souls touched.
 
-Currently `SentList` only renders rows; nothing opens. The server already has `openSentThread(workshop_id, gmail_thread_id)` which upserts the Gmail thread into `email_threads` and returns the same row shape the Inbox view uses.
+## What gets built
 
-- Wire `SentList` rows to be clickable.
-- On click → call `openSentThread` → take returned row → feed into existing `openThread(...)` so the full reader + reply/schedule/ink-jar UI loads (same as Inbox).
-- Selected sent thread highlights like Inbox selection.
-- "Trash" button on the open thread keeps working (it already calls `trashThread` by db id).
+### 1. Server function — `pingVenice`
+New file: `src/lib-server/venice-health.functions.ts`
 
-Net result: clicking a row in Sent opens the full conversation with reply, schedule, attachments, and forward-via-compose available — same controls already used in Inbox.
+- `createServerFn({ method: "POST" })` with no input.
+- Reads `process.env.VENICE_API_KEY` inside the handler (never at module scope).
+- Sends one minimal `/v1/chat/completions` call to Venice's gateway using the cheapest approved free-premium text model from the Venice registry memory (`llama-3.2-3b` or equivalent — confirmed from `mem://references/venice-gateway`).
+- Body: `max_tokens: 1`, single user message `"ping"`, no streaming.
+- Returns a plain DTO:
+  ```ts
+  {
+    ok: boolean,
+    status: number,           // HTTP status from Venice
+    latency_ms: number,
+    model_used: string,
+    error: string | null,     // human-readable if !ok
+    raw_snippet: string | null // first 200 chars of body on failure
+  }
+  ```
+- Wrapped in try/catch — network failures return `ok:false` with a clear message instead of throwing.
 
-## 2. Back button from Workshop / Scriptorium
+### 2. UI — `VeniceHealthCheck` card
+New component: `src/components/registry/VeniceHealthCheck.tsx`
 
-`router.history.back()` silently fails when the page was opened directly (no prior entry). Replace the single "Back" button at the top of `/workshop/$buildingId` with two reliable links:
+- Rendered inside `ConstitutionPanel.tsx`, sealed below the existing "Active Provider / Veritas / Realm Grid" status row.
+- Single button: **"✶ Ping the Venice Gateway"**
+- States:
+  - **Idle** — golden-dawn button, short caption "One call. No credits charged to Lovable. Tells Us if the key is alive."
+  - **Pinging…** — button disabled, soft pulse on the sigil.
+  - **Verified** — green-tinted parchment block: `"Venice answered in {latency_ms} ms · model {model_used}"` + a small "Run again" link.
+  - **Failed** — ember-tinted block with the HTTP status, the error message, and a one-line remedy ("401 → mint a fresh key on venice.ai", "402 → top up Venice balance", "5xx → retry shortly").
+- Last result kept in component state only; nothing written to DB.
 
-- "Registry" → `/` (Master Scroll / High Council round table — same page, same destination as user expects)
-- "Realm" → `/realm`
+### 3. Memory update
+Append a one-liner to `mem://index.md` Core: *"Venice key verified {date}"* — but only after You press the button and we see a green result. Not part of this build; I'll do it the moment the ping returns 200.
 
-Both use TanStack `<Link to=…>` so they always work regardless of history depth. Keeps the existing pill styling.
+## What is intentionally NOT in this build
 
-## 3. Scheduled-list delete causing horizontal pop-out
+- No `active_provider` change.
+- No Soul routing through Venice.
+- No tiered model registry UI (that's the next plan).
+- No persisted health log — this is a fingertip check, not a monitor.
 
-The Scheduled list rows use `flex items-center justify-between gap-2` with no `min-w-0` on the `<li>` itself, so on narrow viewports the long `to_addr · timestamp · status` line pushes the X/Trash buttons off-screen and forces the panel wider than its column.
+## Files touched
 
-- Add `min-w-0` to the `<li>` and `flex-shrink-0` to the two action buttons so the text column truncates instead of pushing.
-- Add `overflow-hidden` on the outer Scheduled container.
-- No behavior change to delete itself.
+- **NEW** `src/lib-server/venice-health.functions.ts`
+- **NEW** `src/components/registry/VeniceHealthCheck.tsx`
+- **EDIT** `src/components/registry/ConstitutionPanel.tsx` (one import + one `<VeniceHealthCheck />` line under the status grid)
 
-## Technical details
+## Credit cost
 
-Files touched:
-- `src/components/workshop/InboxPanel.tsx`
-  - Add `openSentThreadFn = useServerFn(openSentThread)` + import.
-  - New `openSentRow(s: SentThread)` handler → `openSentThreadFn → openThread`.
-  - `SentList` accepts `onOpen` + `selectedId`, renders each row as a button.
-  - `ScheduledList`: `min-w-0` on `<li>`, `flex-shrink-0` on buttons, `overflow-hidden` on container.
-- `src/routes/workshop.$buildingId.tsx`
-  - Replace the single `router.history.back()` button with two `<Link>` pills: Registry (`/`) and Realm (`/realm`).
+~0.0 Lovable credits (one tiny serverFn call, no Lovable AI Gateway use). Venice charges Venice-side — a 1-token call is fractions of a cent on their cheapest model.
 
-No DB changes, no server-function changes (openSentThread already shipped).
+## After You approve
+
+Switch to build mode and I'll ship all three files in one pass, then You press the button.
