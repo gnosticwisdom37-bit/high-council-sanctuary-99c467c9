@@ -37,13 +37,8 @@ export const speakAsSoul = createServerFn({ method: "POST" })
     }) => data,
   )
   .handler(async ({ data }) => {
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) {
-      return {
-        ok: false as const,
-        error: "The Gateway key is not configured. The Bank could not open a channel.",
-      };
-    }
+    // API key is resolved below after we know which provider is active.
+
 
     // 1. Load Constitution + Compact + Soul identity in parallel
     const [{ data: settings }, { data: soulRow }] = await Promise.all([
