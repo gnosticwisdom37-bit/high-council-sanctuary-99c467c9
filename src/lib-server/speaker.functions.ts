@@ -10,9 +10,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { petitionBankImpl } from "./bank.server";
 import {
-  LOVABLE_AI_GATEWAY_URL,
   buildSystemPrompt,
   loadKingsLexicon,
+  resolveGateway,
   type ProviderCompact,
   type SoulIdentity,
 } from "./ai-shared.server";
