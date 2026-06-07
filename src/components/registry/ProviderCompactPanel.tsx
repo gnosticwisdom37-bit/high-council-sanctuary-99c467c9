@@ -225,20 +225,45 @@ export function ProviderCompactPanel() {
           })}
         </ol>
 
+        {(() => {
+          const freeAvailable = available.filter((m) => m.tier === "free-premium");
+          return freeAvailable.length > 0 ? (
+            <div className="mt-3">
+              <button
+                onClick={addAllFreePremium}
+                className="rounded-full px-4 py-1.5 text-[11px] uppercase tracking-[0.25em]"
+                style={{
+                  background: "var(--gradient-dawn)",
+                  color: "var(--dawn-parchment)",
+                  border: "1px solid color-mix(in oklab, var(--dawn-gold) 80%, transparent)",
+                  boxShadow: "var(--shadow-sigil)",
+                }}
+              >
+                ✶ Add all {freeAvailable.length} free-premium models
+              </button>
+            </div>
+          ) : null;
+        })()}
+
         {available.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
-            <span className="text-xs opacity-70">Add:</span>
+            <span className="text-xs opacity-70">Add individually:</span>
             {available.map((m) => (
               <button
                 key={m.model_id}
                 onClick={() => addModel(m.model_id)}
                 className="rounded-full px-3 py-1 text-xs"
                 style={{
-                  background: "color-mix(in oklab, var(--dawn-gold) 18%, transparent)",
+                  background:
+                    m.tier === "free-premium"
+                      ? "color-mix(in oklab, var(--dawn-gold) 18%, transparent)"
+                      : "color-mix(in oklab, var(--dawn-ember) 14%, transparent)",
                   border: "1px solid color-mix(in oklab, var(--dawn-gold) 40%, transparent)",
                 }}
+                title={m.tier === "premium" ? "Premium — Bank petition required" : "Free-premium"}
               >
                 + {m.display_name}
+                <span className="ml-1 opacity-60">· {m.tier === "free-premium" ? "free" : m.tier}</span>
               </button>
             ))}
           </div>
