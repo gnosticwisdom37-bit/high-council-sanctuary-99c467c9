@@ -17,7 +17,7 @@ type ToolboxRow = {
   provider: string;
   model_id: string;
   display_name: string;
-  tier: "free-premium" | "premium";
+  tier: "free-premium" | "premium" | "image";
   best_for: string[];
   veritas_cost_per_1k_tokens: number;
   active: boolean;
