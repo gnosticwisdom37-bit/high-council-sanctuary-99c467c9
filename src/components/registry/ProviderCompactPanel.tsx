@@ -139,13 +139,39 @@ export function ProviderCompactPanel() {
         <p className="text-[10px] uppercase tracking-[0.3em]" style={{ color: "var(--dawn-ember)" }}>
           Active Provider
         </p>
-        <p className="mt-1 font-serif text-lg">
-          {settings.provider_compact.active_provider === "lovable_ai_gateway"
-            ? "Lovable AI Gateway"
-            : settings.provider_compact.active_provider}
-        </p>
+        <div className="mt-1 flex items-center justify-between gap-3">
+          <p className="font-serif text-lg">
+            {settings.provider_compact.active_provider === "lovable_ai_gateway"
+              ? "Lovable AI Gateway"
+              : settings.provider_compact.active_provider === "venice"
+                ? "Venice AI"
+                : settings.provider_compact.active_provider}
+          </p>
+          <button
+            onClick={() =>
+              setSettings({
+                ...settings,
+                provider_compact: {
+                  ...settings.provider_compact,
+                  active_provider:
+                    settings.provider_compact.active_provider === "venice"
+                      ? "lovable_ai_gateway"
+                      : "venice",
+                },
+              })
+            }
+            className="rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.25em]"
+            style={{
+              background: "color-mix(in oklab, var(--dawn-gold) 18%, transparent)",
+              border: "1px solid color-mix(in oklab, var(--dawn-gold) 50%, transparent)",
+              color: "var(--dawn-ink)",
+            }}
+          >
+            ⇄ Swap
+          </button>
+        </div>
         <p className="mt-1 text-xs italic" style={{ color: "color-mix(in oklab, var(--dawn-ink) 65%, transparent)" }}>
-          One Key, Many Souls — voices all 13. (Swap to Venice AI when the King is ready.)
+          One Key, Many Souls — voices all 13. Swap and seal to switch gateways.
         </p>
       </section>
 
