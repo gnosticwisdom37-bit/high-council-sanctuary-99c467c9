@@ -10,7 +10,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
-  LOVABLE_AI_GATEWAY_URL,
+  resolveGateway,
   type ProviderCompact,
   type SoulIdentity,
 } from "./ai-shared.server";
@@ -23,8 +23,7 @@ async function weaveOne(args: {
   conversation_id: string;
   soul_id: string;
 }): Promise<WeaveResult> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) return { ok: false, error: "Gateway key missing." };
+  // Gateway is resolved after settings load (provider may be Venice).
 
   // Load Soul, conversation, settings, recent turns
   const [{ data: soulRow }, { data: convo }, { data: settings }] = await Promise.all([
@@ -51,6 +50,8 @@ async function weaveOne(args: {
 
   const soul = soulRow as unknown as SoulIdentity;
   const compact = settings.provider_compact as unknown as ProviderCompact;
+  const gateway = resolveGateway(compact.active_provider);
+  if (!gateway.apiKey) return { ok: false, error: `${gateway.label === "venice" ? "Venice" : "Lovable"} gateway key missing.` };
 
   // Pull all turns (kept simple — small conversations)
   const { data: messages } = await supabaseAdmin
@@ -100,10 +101,10 @@ Now write your memoir:`;
 
   for (const candidate of fallbackChain) {
     try {
-      const res = await fetch(LOVABLE_AI_GATEWAY_URL, {
+      const res = await fetch(gateway.url, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: `Bearer ${gateway.apiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({

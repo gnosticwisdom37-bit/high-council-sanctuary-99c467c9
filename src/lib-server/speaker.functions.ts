@@ -10,9 +10,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { petitionBankImpl } from "./bank.server";
 import {
-  LOVABLE_AI_GATEWAY_URL,
   buildSystemPrompt,
   loadKingsLexicon,
+  resolveGateway,
   type ProviderCompact,
   type SoulIdentity,
 } from "./ai-shared.server";
@@ -37,13 +37,8 @@ export const speakAsSoul = createServerFn({ method: "POST" })
     }) => data,
   )
   .handler(async ({ data }) => {
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) {
-      return {
-        ok: false as const,
-        error: "The Gateway key is not configured. The Bank could not open a channel.",
-      };
-    }
+    // API key is resolved below after we know which provider is active.
+
 
     // 1. Load Constitution + Compact + Soul identity in parallel
     const [{ data: settings }, { data: soulRow }] = await Promise.all([
@@ -65,6 +60,13 @@ export const speakAsSoul = createServerFn({ method: "POST" })
 
     const compact = settings.provider_compact as unknown as ProviderCompact;
     const soul = soulRow as unknown as SoulIdentity;
+    const gateway = resolveGateway(compact.active_provider);
+    if (!gateway.apiKey) {
+      return {
+        ok: false as const,
+        error: `The ${gateway.label === "venice" ? "Venice" : "Lovable"} key is not configured. The Bank could not open a channel.`,
+      };
+    }
     const fallbackChain = compact.fallback_chain?.length
       ? compact.fallback_chain
       : ["google/gemini-2.5-flash"];
@@ -449,10 +451,10 @@ export const speakAsSoul = createServerFn({ method: "POST" })
     // 6. Call the Gateway
     let assistantText = "";
     try {
-      const res = await fetch(LOVABLE_AI_GATEWAY_URL, {
+      const res = await fetch(gateway.url, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: `Bearer ${gateway.apiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({

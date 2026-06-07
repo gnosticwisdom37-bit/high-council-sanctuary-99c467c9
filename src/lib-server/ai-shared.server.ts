@@ -6,6 +6,36 @@
 export const LOVABLE_AI_GATEWAY_URL =
   "https://ai.gateway.lovable.dev/v1/chat/completions";
 
+export const VENICE_GATEWAY_URL =
+  "https://api.venice.ai/api/v1/chat/completions";
+
+/**
+ * Resolve the active gateway from the Provider Compact's `active_provider`.
+ * Returns the URL to POST to + the env key to use as bearer.
+ * Falls back to Lovable AI Gateway if no key is configured for Venice.
+ */
+export function resolveGateway(activeProvider: string | undefined): {
+  url: string;
+  apiKey: string | undefined;
+  label: "venice" | "lovable_ai_gateway";
+} {
+  if (activeProvider === "venice") {
+    const k = process.env.VENICE_API_KEY;
+    if (k) return { url: VENICE_GATEWAY_URL, apiKey: k, label: "venice" };
+    // Soft fallback if Venice selected but key missing
+    return {
+      url: LOVABLE_AI_GATEWAY_URL,
+      apiKey: process.env.LOVABLE_API_KEY,
+      label: "lovable_ai_gateway",
+    };
+  }
+  return {
+    url: LOVABLE_AI_GATEWAY_URL,
+    apiKey: process.env.LOVABLE_API_KEY,
+    label: "lovable_ai_gateway",
+  };
+}
+
 export type SoulIdentity = {
   soul_id: string;
   title: string;
