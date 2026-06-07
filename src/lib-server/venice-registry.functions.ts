@@ -18,20 +18,32 @@ type SyncResult = {
   error: string | null;
 };
 
+// Venice has no $0 text models via API — every text model bills USD/M tokens.
+// We treat low-cost models (≤ $0.50/M input AND ≤ $1.50/M output) as
+// "free-premium" so all Souls can reach for them without Bank petitions.
+// Image models are uniformly tier="image" — almost all are free in Venice's
+// own toggle list, and the few paid ones King Sean has said He never uses.
+const FREE_INPUT_USD_PER_M = 0.5;
+const FREE_OUTPUT_USD_PER_M = 1.5;
+
 function classifyTier(m: any): "free-premium" | "premium" | "image" {
   const type = m?.type ?? m?.model_spec?.type;
   if (type === "image") return "image";
-  const traits: string[] = m?.model_spec?.traits ?? [];
-  const inUsd = m?.model_spec?.pricing?.input?.usd;
-  if (traits.includes("default") || inUsd === 0) return "free-premium";
+  const inUsd = m?.model_spec?.pricing?.input?.usd ?? 0;
+  const outUsd = m?.model_spec?.pricing?.output?.usd ?? 0;
+  if (inUsd <= FREE_INPUT_USD_PER_M && outUsd <= FREE_OUTPUT_USD_PER_M) {
+    return "free-premium";
+  }
   return "premium";
 }
 
 function costPerThousand(m: any): number {
   // Venice prices in USD per million tokens; convert to Veritas per 1k.
-  // 1 credit = 100 Veritas; rough mapping: $1 ≈ 1 credit → 100 Veritas.
+  // 1 credit ≈ 100 Veritas; $1 ≈ 1 credit. Column is integer — round up so
+  // sub-cent models surface as ≥1 Veritas instead of vanishing to 0.
   const inUsdPerM = m?.model_spec?.pricing?.input?.usd ?? 0;
-  return Math.max(0, Math.round((inUsdPerM / 1000) * 100));
+  const veritasPer1k = (inUsdPerM / 1000) * 100;
+  return Math.max(0, Math.ceil(veritasPer1k));
 }
 
 function bestFor(m: any): string[] {
