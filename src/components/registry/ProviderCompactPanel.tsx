@@ -107,6 +107,18 @@ export function ProviderCompactPanel() {
     setSettings({ ...settings, provider_compact: { ...settings.provider_compact, fallback_chain: chain } });
   }
 
+  function addAllFreePremium() {
+    if (!settings) return;
+    const existing = new Set(settings.provider_compact.fallback_chain);
+    const freeIds = models
+      .filter((m) => m.tier === "free-premium")
+      .map((m) => m.model_id)
+      .filter((id) => !existing.has(id));
+    if (freeIds.length === 0) return;
+    const chain = [...settings.provider_compact.fallback_chain, ...freeIds];
+    setSettings({ ...settings, provider_compact: { ...settings.provider_compact, fallback_chain: chain } });
+  }
+
   if (!settings) {
     return <p className="text-sm italic" style={{ color: "var(--dawn-ink)" }}>Opening the Compact…</p>;
   }
