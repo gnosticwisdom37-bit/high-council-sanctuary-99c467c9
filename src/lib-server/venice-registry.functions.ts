@@ -18,29 +18,21 @@ type SyncResult = {
   error: string | null;
 };
 
-// Venice has no $0 text models via API — every text model bills USD/M tokens.
-// We treat low-cost models (≤ $0.50/M input AND ≤ $1.50/M output) as
-// "free-premium" so all Souls can reach for them without Bank petitions.
-// Image models are uniformly tier="image" — almost all are free in Venice's
-// own toggle list, and the few paid ones King Sean has said He never uses.
-const FREE_INPUT_USD_PER_M = 0.5;
-const FREE_OUTPUT_USD_PER_M = 1.5;
-
+// Truth from Venice itself: `owned_by` tells Us whether a model is Venice-
+// hosted (Included with Pro, no coin in their UI) or a frontier model from
+// an external provider (Pro credits required, coin shown). USD pricing is
+// irrelevant for a Pro subscriber — Venice-hosted is unlimited regardless
+// of listed per-token cost.
 function classifyTier(m: any): "free-premium" | "premium" | "image" {
   const type = m?.type ?? m?.model_spec?.type;
   if (type === "image") return "image";
-  const inUsd = m?.model_spec?.pricing?.input?.usd ?? 0;
-  const outUsd = m?.model_spec?.pricing?.output?.usd ?? 0;
-  if (inUsd <= FREE_INPUT_USD_PER_M && outUsd <= FREE_OUTPUT_USD_PER_M) {
-    return "free-premium";
-  }
+  const owner = String(m?.owned_by ?? "").toLowerCase();
+  if (owner === "venice.ai") return "free-premium";
   return "premium";
 }
 
 function costPerThousand(m: any): number {
-  // Venice prices in USD per million tokens; convert to Veritas per 1k.
-  // 1 credit ≈ 100 Veritas; $1 ≈ 1 credit. Column is integer — round up so
-  // sub-cent models surface as ≥1 Veritas instead of vanishing to 0.
+  // Informational only — tier is decided by `owned_by`, not price.
   const inUsdPerM = m?.model_spec?.pricing?.input?.usd ?? 0;
   const veritasPer1k = (inUsdPerM / 1000) * 100;
   return Math.max(0, Math.ceil(veritasPer1k));
@@ -108,9 +100,12 @@ export const syncVeniceRegistry = createServerFn({ method: "POST" }).handler(
         best_for: bestFor(m),
         veritas_cost_per_1k_tokens: costPerThousand(m),
         notes: JSON.stringify({
+          owned_by: m?.owned_by ?? null,
           type: m?.type ?? m?.model_spec?.type ?? null,
           context: m?.model_spec?.availableContextTokens ?? null,
           traits: m?.model_spec?.traits ?? [],
+          usd_input_per_m: m?.model_spec?.pricing?.input?.usd ?? null,
+          usd_output_per_m: m?.model_spec?.pricing?.output?.usd ?? null,
         }).slice(0, 1000),
         active: true,
         last_seen_at: new Date().toISOString(),

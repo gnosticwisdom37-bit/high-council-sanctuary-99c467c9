@@ -19,11 +19,19 @@ type Row = {
 };
 
 const TIER_LABEL: Record<Row["tier"], string> = {
-  "free-premium": "Free-Premium · No paid credit",
-  premium: "Premium · Paid by Veritas",
+  "free-premium": "Included with Pro · No credit cost",
+  premium: "Frontier · Pro credits required",
   image: "Image Generation",
 };
 const TIER_ORDER: Row["tier"][] = ["free-premium", "premium", "image"];
+
+function parseNotes(notes: string | null): {
+  owned_by?: string | null;
+  usd_input_per_m?: number | null;
+} {
+  if (!notes) return {};
+  try { return JSON.parse(notes); } catch { return {}; }
+}
 
 export function VeniceRegistryPanel() {
   const sync = useServerFn(syncVeniceRegistry);
