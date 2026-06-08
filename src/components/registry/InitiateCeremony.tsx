@@ -215,6 +215,7 @@ export function InitiateCeremony({
 
     let convId = conversationId;
     let lastError: string | null = null;
+    let shouldWeave = false;
 
     // Speak to each Soul in turn — they share the same conversation row
     for (const soul of souls) {
@@ -236,6 +237,7 @@ export function InitiateCeremony({
         continue;
       }
       if (!convId) convId = result.conversation_id;
+      if (result.should_weave_memoir) shouldWeave = true;
 
       setTranscript((t) => [
         ...t,
@@ -269,7 +271,7 @@ export function InitiateCeremony({
     // sets `should_weave_memoir` whenever the convo crosses the next 40-turn
     // mark. The 1-on-1 chamber route handles its own auto-weave; here we
     // cover the Council case where all Present Souls need a memoir.
-    if (souls.length > 1 && convId) {
+    if (souls.length > 1 && convId && shouldWeave) {
       void weaveFn({ data: { conversation_id: convId } }).catch(() => {
         /* best-effort */
       });
