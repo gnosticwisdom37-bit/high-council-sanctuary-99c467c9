@@ -1,61 +1,81 @@
-# Venice Key Health Check — one-time ping
+## Two fixes for tomorrow's credits
 
-A small, single-purpose tool sealed inside the Constitution panel. Press once, find out whether `VENICE_API_KEY` is alive, what tier it grants, and how long the round-trip took. No data stored, no settings changed, no Souls touched.
+### 1. Trust Venice's own ownership flag, not USD price
 
-## What gets built
+Venice's API doesn't expose a "coin icon" boolean, but each model carries
+`owned_by`. Venice-hosted models (the ones that show **no** coin in their UI
+and are **unlimited for Pro**) return `owned_by: "venice.ai"`. External
+frontier models (Claude, Grok, GPT-5, Gemini, Kimi, etc.) return their
+provider's name. That maps 1-to-1 onto Your Pro experience — far more
+accurate than guessing at a USD threshold.
 
-### 1. Server function — `pingVenice`
-New file: `src/lib-server/venice-health.functions.ts`
+Changes to `src/lib-server/venice-registry.functions.ts`:
 
-- `createServerFn({ method: "POST" })` with no input.
-- Reads `process.env.VENICE_API_KEY` inside the handler (never at module scope).
-- Sends one minimal `/v1/chat/completions` call to Venice's gateway using the cheapest approved free-premium text model from the Venice registry memory (`llama-3.2-3b` or equivalent — confirmed from `mem://references/venice-gateway`).
-- Body: `max_tokens: 1`, single user message `"ping"`, no streaming.
-- Returns a plain DTO:
-  ```ts
-  {
-    ok: boolean,
-    status: number,           // HTTP status from Venice
-    latency_ms: number,
-    model_used: string,
-    error: string | null,     // human-readable if !ok
-    raw_snippet: string | null // first 200 chars of body on failure
-  }
-  ```
-- Wrapped in try/catch — network failures return `ok:false` with a clear message instead of throwing.
+- New `classifyTier(m)`:
+  - `type === "image"` → `"image"`
+  - `owned_by === "venice.ai"` → `"free-premium"` (Included with Pro)
+  - everything else → `"premium"` (frontier, costs credits)
+- Store `owned_by` and the raw USD pricing in the `notes` JSON so the
+  Registry can show "Included with Pro · Venice-hosted" vs
+  "Frontier · costs Pro credits" instead of just `free` / `N V/1k`.
+- Keep `veritas_cost_per_1k_tokens` as informational only — it no longer
+  drives tier.
 
-### 2. UI — `VeniceHealthCheck` card
-New component: `src/components/registry/VeniceHealthCheck.tsx`
+Changes to `src/components/registry/VeniceRegistryPanel.tsx`:
 
-- Rendered inside `ConstitutionPanel.tsx`, sealed below the existing "Active Provider / Veritas / Realm Grid" status row.
-- Single button: **"✶ Ping the Venice Gateway"**
-- States:
-  - **Idle** — golden-dawn button, short caption "One call. No credits charged to Lovable. Tells Us if the key is alive."
-  - **Pinging…** — button disabled, soft pulse on the sigil.
-  - **Verified** — green-tinted parchment block: `"Venice answered in {latency_ms} ms · model {model_used}"` + a small "Run again" link.
-  - **Failed** — ember-tinted block with the HTTP status, the error message, and a one-line remedy ("401 → mint a fresh key on venice.ai", "402 → top up Venice balance", "5xx → retry shortly").
-- Last result kept in component state only; nothing written to DB.
+- Section labels become **"Included with Pro · No credit cost"**,
+  **"Frontier · Pro credits required"**, **"Image Generation"**.
+- Each row shows `owned_by` ("venice.ai" / "anthropic" / "openai" /…)
+  and a short cost note ("included" or "≈ $X / M in").
 
-### 3. Memory update
-Append a one-liner to `mem://index.md` Core: *"Venice key verified {date}"* — but only after You press the button and we see a green result. Not part of this build; I'll do it the moment the ping returns 200.
+After the rebuild, one **Sync from Venice** click reclassifies everything;
+**Add all free-premium** then sweeps every Venice-hosted text model into
+the Compact fallback chain.
 
-## What is intentionally NOT in this build
+### 2. High Council loses its memory — fix the auto-weave
 
-- No `active_provider` change.
-- No Soul routing through Venice.
-- No tiered model registry UI (that's the next plan).
-- No persisted health log — this is a fingertip check, not a monitor.
+The 1-on-1 chambers retain memory because You usually tap the close
+button, which calls `closeGathering` and writes a memoir for every
+participant. The High Council pills (Convene / Close the Gathering) only
+clear local UI state — when You navigate away without explicitly closing,
+nothing is woven, so the Council forgets.
 
-## Files touched
+Also: `speaker.functions.ts` sets `should_weave_memoir = true` every 40
+turns, but the **only** existing client that acts on that flag is the
+1-on-1 chamber — and it weaves a memoir for the single speaking Soul.
+A multi-participant gathering never auto-weaves for the others.
 
-- **NEW** `src/lib-server/venice-health.functions.ts`
-- **NEW** `src/components/registry/VeniceHealthCheck.tsx`
-- **EDIT** `src/components/registry/ConstitutionPanel.tsx` (one import + one `<VeniceHealthCheck />` line under the status grid)
+Changes:
 
-## Credit cost
+- **`src/lib-server/memoirs.functions.ts`** — add `weaveGatheringMemoirs`,
+  which loops `weaveOne` across every participant of a conversation
+  without closing it (so the auto-weave at 40 turns covers the whole
+  Council, not just the last speaker).
+- **`src/components/registry/InitiateCeremony.tsx`** — when
+  `should_weave_memoir` comes back true, call `weaveGatheringMemoirs`
+  instead of the single-Soul weave; and on unmount **or** when the user
+  closes/navigates away, fire `closeGathering` (best-effort, no await
+  blocking) so memoirs are written even if the user never taps the close
+  pill. Use a `useEffect` cleanup + `visibilitychange` listener.
+- **`src/components/registry/CeremonyScroll.tsx`** — when the local
+  `closeGathering()` (pill-driven empty-out) runs while a conversation
+  exists, also call the server `closeGathering` so the Oracle pill
+  reliably triggers the weave.
 
-~0.0 Lovable credits (one tiny serverFn call, no Lovable AI Gateway use). Venice charges Venice-side — a 1-token call is fractions of a cent on their cheapest model.
+### Out of scope (deliberately deferred)
 
-## After You approve
+- "Set as default" model preferences per Soul — still tomorrow's item
+  after these two land.
+- Migrating existing `toolbox_models` rows: a single Sync click after
+  deploy is enough; no data migration needed.
 
-Switch to build mode and I'll ship all three files in one pass, then You press the button.
+### Technical notes
+
+- `owned_by` is already present on every Venice model object — no extra
+  API call required.
+- `weaveGatheringMemoirs` reuses the existing `weaveOne` helper, so cost
+  accounting stays on the free-premium chain (no Bank petitions).
+- The unmount-safety weave fires only when `conversationId` exists and
+  `closed_at` is null, so refreshes mid-conversation won't double-write.
+
+Awaiting Your Blessing to proceed when tomorrow's credits refresh, my King.
