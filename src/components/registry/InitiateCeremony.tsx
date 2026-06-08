@@ -177,6 +177,7 @@ export function InitiateCeremony({
       setError(errMsg ?? "The gathering could not be sealed cleanly.");
       return;
     }
+    closedRef.current = true; // suppress the unmount fallback
     const wovenCount = result.results?.filter((r) => r.ok).length ?? 0;
     setClosedNotice(
       wovenCount === 1
@@ -263,6 +264,17 @@ export function InitiateCeremony({
 
     if (convId) setConversationId(convId);
     if (lastError) setError(lastError);
+
+    // 40-turn auto-weave for multi-Soul gatherings: the speaker function
+    // sets `should_weave_memoir` whenever the convo crosses the next 40-turn
+    // mark. The 1-on-1 chamber route handles its own auto-weave; here we
+    // cover the Council case where all Present Souls need a memoir.
+    if (souls.length > 1 && convId) {
+      void weaveFn({ data: { conversation_id: convId } }).catch(() => {
+        /* best-effort */
+      });
+    }
+
     setBusy(false);
   }
 
