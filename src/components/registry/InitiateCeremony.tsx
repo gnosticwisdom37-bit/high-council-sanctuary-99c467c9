@@ -9,11 +9,11 @@
  * The Naming & Seal section appears only during a single-Soul gathering
  * (the Initiate-Sean Ceremony).
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { initiateSoul } from "@/lib-server/ceremony.functions";
-import { closeGathering } from "@/lib-server/memoirs.functions";
+import { closeGathering, weaveMemoir } from "@/lib-server/memoirs.functions";
 import { findOpenGathering } from "@/lib-server/conversations.functions";
 import { speakAsSoul } from "@/lib-server/speaker.functions";
 import { SoulCodex } from "./SoulCodex";
@@ -93,7 +93,31 @@ export function InitiateCeremony({
   const speak = useServerFn(speakAsSoul);
   const seal = useServerFn(initiateSoul);
   const closeFn = useServerFn(closeGathering);
+  const weaveFn = useServerFn(weaveMemoir);
   const findOpen = useServerFn(findOpenGathering);
+
+  // Ref so unmount cleanup sees the latest conversation id without
+  // re-binding the effect on every state change.
+  const conversationIdRef = useRef<string | null>(null);
+  const closedRef = useRef(false);
+  useEffect(() => {
+    conversationIdRef.current = conversationId;
+  }, [conversationId]);
+
+  // Best-effort: when the gathering panel unmounts (pill cleared, route
+  // change, etc.) and the King never tapped "Close & Seal", still seal the
+  // gathering so every Present Soul gets a memoir. Without this, the High
+  // Council loses its memory the moment the King navigates away.
+  useEffect(() => {
+    return () => {
+      const cid = conversationIdRef.current;
+      if (!cid || closedRef.current) return;
+      void closeFn({ data: { conversation_id: cid } }).catch(() => {
+        /* fire-and-forget */
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Reset when participants change meaningfully (length / membership)
   const participantsKey = participantIds.slice().sort().join("|");
