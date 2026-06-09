@@ -111,7 +111,7 @@ export function VeniceRegistryPanel() {
             className="mt-1 text-[11px] italic"
             style={{ color: "color-mix(in oklab, var(--dawn-ink) 60%, transparent)" }}
           >
-            Live catalogue from Venice. Preferences arrive in the next session.
+            Live catalogue from Venice · auto-synced daily{lastSyncedAt ? ` · last ${formatAgo(lastSyncedAt)}` : ""}
           </p>
         </div>
         <button
