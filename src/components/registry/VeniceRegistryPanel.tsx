@@ -35,9 +35,11 @@ function parseNotes(notes: string | null): {
 
 export function VeniceRegistryPanel() {
   const sync = useServerFn(syncVeniceRegistry);
+  const lastSync = useServerFn(getVeniceLastSync);
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [open, setOpen] = useState<Record<string, boolean>>({
     "free-premium": true,
     premium: false,
@@ -53,6 +55,10 @@ export function VeniceRegistryPanel() {
       .order("tier")
       .order("model_id");
     if (!error && data) setRows(data as Row[]);
+    try {
+      const r = await lastSync();
+      setLastSyncedAt(r.last_seen_at);
+    } catch { /* ignore */ }
   }
 
   useEffect(() => {
