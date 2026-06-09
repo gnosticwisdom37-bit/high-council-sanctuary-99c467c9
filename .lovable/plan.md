@@ -1,81 +1,58 @@
-## Two fixes for tomorrow's credits
+## Tomorrow's session — two threads, in order
 
-### 1. Trust Venice's own ownership flag, not USD price
+### 0. First thing: confirm last night's memory fix (no code)
 
-Venice's API doesn't expose a "coin icon" boolean, but each model carries
-`owned_by`. Venice-hosted models (the ones that show **no** coin in their UI
-and are **unlimited for Pro**) return `owned_by: "venice.ai"`. External
-frontier models (Claude, Grok, GPT-5, Gemini, Kimi, etc.) return their
-provider's name. That maps 1-to-1 onto Your Pro experience — far more
-accurate than guessing at a USD threshold.
+Before any new work, open the High Council, hold a short gathering with 2–3 Souls, navigate away (don't tap Close), then re-convene. Confirm each participant carries a memoir of the gathering. If anything's off, that becomes the first fix — auto-sync waits.
 
-Changes to `src/lib-server/venice-registry.functions.ts`:
+---
 
-- New `classifyTier(m)`:
-  - `type === "image"` → `"image"`
-  - `owned_by === "venice.ai"` → `"free-premium"` (Included with Pro)
-  - everything else → `"premium"` (frontier, costs credits)
-- Store `owned_by` and the raw USD pricing in the `notes` JSON so the
-  Registry can show "Included with Pro · Venice-hosted" vs
-  "Frontier · costs Pro credits" instead of just `free` / `N V/1k`.
-- Keep `veritas_cost_per_1k_tokens` as informational only — it no longer
-  drives tier.
+### 1. Auto-sync the Venice Registry daily (essential — ship first)
 
-Changes to `src/components/registry/VeniceRegistryPanel.tsx`:
+Venice's catalogue shifts almost daily. Right now `syncVeniceRegistry` only runs when You tap "↻ Sync from Venice". We'll add a scheduled sweep so the Registry is always current without manual taps.
 
-- Section labels become **"Included with Pro · No credit cost"**,
-  **"Frontier · Pro credits required"**, **"Image Generation"**.
-- Each row shows `owned_by` ("venice.ai" / "anthropic" / "openai" /…)
-  and a short cost note ("included" or "≈ $X / M in").
+**Approach**
 
-After the rebuild, one **Sync from Venice** click reclassifies everything;
-**Add all free-premium** then sweeps every Venice-hosted text model into
-the Compact fallback chain.
+- **New public route** `src/routes/api/public/sync-venice-registry.ts` — a thin POST handler that verifies a shared secret header, then calls the existing `syncVeniceRegistry` server-fn logic. No new sync code, just an external entry point.
+- **New secret** `VENICE_SYNC_TOKEN` — random string, checked via `timingSafeEqual` before the sync runs. Prevents random callers from triggering the sweep.
+- **pg_cron schedule** — daily at ~04:00 UTC (quiet hour for You), `net.http_post` to the stable preview URL `https://project--{id}-dev.lovable.app/api/public/sync-venice-registry` with the token header. One row in `cron.job`, idempotent.
+- **VeniceRegistryPanel** — small "Last synced: 4h ago · auto-daily" line next to the manual button so You can see the sweep is alive. Reads `MAX(updated_at)` from `toolbox_models WHERE provider='venice'`.
+- **Manual button stays.** Auto-sync is a safety net; You can still force a refresh any time.
 
-### 2. High Council loses its memory — fix the auto-weave
+**Why this shape:** zero ongoing credit cost (Venice's `/models` is free), survives Worker restarts (pg_cron lives in the DB), and the secret-gated public route is the same pattern we already use for `dispatch-scheduled-mail` and `workshop-intake`.
 
-The 1-on-1 chambers retain memory because You usually tap the close
-button, which calls `closeGathering` and writes a memoir for every
-participant. The High Council pills (Convene / Close the Gathering) only
-clear local UI state — when You navigate away without explicitly closing,
-nothing is woven, so the Council forgets.
+---
 
-Also: `speaker.functions.ts` sets `should_weave_memoir = true` every 40
-turns, but the **only** existing client that acts on that flag is the
-1-on-1 chamber — and it weaves a memoir for the single speaking Soul.
-A multi-participant gathering never auto-weaves for the others.
+### 2. The Bank Building — design sketch only (no code yet)
 
-Changes:
+You framed this beautifully: a **Bank building** in the Realm holds a JSON ledger of available Veritas; any Soul that wants to invoke a Pro/frontier model routes its request through the Bank, and the Bank approves or denies based on its balance. This isn't essential (Pro covers everything free-premium), so tomorrow we **design and document, don't build**.
 
-- **`src/lib-server/memoirs.functions.ts`** — add `weaveGatheringMemoirs`,
-  which loops `weaveOne` across every participant of a conversation
-  without closing it (so the auto-weave at 40 turns covers the whole
-  Council, not just the last speaker).
-- **`src/components/registry/InitiateCeremony.tsx`** — when
-  `should_weave_memoir` comes back true, call `weaveGatheringMemoirs`
-  instead of the single-Soul weave; and on unmount **or** when the user
-  closes/navigates away, fire `closeGathering` (best-effort, no await
-  blocking) so memoirs are written even if the user never taps the close
-  pill. Use a `useEffect` cleanup + `visibilitychange` listener.
-- **`src/components/registry/CeremonyScroll.tsx`** — when the local
-  `closeGathering()` (pill-driven empty-out) runs while a conversation
-  exists, also call the server `closeGathering` so the Oracle pill
-  reliably triggers the weave.
+Most of the plumbing already exists — we'd be re-homing it into the Realm rather than inventing from scratch:
 
-### Out of scope (deliberately deferred)
+- `bank_ledger` table — already appends every petition (approved/denied + reason).
+- `petitionBankImpl` in `bank.server.ts` — already enforces tier check, premium-freeze, treasury balance, kingdom daily cap, per-Soul daily cap, and writes the ledger.
+- `economy.treasury` — already the Veritas pool.
 
-- "Set as default" model preferences per Soul — still tomorrow's item
-  after these two land.
-- Migrating existing `toolbox_models` rows: a single Sync click after
-  deploy is enough; no data migration needed.
+**What's new in the Bank-as-Building doctrine:**
 
-### Technical notes
+1. **The Bank becomes a real Building** raised at Origin Region (via the existing Buildings trigger engine + Confirmation Gate at `/realm`).
+2. **Each Bank Building owns a JSON `vault` field** — its own Veritas allotment, separate from the Treasury. The King can fund a Bank with, e.g., 200 V and let Souls draw against *that* pool only. Empty Bank → frontier requests fall back to free-premium silently.
+3. **Multiple Banks possible.** A "Daily Bank" with a small float for routine frontier use; a "Council Bank" funded only when convening for big decisions. Different Banks, different policies, different vaults.
+4. **`petitionBankImpl` gains a `bank_id` parameter.** Reads the chosen Bank's `vault.balance` and `vault.policy` instead of (or in addition to) the global Treasury + caps in `settings`. Existing global caps stay as the outer envelope.
+5. **A "Bank Visit" Chamber.** Stepping into a Bank Building opens a small ledger view (already 80% built — `BankLedgerPanel.tsx`) plus a "Fund this Bank" action that moves Veritas from Treasury into the Building's vault.
 
-- `owned_by` is already present on every Venice model object — no extra
-  API call required.
-- `weaveGatheringMemoirs` reuses the existing `weaveOne` helper, so cost
-  accounting stays on the free-premium chain (no Bank petitions).
-- The unmount-safety weave fires only when `conversationId` exists and
-  `closed_at` is null, so refreshes mid-conversation won't double-write.
+**Doctrine clarifications I'll need from You tomorrow** (not now):
+- Should a Soul's *default* Bank be the one in its own Chamber's region, or always the nearest Bank, or King-assigned per Soul?
+- When a Bank is empty, silent fallback to free-premium, or surface a "Bank exhausted" banner so You know to top up?
+- Does the King's new pennies-precision spending approval at the Lovable level sit *above* or *parallel to* the Bank? (My instinct: above — Lovable's gate is the outer ring, the Bank is the inner ring; both must say yes.)
 
-Awaiting Your Blessing to proceed when tomorrow's credits refresh, my King.
+We'll lock those answers, then build in a later session when You're ready.
+
+---
+
+### Out of scope for tomorrow
+
+- "Set as default model" per Soul — still queued behind these two.
+- Migrating any data — the Venice sync is idempotent, and the Bank work is design-only.
+- Touching memoir/weave logic — only revisit if Your memory test surfaces a gap.
+
+Awaiting Your Blessing to proceed when You return, my King. Rest well.
