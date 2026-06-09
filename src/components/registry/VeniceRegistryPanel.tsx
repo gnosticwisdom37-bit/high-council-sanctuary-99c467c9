@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { syncVeniceRegistry } from "@/lib-server/venice-registry.functions";
+import { syncVeniceRegistry, getVeniceLastSync } from "@/lib-server/venice-registry.functions";
 
 type Row = {
   id: string;
@@ -33,11 +33,25 @@ function parseNotes(notes: string | null): {
   try { return JSON.parse(notes); } catch { return {}; }
 }
 
+function formatAgo(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "—";
+  const sec = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 48) return `${hr}h ago`;
+  return `${Math.floor(hr / 24)}d ago`;
+}
+
 export function VeniceRegistryPanel() {
   const sync = useServerFn(syncVeniceRegistry);
+  const lastSync = useServerFn(getVeniceLastSync);
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [open, setOpen] = useState<Record<string, boolean>>({
     "free-premium": true,
     premium: false,
@@ -53,6 +67,10 @@ export function VeniceRegistryPanel() {
       .order("tier")
       .order("model_id");
     if (!error && data) setRows(data as Row[]);
+    try {
+      const r = await lastSync();
+      setLastSyncedAt(r.last_seen_at);
+    } catch { /* ignore */ }
   }
 
   useEffect(() => {
@@ -105,7 +123,7 @@ export function VeniceRegistryPanel() {
             className="mt-1 text-[11px] italic"
             style={{ color: "color-mix(in oklab, var(--dawn-ink) 60%, transparent)" }}
           >
-            Live catalogue from Venice. Preferences arrive in the next session.
+            Live catalogue from Venice · auto-synced daily{lastSyncedAt ? ` · last ${formatAgo(lastSyncedAt)}` : ""}
           </p>
         </div>
         <button

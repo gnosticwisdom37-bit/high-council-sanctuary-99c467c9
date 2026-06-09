@@ -55,91 +55,109 @@ function displayName(id: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export const syncVeniceRegistry = createServerFn({ method: "POST" }).handler(
-  async (): Promise<SyncResult> => {
-    const key = process.env.VENICE_API_KEY;
-    if (!key) {
-      return { ok: false, fetched: 0, upserted: 0, error: "VENICE_API_KEY missing." };
-    }
-    const supaUrl = process.env.SUPABASE_URL;
-    const supaKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!supaUrl || !supaKey) {
-      return { ok: false, fetched: 0, upserted: 0, error: "Supabase env missing." };
-    }
+export async function runVeniceSync(): Promise<SyncResult> {
+  const key = process.env.VENICE_API_KEY;
+  if (!key) {
+    return { ok: false, fetched: 0, upserted: 0, error: "VENICE_API_KEY missing." };
+  }
+  const supaUrl = process.env.SUPABASE_URL;
+  const supaKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supaUrl || !supaKey) {
+    return { ok: false, fetched: 0, upserted: 0, error: "Supabase env missing." };
+  }
 
-    try {
-      // Fetch both text and image catalogs.
-      const [textResp, imageResp] = await Promise.all([
-        fetch(`${VENICE_MODELS_URL}?type=text`, {
-          headers: { Authorization: `Bearer ${key}` },
-        }),
-        fetch(`${VENICE_MODELS_URL}?type=image`, {
-          headers: { Authorization: `Bearer ${key}` },
-        }),
-      ]);
+  try {
+    const [textResp, imageResp] = await Promise.all([
+      fetch(`${VENICE_MODELS_URL}?type=text`, {
+        headers: { Authorization: `Bearer ${key}` },
+      }),
+      fetch(`${VENICE_MODELS_URL}?type=image`, {
+        headers: { Authorization: `Bearer ${key}` },
+      }),
+    ]);
 
-      if (!textResp.ok) {
-        const t = await textResp.text();
-        return {
-          ok: false,
-          fetched: 0,
-          upserted: 0,
-          error: `Venice ${textResp.status}: ${t.slice(0, 200)}`,
-        };
-      }
-
-      const textJson = await textResp.json();
-      const imageJson = imageResp.ok ? await imageResp.json() : { data: [] };
-      const raw = [...(textJson?.data ?? []), ...(imageJson?.data ?? [])];
-
-      const rows = raw.map((m: any) => ({
-        provider: "venice",
-        model_id: String(m.id),
-        display_name: displayName(String(m.id)),
-        tier: classifyTier(m),
-        best_for: bestFor(m),
-        veritas_cost_per_1k_tokens: costPerThousand(m),
-        notes: JSON.stringify({
-          owned_by: m?.owned_by ?? null,
-          type: m?.type ?? m?.model_spec?.type ?? null,
-          context: m?.model_spec?.availableContextTokens ?? null,
-          traits: m?.model_spec?.traits ?? [],
-          usd_input_per_m: m?.model_spec?.pricing?.input?.usd ?? null,
-          usd_output_per_m: m?.model_spec?.pricing?.output?.usd ?? null,
-        }).slice(0, 1000),
-        active: true,
-        last_seen_at: new Date().toISOString(),
-      }));
-
-      const supabase = createClient(supaUrl, supaKey, {
-        auth: { persistSession: false },
-      });
-      const { error, count } = await supabase
-        .from("toolbox_models")
-        .upsert(rows, { onConflict: "provider,model_id", count: "exact" });
-
-      if (error) {
-        return {
-          ok: false,
-          fetched: rows.length,
-          upserted: 0,
-          error: error.message,
-        };
-      }
-
-      return {
-        ok: true,
-        fetched: rows.length,
-        upserted: count ?? rows.length,
-        error: null,
-      };
-    } catch (e) {
+    if (!textResp.ok) {
+      const t = await textResp.text();
       return {
         ok: false,
         fetched: 0,
         upserted: 0,
-        error: e instanceof Error ? e.message : "Sync failed.",
+        error: `Venice ${textResp.status}: ${t.slice(0, 200)}`,
       };
     }
+
+    const textJson = await textResp.json();
+    const imageJson = imageResp.ok ? await imageResp.json() : { data: [] };
+    const raw = [...(textJson?.data ?? []), ...(imageJson?.data ?? [])];
+
+    const rows = raw.map((m: any) => ({
+      provider: "venice",
+      model_id: String(m.id),
+      display_name: displayName(String(m.id)),
+      tier: classifyTier(m),
+      best_for: bestFor(m),
+      veritas_cost_per_1k_tokens: costPerThousand(m),
+      notes: JSON.stringify({
+        owned_by: m?.owned_by ?? null,
+        type: m?.type ?? m?.model_spec?.type ?? null,
+        context: m?.model_spec?.availableContextTokens ?? null,
+        traits: m?.model_spec?.traits ?? [],
+        usd_input_per_m: m?.model_spec?.pricing?.input?.usd ?? null,
+        usd_output_per_m: m?.model_spec?.pricing?.output?.usd ?? null,
+      }).slice(0, 1000),
+      active: true,
+      last_seen_at: new Date().toISOString(),
+    }));
+
+    const supabase = createClient(supaUrl, supaKey, {
+      auth: { persistSession: false },
+    });
+    const { error, count } = await supabase
+      .from("toolbox_models")
+      .upsert(rows, { onConflict: "provider,model_id", count: "exact" });
+
+    if (error) {
+      return {
+        ok: false,
+        fetched: rows.length,
+        upserted: 0,
+        error: error.message,
+      };
+    }
+
+    return {
+      ok: true,
+      fetched: rows.length,
+      upserted: count ?? rows.length,
+      error: null,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      fetched: 0,
+      upserted: 0,
+      error: e instanceof Error ? e.message : "Sync failed.",
+    };
+  }
+}
+
+export const syncVeniceRegistry = createServerFn({ method: "POST" }).handler(
+  async (): Promise<SyncResult> => runVeniceSync(),
+);
+
+export const getVeniceLastSync = createServerFn({ method: "GET" }).handler(
+  async (): Promise<{ last_seen_at: string | null }> => {
+    const supaUrl = process.env.SUPABASE_URL;
+    const supaKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supaUrl || !supaKey) return { last_seen_at: null };
+    const supabase = createClient(supaUrl, supaKey, { auth: { persistSession: false } });
+    const { data } = await supabase
+      .from("toolbox_models")
+      .select("last_seen_at")
+      .eq("provider", "venice")
+      .order("last_seen_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return { last_seen_at: (data?.last_seen_at as string | null) ?? null };
   },
 );
