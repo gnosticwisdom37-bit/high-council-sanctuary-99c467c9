@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { syncVeniceRegistry } from "@/lib-server/venice-registry.functions";
+import { syncVeniceRegistry, getVeniceLastSync } from "@/lib-server/venice-registry.functions";
 
 type Row = {
   id: string;
