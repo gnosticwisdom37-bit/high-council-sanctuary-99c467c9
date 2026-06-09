@@ -33,6 +33,18 @@ function parseNotes(notes: string | null): {
   try { return JSON.parse(notes); } catch { return {}; }
 }
 
+function formatAgo(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "—";
+  const sec = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 48) return `${hr}h ago`;
+  return `${Math.floor(hr / 24)}d ago`;
+}
+
 export function VeniceRegistryPanel() {
   const sync = useServerFn(syncVeniceRegistry);
   const lastSync = useServerFn(getVeniceLastSync);
