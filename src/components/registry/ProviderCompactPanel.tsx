@@ -50,6 +50,27 @@ export function ProviderCompactPanel() {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [failedIdx, setFailedIdx] = useState<number>(-1); // -1 = none failed; simulates first N unavailable
+  const [rebuilding, setRebuilding] = useState(false);
+  const rebuild = useServerFn(rebuildFallbackChain);
+
+  async function handleRebuild() {
+    setRebuilding(true);
+    setStatus(null);
+    setError(null);
+    try {
+      const r = await rebuild();
+      if (r.ok) {
+        setStatus(`Chain rebuilt from tier files — ${r.chain.length} model${r.chain.length === 1 ? "" : "s"}.`);
+        await load();
+      } else {
+        setError(r.error ?? "Rebuild failed.");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Rebuild failed.");
+    } finally {
+      setRebuilding(false);
+    }
+  }
 
 
   useEffect(() => {
