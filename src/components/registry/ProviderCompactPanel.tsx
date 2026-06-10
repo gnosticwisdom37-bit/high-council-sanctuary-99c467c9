@@ -36,6 +36,8 @@ export function ProviderCompactPanel() {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [failedIdx, setFailedIdx] = useState<number>(-1); // -1 = none failed; simulates first N unavailable
+
 
   useEffect(() => {
     void load();
