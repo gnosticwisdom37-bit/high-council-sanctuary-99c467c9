@@ -1285,9 +1285,11 @@ export type Database = {
       toolbox_models: {
         Row: {
           active: boolean
+          auto_fallback_enabled: boolean
           best_for: string[]
           created_at: string
           display_name: string
+          fallback_rank: number | null
           id: string
           last_seen_at: string
           model_id: string
@@ -1295,13 +1297,16 @@ export type Database = {
           provider: string
           tier: string
           updated_at: string
+          venice_tier: string
           veritas_cost_per_1k_tokens: number
         }
         Insert: {
           active?: boolean
+          auto_fallback_enabled?: boolean
           best_for?: string[]
           created_at?: string
           display_name: string
+          fallback_rank?: number | null
           id?: string
           last_seen_at?: string
           model_id: string
@@ -1309,13 +1314,16 @@ export type Database = {
           provider: string
           tier: string
           updated_at?: string
+          venice_tier?: string
           veritas_cost_per_1k_tokens?: number
         }
         Update: {
           active?: boolean
+          auto_fallback_enabled?: boolean
           best_for?: string[]
           created_at?: string
           display_name?: string
+          fallback_rank?: number | null
           id?: string
           last_seen_at?: string
           model_id?: string
@@ -1323,6 +1331,7 @@ export type Database = {
           provider?: string
           tier?: string
           updated_at?: string
+          venice_tier?: string
           veritas_cost_per_1k_tokens?: number
         }
         Relationships: []
