@@ -13,17 +13,23 @@ type Row = {
   model_id: string;
   display_name: string;
   tier: "free-premium" | "premium" | "image";
+  venice_tier?: "pro" | "free" | "paid" | "image";
+  auto_fallback_enabled?: boolean;
+  fallback_rank?: number | null;
   best_for: string[];
   veritas_cost_per_1k_tokens: number;
   notes: string | null;
 };
 
-const TIER_LABEL: Record<Row["tier"], string> = {
-  "free-premium": "Included with Pro · No credit cost",
-  premium: "Frontier · Pro credits required",
+type VeniceTier = "pro" | "free" | "paid" | "image";
+
+const TIER_LABEL: Record<VeniceTier, string> = {
+  pro: "Venice Pro · Included in membership",
+  free: "Venice Free · Fallback after Pro",
+  paid: "Paid/blocked · Requires explicit approval",
   image: "Image Generation",
 };
-const TIER_ORDER: Row["tier"][] = ["free-premium", "premium", "image"];
+const TIER_ORDER: VeniceTier[] = ["pro", "free", "paid", "image"];
 
 function parseNotes(notes: string | null): {
   owned_by?: string | null;
@@ -53,15 +59,16 @@ export function VeniceRegistryPanel() {
   const [status, setStatus] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [open, setOpen] = useState<Record<string, boolean>>({
-    "free-premium": true,
-    premium: false,
+    pro: true,
+    free: true,
+    paid: false,
     image: false,
   });
 
   async function load() {
     const { data, error } = await supabase
       .from("toolbox_models")
-      .select("id, model_id, display_name, tier, best_for, veritas_cost_per_1k_tokens, notes")
+        .select("id, model_id, display_name, tier, venice_tier, auto_fallback_enabled, fallback_rank, best_for, veritas_cost_per_1k_tokens, notes")
       .eq("provider", "venice")
       .eq("active", true)
       .order("tier")
@@ -95,7 +102,7 @@ export function VeniceRegistryPanel() {
     }
   }
 
-  const byTier = (t: Row["tier"]) => rows.filter((r) => r.tier === t);
+  const byTier = (t: VeniceTier) => rows.filter((r) => (r.venice_tier ?? (r.tier === "image" ? "image" : "paid")) === t);
 
   return (
     <section
