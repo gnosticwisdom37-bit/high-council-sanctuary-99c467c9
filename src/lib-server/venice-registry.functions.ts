@@ -18,16 +18,27 @@ type SyncResult = {
   error: string | null;
 };
 
-// Truth from Venice itself: `owned_by` tells Us whether a model is Venice-
-// hosted (Included with Pro, no coin in their UI) or a frontier model from
-// an external provider (Pro credits required, coin shown). USD pricing is
-// irrelevant for a Pro subscriber — Venice-hosted is unlimited regardless
-// of listed per-token cost.
+// Truth from billing reality: `owned_by === "venice.ai"` is NOT a reliable
+// proxy for "Included with Pro" — Venice still bills per-token USD for many
+// venice.ai-owned models (e.g. glm-4.7, deepseek-v3.2). The only safe signal
+// is zero pricing OR an explicit free/included trait. Everything else is
+// `premium` and must go through the Bank.
 function classifyTier(m: any): "free-premium" | "premium" | "image" {
   const type = m?.type ?? m?.model_spec?.type;
   if (type === "image") return "image";
-  const owner = String(m?.owned_by ?? "").toLowerCase();
-  if (owner === "venice.ai") return "free-premium";
+  const inUsd = Number(m?.model_spec?.pricing?.input?.usd ?? 0);
+  const outUsd = Number(m?.model_spec?.pricing?.output?.usd ?? 0);
+  const traits = (m?.model_spec?.traits ?? []).map((t: unknown) =>
+    String(t).toLowerCase(),
+  );
+  const freeTrait = traits.some((t: string) =>
+    /included(in)?pro|free|akash/.test(t),
+  );
+  const id = String(m?.id ?? "").toLowerCase();
+  const freeById = /akash/.test(id);
+  if ((inUsd === 0 && outUsd === 0) || freeTrait || freeById) {
+    return "free-premium";
+  }
   return "premium";
 }
 
