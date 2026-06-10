@@ -4,7 +4,9 @@
  * and the kill-switch that halts all paid spend instantly.
  */
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { rebuildFallbackChain } from "@/lib-server/venice-registry.functions";
 
 type CompactJSON = {
   active_provider: string;
@@ -48,6 +50,27 @@ export function ProviderCompactPanel() {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [failedIdx, setFailedIdx] = useState<number>(-1); // -1 = none failed; simulates first N unavailable
+  const [rebuilding, setRebuilding] = useState(false);
+  const rebuild = useServerFn(rebuildFallbackChain);
+
+  async function handleRebuild() {
+    setRebuilding(true);
+    setStatus(null);
+    setError(null);
+    try {
+      const r = await rebuild();
+      if (r.ok) {
+        setStatus(`Chain rebuilt from tier files — ${r.chain.length} model${r.chain.length === 1 ? "" : "s"}.`);
+        await load();
+      } else {
+        setError(r.error ?? "Rebuild failed.");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Rebuild failed.");
+    } finally {
+      setRebuilding(false);
+    }
+  }
 
 
   useEffect(() => {
@@ -240,6 +263,22 @@ export function ProviderCompactPanel() {
             );
           })}
         </ol>
+
+        <div className="mt-3">
+          <button
+            onClick={() => void handleRebuild()}
+            disabled={rebuilding}
+            className="rounded-full px-4 py-1.5 text-[11px] uppercase tracking-[0.25em] disabled:opacity-50"
+            style={{
+              background: "color-mix(in oklab, var(--dawn-gold) 18%, transparent)",
+              border: "1px solid color-mix(in oklab, var(--dawn-gold) 55%, transparent)",
+              color: "var(--dawn-ink)",
+            }}
+            title="Re-tag every model and rebuild the chain from src/lib-server/venice-tier-map.ts (no Venice fetch)"
+          >
+            {rebuilding ? "Rebuilding…" : "↻ Rebuild chain from tier files"}
+          </button>
+        </div>
 
         {(() => {
           return approvedAvailable.length > 0 ? (

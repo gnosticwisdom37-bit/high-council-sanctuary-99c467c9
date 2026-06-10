@@ -1063,6 +1063,7 @@ export type Database = {
           provider_compact: Json
           realm_grid_size: number
           system_constitution: string
+          tier_map_unmatched: Json
           updated_at: string
           veritas_per_credit: number
         }
@@ -1077,6 +1078,7 @@ export type Database = {
           provider_compact?: Json
           realm_grid_size?: number
           system_constitution?: string
+          tier_map_unmatched?: Json
           updated_at?: string
           veritas_per_credit?: number
         }
@@ -1091,6 +1093,7 @@ export type Database = {
           provider_compact?: Json
           realm_grid_size?: number
           system_constitution?: string
+          tier_map_unmatched?: Json
           updated_at?: string
           veritas_per_credit?: number
         }
