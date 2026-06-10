@@ -33,6 +33,14 @@ type SettingsRow = {
   premium_freeze: boolean;
 };
 
+function membershipLabel(model?: ToolboxRow | null): string {
+  if (!model) return "unknown";
+  if (model.venice_tier === "pro") return "Venice Pro";
+  if (model.venice_tier === "free") return "Venice Free";
+  if (model.venice_tier === "image") return "Image";
+  return "Paid/blocked";
+}
+
 export function ProviderCompactPanel() {
   const [settings, setSettings] = useState<SettingsRow | null>(null);
   const [models, setModels] = useState<ToolboxRow[]>([]);
@@ -217,7 +225,7 @@ export function ProviderCompactPanel() {
                     {i + 1}. {meta?.display_name ?? modelId}
                   </p>
                   <p className="text-[11px] opacity-70">
-                    {meta?.tier ?? "unknown"} · {modelId}
+                    {membershipLabel(meta)} · {modelId}
                     {meta && meta.veritas_cost_per_1k_tokens > 0 && (
                       <> · {meta.veritas_cost_per_1k_tokens} Veritas / 1k tokens</>
                     )}
@@ -264,7 +272,7 @@ export function ProviderCompactPanel() {
                   background:
                     m.venice_tier === "pro"
                       ? "color-mix(in oklab, var(--dawn-gold) 18%, transparent)"
-                      : "color-mix(in oklab, var(--dawn-sky) 14%, transparent)",
+                      : "color-mix(in oklab, var(--dawn-mid) 14%, transparent)",
                   border: "1px solid color-mix(in oklab, var(--dawn-gold) 40%, transparent)",
                 }}
                 title={m.venice_tier === "pro" ? "Venice Pro — auto fallback approved" : "Venice Free — fallback after Pro"}
@@ -347,7 +355,7 @@ export function ProviderCompactPanel() {
                   ✓ Next chosen:{" "}
                   <strong>{winnerMeta?.display_name ?? winnerId}</strong>{" "}
                   <span className="opacity-60">
-                    · {winnerMeta?.tier ?? "unknown"} · {winnerId}
+                    · {membershipLabel(winnerMeta)} · {winnerId}
                   </span>
                 </p>
               ) : (
