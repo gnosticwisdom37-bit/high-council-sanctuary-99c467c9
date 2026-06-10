@@ -36,6 +36,8 @@ export function ProviderCompactPanel() {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [failedIdx, setFailedIdx] = useState<number>(-1); // -1 = none failed; simulates first N unavailable
+
 
   useEffect(() => {
     void load();
@@ -270,8 +272,87 @@ export function ProviderCompactPanel() {
         )}
       </section>
 
+      {/* Fallback simulator */}
+      {(() => {
+        const nextIdx = failedIdx + 1;
+        const winnerId = chain[nextIdx];
+        const winnerMeta = winnerId ? models.find((m) => m.model_id === winnerId) : null;
+        const exhausted = nextIdx >= chain.length;
+        return (
+          <section
+            className="rounded-xl p-4"
+            style={{
+              background: "color-mix(in oklab, var(--dawn-parchment) 90%, transparent)",
+              border: "1px dashed color-mix(in oklab, var(--dawn-gold) 50%, transparent)",
+            }}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.3em]" style={{ color: "var(--dawn-ember)" }}>
+                  Test model fallback
+                </p>
+                <p className="mt-1 text-xs italic opacity-70">
+                  Simulate the next model in the chain being unavailable. No tokens spent — pure walk of the Compact.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setFailedIdx((i) => Math.min(i + 1, chain.length - 1))}
+                  disabled={exhausted}
+                  className="rounded-full px-4 py-1.5 text-[11px] uppercase tracking-[0.25em] disabled:opacity-40"
+                  style={{
+                    background: "var(--gradient-dawn)",
+                    color: "var(--dawn-parchment)",
+                    border: "1px solid color-mix(in oklab, var(--dawn-gold) 80%, transparent)",
+                  }}
+                >
+                  ⚡ Simulate failure
+                </button>
+                <button
+                  onClick={() => setFailedIdx(-1)}
+                  className="rounded-full px-4 py-1.5 text-[11px] uppercase tracking-[0.25em]"
+                  style={{
+                    background: "color-mix(in oklab, var(--dawn-gold) 14%, transparent)",
+                    border: "1px solid color-mix(in oklab, var(--dawn-gold) 45%, transparent)",
+                    color: "var(--dawn-ink)",
+                  }}
+                >
+                  ↺ Reset
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-3 space-y-1 text-xs">
+              {failedIdx >= 0 && (
+                <p style={{ color: "var(--dawn-ember)" }}>
+                  ✗ Skipped ({failedIdx + 1}):{" "}
+                  {chain.slice(0, failedIdx + 1).map((id) => {
+                    const m = models.find((mm) => mm.model_id === id);
+                    return m?.display_name ?? id;
+                  }).join(" → ")}
+                </p>
+              )}
+              {!exhausted && winnerId ? (
+                <p className="font-serif text-sm">
+                  ✓ Next chosen:{" "}
+                  <strong>{winnerMeta?.display_name ?? winnerId}</strong>{" "}
+                  <span className="opacity-60">
+                    · {winnerMeta?.tier ?? "unknown"} · {winnerId}
+                  </span>
+                </p>
+              ) : (
+                <p style={{ color: "var(--dawn-ember)" }}>
+                  ⚠ Chain exhausted — no Pro model left to try. Add more to the Compact.
+                </p>
+              )}
+            </div>
+          </section>
+        );
+      })()}
+
       {/* Premium guardrails */}
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+
         <NumberCard
           label="Kingdom daily cap"
           value={settings.premium_daily_veritas_cap}
