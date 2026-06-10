@@ -4,7 +4,9 @@
  * and the kill-switch that halts all paid spend instantly.
  */
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { rebuildFallbackChain } from "@/lib-server/venice-registry.functions";
 
 type CompactJSON = {
   active_provider: string;
