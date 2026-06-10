@@ -176,6 +176,36 @@ export function VeniceRegistryPanel() {
         </p>
       )}
 
+      {(unmatched.pro_missing.length > 0 || unmatched.free_missing.length > 0) && (
+        <div
+          className="mt-3 rounded-lg p-3 text-[11px]"
+          style={{
+            background: "color-mix(in oklab, var(--dawn-ember) 12%, transparent)",
+            border: "1px solid color-mix(in oklab, var(--dawn-ember) 45%, transparent)",
+            color: "var(--dawn-ink)",
+          }}
+        >
+          <p className="font-medium" style={{ color: "var(--dawn-ember)" }}>
+            ⚠ {unmatched.pro_missing.length + unmatched.free_missing.length} curated tier ID
+            {unmatched.pro_missing.length + unmatched.free_missing.length === 1 ? "" : "s"} not found on Venice right now
+          </p>
+          {unmatched.pro_missing.length > 0 && (
+            <p className="mt-1 opacity-80">
+              Pro missing: {unmatched.pro_missing.map((id) => <code key={id} className="font-mono">{id}</code>).reduce((acc: any, el, i) => i === 0 ? [el] : [...acc, ", ", el], [])}
+            </p>
+          )}
+          {unmatched.free_missing.length > 0 && (
+            <p className="mt-1 opacity-80">
+              Free missing: {unmatched.free_missing.map((id) => <code key={id} className="font-mono">{id}</code>).reduce((acc: any, el, i) => i === 0 ? [el] : [...acc, ", ", el], [])}
+            </p>
+          )}
+          <p className="mt-2 italic opacity-70">
+            Update <code className="font-mono">src/lib-server/venice-tier-map.ts</code> and the matching <code className="font-mono">src/data/venice-*-models.txt</code> file.
+          </p>
+        </div>
+      )}
+
+
       {rows.length > 0 && (
         <div className="mt-4 space-y-2">
           {TIER_ORDER.map((tier) => {
