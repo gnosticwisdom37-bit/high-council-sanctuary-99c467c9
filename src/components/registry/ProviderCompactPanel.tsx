@@ -234,11 +234,10 @@ export function ProviderCompactPanel() {
         </ol>
 
         {(() => {
-          const freeAvailable = available.filter((m) => m.tier === "free-premium");
-          return freeAvailable.length > 0 ? (
+          return approvedAvailable.length > 0 ? (
             <div className="mt-3">
               <button
-                onClick={addAllFreePremium}
+                onClick={addAllApprovedFallback}
                 className="rounded-full px-4 py-1.5 text-[11px] uppercase tracking-[0.25em]"
                 style={{
                   background: "var(--gradient-dawn)",
@@ -247,34 +246,39 @@ export function ProviderCompactPanel() {
                   boxShadow: "var(--shadow-sigil)",
                 }}
               >
-                ✶ Add all {freeAvailable.length} free-premium models
+                ✶ Add all {approvedAvailable.length} approved fallback models
               </button>
             </div>
           ) : null;
         })()}
 
-        {available.length > 0 && (
+        {approvedAvailable.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
-            <span className="text-xs opacity-70">Add individually:</span>
-            {available.map((m) => (
+            <span className="text-xs opacity-70">Add approved fallback:</span>
+            {approvedAvailable.map((m) => (
               <button
                 key={m.model_id}
                 onClick={() => addModel(m.model_id)}
                 className="rounded-full px-3 py-1 text-xs"
                 style={{
                   background:
-                    m.tier === "free-premium"
+                    m.venice_tier === "pro"
                       ? "color-mix(in oklab, var(--dawn-gold) 18%, transparent)"
-                      : "color-mix(in oklab, var(--dawn-ember) 14%, transparent)",
+                      : "color-mix(in oklab, var(--dawn-sky) 14%, transparent)",
                   border: "1px solid color-mix(in oklab, var(--dawn-gold) 40%, transparent)",
                 }}
-                title={m.tier === "premium" ? "Premium — Bank petition required" : "Free-premium"}
+                title={m.venice_tier === "pro" ? "Venice Pro — auto fallback approved" : "Venice Free — fallback after Pro"}
               >
                 + {m.display_name}
-                <span className="ml-1 opacity-60">· {m.tier === "free-premium" ? "free" : m.tier}</span>
+                <span className="ml-1 opacity-60">· Venice {m.venice_tier}</span>
               </button>
             ))}
           </div>
+        )}
+        {paidBlockedCount > 0 && (
+          <p className="mt-3 text-[11px] italic opacity-70">
+            {paidBlockedCount} paid-credit model{paidBlockedCount === 1 ? "" : "s"} blocked from automatic fallback, including Claude.
+          </p>
         )}
       </section>
 
