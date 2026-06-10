@@ -192,13 +192,15 @@ export function VeniceRegistryPanel() {
                       const owner = meta.owned_by ?? "—";
                       const usdIn = meta.usd_input_per_m;
                       const costLabel =
-                        tier === "free-premium"
+                        tier === "pro"
                           ? "included with Pro"
+                          : tier === "free"
+                            ? "free fallback"
                           : tier === "image"
                             ? "included with Pro"
                             : usdIn != null
-                              ? `≈ $${usdIn}/M in · Pro credits`
-                              : "Pro credits";
+                              ? `≈ $${usdIn}/M in · paid/blocked`
+                              : "paid/blocked";
                       return (
                         <li
                           key={r.id}
