@@ -264,6 +264,22 @@ export function ProviderCompactPanel() {
           })}
         </ol>
 
+        <div className="mt-3">
+          <button
+            onClick={() => void handleRebuild()}
+            disabled={rebuilding}
+            className="rounded-full px-4 py-1.5 text-[11px] uppercase tracking-[0.25em] disabled:opacity-50"
+            style={{
+              background: "color-mix(in oklab, var(--dawn-gold) 18%, transparent)",
+              border: "1px solid color-mix(in oklab, var(--dawn-gold) 55%, transparent)",
+              color: "var(--dawn-ink)",
+            }}
+            title="Re-tag every model and rebuild the chain from src/lib-server/venice-tier-map.ts (no Venice fetch)"
+          >
+            {rebuilding ? "Rebuilding…" : "↻ Rebuild chain from tier files"}
+          </button>
+        </div>
+
         {(() => {
           return approvedAvailable.length > 0 ? (
             <div className="mt-3">
