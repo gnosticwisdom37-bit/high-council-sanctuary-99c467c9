@@ -108,7 +108,7 @@ export function VeniceRegistryPanel() {
     try {
       const r = await sync();
       if (r.ok) {
-        setStatus(`Synced ${r.upserted} model${r.upserted === 1 ? "" : "s"} from Venice.`);
+        setStatus(`Synced ${r.upserted} model${r.upserted === 1 ? "" : "s"} from Venice. Pro matched ${(r as any).pro_matched ?? 0}/25 · Free matched ${(r as any).free_matched ?? 0}/11.`);
         await load();
       } else {
         setStatus(`Sync failed: ${r.error ?? "unknown"}`);
