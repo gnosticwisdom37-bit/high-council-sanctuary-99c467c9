@@ -64,6 +64,10 @@ export function VeniceRegistryPanel() {
     paid: false,
     image: false,
   });
+  const [unmatched, setUnmatched] = useState<{ pro_missing: string[]; free_missing: string[] }>({
+    pro_missing: [],
+    free_missing: [],
+  });
 
   async function load() {
     const { data, error } = await supabase
@@ -77,6 +81,20 @@ export function VeniceRegistryPanel() {
     try {
       const r = await lastSync();
       setLastSyncedAt(r.last_seen_at);
+    } catch { /* ignore */ }
+    try {
+      const { data: s } = await supabase
+        .from("settings")
+        .select("tier_map_unmatched")
+        .eq("id", true)
+        .single();
+      const tm = (s as any)?.tier_map_unmatched;
+      if (tm && typeof tm === "object") {
+        setUnmatched({
+          pro_missing: Array.isArray(tm.pro_missing) ? tm.pro_missing : [],
+          free_missing: Array.isArray(tm.free_missing) ? tm.free_missing : [],
+        });
+      }
     } catch { /* ignore */ }
   }
 
