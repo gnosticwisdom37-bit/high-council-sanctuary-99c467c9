@@ -1,0 +1,133 @@
+25 models
+
+Gemma 4 26B A4B Uncensored
+
+Gemma 4 26B A4B Uncensored running in a Trusted Execution Environment (TEE). An uncensored variant of Google's Gemma 4 MoE model with 25.2B total / 3.8B active parameters, supporting multimodal input across text and images, with hardware attestation evidence available for independent verification.
+
+Uncensored
+TEE · E2EE
+Qwen3.6 35B A3B Uncensored
+
+Qwen3.6 35B A3B Uncensored running in a Trusted Execution Environment (TEE). An uncensored variant of Alibaba's Qwen3.6 MoE model with 35B total parameters and ~3B active, supporting 262K context and multimodal input across text, images, and video, with hardware attestation evidence available for independent verification.
+
+Uncensored
+TEE · E2EE
+Qwen 3.6 27B
+
+The Qwen 3.6 27B native vision-language dense model builds upon the 3.5-27B version, with key improvements in agentic coding capabilities and enhanced STEM reasoning and inference skills. In the vision modality, it demonstrates significant advances in spatial intelligence, object localization, and detection, while video understanding, document OCR, and visual agent capabilities continue to improve steadily.
+
+Private
+DeepSeek V4 Flash
+
+DeepSeek V4 Flash is an efficiency-optimized 284B-parameter Mixture-of-Experts model with 13B active parameters and a 1M-token context window. Tuned for fast inference and high-throughput workloads while maintaining strong reasoning and coding performance.
+
+Anon
+GLM 5.1
+
+GLM 5.1 running in a Trusted Execution Environment (TEE). Hardware attestation evidence is available for independent verification of enclave identity and configuration.
+
+TEE · E2EE
+Gemma 4 Uncensored
+
+Gemma 4 Uncensored is an uncensored variant of Google Gemma 4 26B, a Mixture-of-Experts model with 26B total parameters and only 4B active per token. Fine-tuned for uncensored chat without content filtering, it supports 256K context, coding, and general-purpose conversation.
+
+Uncensored
+Private
+GLM 5.1
+
+GLM-5.1 is the next-generation large language model developed by Zhiyuan AI, featuring significantly enhanced reasoning capabilities, improved instruction following, and support for multiple languages. Supports large context windows for processing extensive text and detailed analysis with fast inference speed.
+
+Private
+Google Gemma 4 31B Instruct
+
+Gemma 4 31B is a dense model from Google DeepMind with 31B parameters, delivering frontier-level reasoning performance. It handles text, image, and video input, supports 256K context, function calling, and configurable thinking modes.
+
+Private
+Google Gemma 4 26B A4B Instruct
+
+Gemma 4 26B A4B is a Mixture-of-Experts model from Google DeepMind with 26B total parameters and only 4B active per token, offering fast inference at high quality. It handles text, image, and video input, supports 256K context, function calling, and reasoning with configurable thinking modes.
+
+Private
+Aion 2.0
+
+Aion 2.0 is a DeepSeek V3.2-based model fine-tuned for immersive roleplaying and long-form storytelling. It excels at introducing tension, crises, and meaningful conflict into narratives, keeping stories unpredictable and deeply engaging. The model handles mature and darker themes with exceptional nuance, avoiding sanitized or surface-level treatment. Available as an early alpha—your feedback helps shape its development.
+
+Uncensored
+Anon
+Venice Uncensored 1.1
+
+Venice Uncensored 1.1 running in a Trusted Execution Environment (TEE). Hardware attestation evidence is available for independent verification of enclave identity and configuration.
+
+Uncensored
+TEE · E2EE
+Gemma 3 27B
+
+Gemma 3 27B running in a Trusted Execution Environment (TEE). Google's multimodal model supporting vision-language input with 140+ language understanding, with hardware attestation evidence available for independent verification.
+
+TEE · E2EE
+GLM 4.7
+
+GLM 4.7 running in a Trusted Execution Environment (TEE). Z.AI's flagship model with enhanced programming capabilities and stable multi-step reasoning, with hardware attestation evidence available for independent verification.
+
+TEE · E2EE
+GLM 4.7 Flash
+
+GLM 4.7 Flash running in a Trusted Execution Environment (TEE). A 30B-class model optimized for agentic coding with strong long-horizon task planning, with hardware attestation evidence available for independent verification.
+
+TEE · E2EE
+GPT OSS 20B
+
+GPT OSS 20B running in a Trusted Execution Environment (TEE). OpenAI's compact open-weight 21B MoE model with 3.6B active parameters, optimized for lower-latency inference, with hardware attestation evidence available for independent verification.
+
+TEE · E2EE
+GPT OSS 120B
+
+GPT OSS 120B running in a Trusted Execution Environment (TEE). OpenAI's open-weight 117B-parameter MoE model with configurable reasoning depth and native tool use, with hardware attestation evidence available for independent verification.
+
+TEE · E2EE
+Qwen 2.5 7B
+
+Qwen 2.5 7B Instruct running in a Trusted Execution Environment (TEE). A compact model with strong coding, math, and multilingual capabilities supporting 29+ languages, with hardware attestation evidence available for independent verification.
+
+TEE · E2EE
+Qwen3 30B A3B
+
+Qwen3 30B A3B running in a Trusted Execution Environment (TEE). A MoE model with 30.5B total parameters and 3.3B activated per inference, supporting ultra-long 256K context, with hardware attestation evidence available for independent verification.
+
+TEE · E2EE
+Qwen3 VL 30B A3B
+
+Qwen3 VL 30B A3B running in a Trusted Execution Environment (TEE). A multimodal model unifying text generation with visual understanding for images and videos, with hardware attestation evidence available for independent verification.
+
+TEE · E2EE
+Qwen 3.5 35B A3B
+
+Qwen 3.5 35B A3B is a highly efficient MoE model with 35B total parameters and only 3B active parameters. It surpasses the larger Qwen3-235B-A22B while being 6.7x smaller, excelling at reasoning, coding, and general knowledge tasks.
+
+Private
+Venice Role Play Uncensored
+
+Optimized for creative roleplay scenarios with maximum freedom. Designed for immersive storytelling, character interactions, and open-ended creative writing.
+
+Uncensored
+Private
+GLM 5
+
+GLM-5 is the next-generation large language model developed by Zhiyuan AI, featuring significantly enhanced reasoning capabilities, improved instruction following, and support for multiple languages. Supports large context windows for processing extensive text and detailed analysis.
+
+Private
+Qwen3 VL 235B
+
+Qwen3-VL 235B vision-language model with MoE architecture. The most powerful VL model in the Qwen series with superior visual perception, OCR, and multimodal reasoning.
+
+Private
+GLM 4.7
+
+GLM-4.7 is a large language model developed by Zhiyuan AI, featuring strong reasoning capabilities and support for multiple languages. Supports the largest context window for processing extensive text and detailed analysis.
+
+Private
+DeepSeek V3.2
+
+DeepSeek-V3.2 is an efficient large language model with DeepSeek Sparse Attention (DSA) for long contexts. It features strong reasoning and tool-use skills, achieving top results on the 2025 IMO and IOI.
+
+Private
