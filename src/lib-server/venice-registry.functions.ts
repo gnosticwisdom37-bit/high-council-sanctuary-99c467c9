@@ -123,9 +123,29 @@ export async function runVeniceSync(): Promise<SyncResult> {
     const supabase = createClient(supaUrl, supaKey, {
       auth: { persistSession: false },
     });
+    const { data: existing } = await supabase
+      .from("toolbox_models")
+      .select("model_id, venice_tier, auto_fallback_enabled, fallback_rank")
+      .eq("provider", "venice")
+      .in("venice_tier", ["pro", "free"]);
+
+    const preserved = new Map(
+      (existing ?? []).map((r: any) => [
+        r.model_id,
+        {
+          venice_tier: r.venice_tier,
+          auto_fallback_enabled: r.auto_fallback_enabled,
+          fallback_rank: r.fallback_rank,
+          tier: "free-premium",
+        },
+      ]),
+    );
+
+    const rowsWithOverrides = rows.map((row) => ({ ...row, ...(preserved.get(row.model_id) ?? {}) }));
+
     const { error, count } = await supabase
       .from("toolbox_models")
-      .upsert(rows, { onConflict: "provider,model_id", count: "exact" });
+      .upsert(rowsWithOverrides, { onConflict: "provider,model_id", count: "exact" });
 
     if (error) {
       return {

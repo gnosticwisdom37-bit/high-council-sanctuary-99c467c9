@@ -18,6 +18,9 @@ type ToolboxRow = {
   model_id: string;
   display_name: string;
   tier: "free-premium" | "premium" | "image";
+  venice_tier?: "pro" | "free" | "paid" | "image";
+  auto_fallback_enabled?: boolean;
+  fallback_rank?: number | null;
   best_for: string[];
   veritas_cost_per_1k_tokens: number;
   active: boolean;
@@ -29,6 +32,14 @@ type SettingsRow = {
   premium_per_soul_daily_cap: number;
   premium_freeze: boolean;
 };
+
+function membershipLabel(model?: ToolboxRow | null): string {
+  if (!model) return "unknown";
+  if (model.venice_tier === "pro") return "Venice Pro";
+  if (model.venice_tier === "free") return "Venice Free";
+  if (model.venice_tier === "image") return "Image";
+  return "Paid/blocked";
+}
 
 export function ProviderCompactPanel() {
   const [settings, setSettings] = useState<SettingsRow | null>(null);
@@ -109,15 +120,16 @@ export function ProviderCompactPanel() {
     setSettings({ ...settings, provider_compact: { ...settings.provider_compact, fallback_chain: chain } });
   }
 
-  function addAllFreePremium() {
+  function addAllApprovedFallback() {
     if (!settings) return;
     const existing = new Set(settings.provider_compact.fallback_chain);
-    const freeIds = models
-      .filter((m) => m.tier === "free-premium")
+    const approvedIds = models
+      .filter((m) => m.auto_fallback_enabled && (m.venice_tier === "pro" || m.venice_tier === "free"))
+      .sort((a, b) => (a.fallback_rank ?? 9999) - (b.fallback_rank ?? 9999))
       .map((m) => m.model_id)
       .filter((id) => !existing.has(id));
-    if (freeIds.length === 0) return;
-    const chain = [...settings.provider_compact.fallback_chain, ...freeIds];
+    if (approvedIds.length === 0) return;
+    const chain = [...settings.provider_compact.fallback_chain, ...approvedIds];
     setSettings({ ...settings, provider_compact: { ...settings.provider_compact, fallback_chain: chain } });
   }
 
@@ -127,6 +139,8 @@ export function ProviderCompactPanel() {
 
   const chain = settings.provider_compact.fallback_chain;
   const available = models.filter((m) => !chain.includes(m.model_id));
+  const approvedAvailable = available.filter((m) => m.auto_fallback_enabled && (m.venice_tier === "pro" || m.venice_tier === "free"));
+  const paidBlockedCount = models.filter((m) => m.venice_tier === "paid" && !m.auto_fallback_enabled).length;
 
   return (
     <article className="space-y-6" style={{ color: "var(--dawn-ink)" }}>
@@ -211,7 +225,7 @@ export function ProviderCompactPanel() {
                     {i + 1}. {meta?.display_name ?? modelId}
                   </p>
                   <p className="text-[11px] opacity-70">
-                    {meta?.tier ?? "unknown"} · {modelId}
+                    {membershipLabel(meta)} · {modelId}
                     {meta && meta.veritas_cost_per_1k_tokens > 0 && (
                       <> · {meta.veritas_cost_per_1k_tokens} Veritas / 1k tokens</>
                     )}
@@ -228,11 +242,10 @@ export function ProviderCompactPanel() {
         </ol>
 
         {(() => {
-          const freeAvailable = available.filter((m) => m.tier === "free-premium");
-          return freeAvailable.length > 0 ? (
+          return approvedAvailable.length > 0 ? (
             <div className="mt-3">
               <button
-                onClick={addAllFreePremium}
+                onClick={addAllApprovedFallback}
                 className="rounded-full px-4 py-1.5 text-[11px] uppercase tracking-[0.25em]"
                 style={{
                   background: "var(--gradient-dawn)",
@@ -241,34 +254,39 @@ export function ProviderCompactPanel() {
                   boxShadow: "var(--shadow-sigil)",
                 }}
               >
-                ✶ Add all {freeAvailable.length} free-premium models
+                ✶ Add all {approvedAvailable.length} approved fallback models
               </button>
             </div>
           ) : null;
         })()}
 
-        {available.length > 0 && (
+        {approvedAvailable.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
-            <span className="text-xs opacity-70">Add individually:</span>
-            {available.map((m) => (
+            <span className="text-xs opacity-70">Add approved fallback:</span>
+            {approvedAvailable.map((m) => (
               <button
                 key={m.model_id}
                 onClick={() => addModel(m.model_id)}
                 className="rounded-full px-3 py-1 text-xs"
                 style={{
                   background:
-                    m.tier === "free-premium"
+                    m.venice_tier === "pro"
                       ? "color-mix(in oklab, var(--dawn-gold) 18%, transparent)"
-                      : "color-mix(in oklab, var(--dawn-ember) 14%, transparent)",
+                      : "color-mix(in oklab, var(--dawn-mid) 14%, transparent)",
                   border: "1px solid color-mix(in oklab, var(--dawn-gold) 40%, transparent)",
                 }}
-                title={m.tier === "premium" ? "Premium — Bank petition required" : "Free-premium"}
+                title={m.venice_tier === "pro" ? "Venice Pro — auto fallback approved" : "Venice Free — fallback after Pro"}
               >
                 + {m.display_name}
-                <span className="ml-1 opacity-60">· {m.tier === "free-premium" ? "free" : m.tier}</span>
+                <span className="ml-1 opacity-60">· Venice {m.venice_tier}</span>
               </button>
             ))}
           </div>
+        )}
+        {paidBlockedCount > 0 && (
+          <p className="mt-3 text-[11px] italic opacity-70">
+            {paidBlockedCount} paid-credit model{paidBlockedCount === 1 ? "" : "s"} blocked from automatic fallback, including Claude.
+          </p>
         )}
       </section>
 
@@ -337,7 +355,7 @@ export function ProviderCompactPanel() {
                   ✓ Next chosen:{" "}
                   <strong>{winnerMeta?.display_name ?? winnerId}</strong>{" "}
                   <span className="opacity-60">
-                    · {winnerMeta?.tier ?? "unknown"} · {winnerId}
+                    · {membershipLabel(winnerMeta)} · {winnerId}
                   </span>
                 </p>
               ) : (

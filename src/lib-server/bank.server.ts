@@ -22,7 +22,7 @@ export async function petitionBankImpl(data: {
 
   const { data: model, error: modelErr } = await supabaseAdmin
     .from("toolbox_models")
-    .select("tier, veritas_cost_per_1k_tokens, model_id")
+    .select("tier, venice_tier, auto_fallback_enabled, active, veritas_cost_per_1k_tokens, model_id")
     .eq("model_id", model_id)
     .maybeSingle();
 
@@ -32,19 +32,26 @@ export async function petitionBankImpl(data: {
     return { decision: "denied", reason, veritas_cost: 0, fallback_model: await firstFreeFallback() };
   }
 
-  if (model.tier === "free-premium") {
+  if (!model.active || !model.auto_fallback_enabled || !["pro", "free"].includes(model.venice_tier ?? "paid")) {
+    const reason = `Model ${model_id} is not approved for automatic fallback.`;
+    const fallback = await firstFreeFallback();
+    await writeLedger({ soul_id, model_id, veritas_cost: 0, decision: "denied", reason, task_summary, fallback_used: fallback });
+    return { decision: "denied", reason, veritas_cost: 0, fallback_model: fallback };
+  }
+
+  if (model.venice_tier === "pro" || model.venice_tier === "free") {
     await writeLedger({
       soul_id,
       model_id,
       veritas_cost: 0,
       decision: "approved",
-      reason: "Free-premium model — no Treasury debit required.",
+      reason: `Venice ${model.venice_tier === "pro" ? "Pro" : "Free"} model — no paid-credit debit required.`,
       task_summary,
       fallback_used: null,
     });
     return {
       decision: "approved",
-      reason: "Free-premium — passes the Bank without debit.",
+      reason: `Venice ${model.venice_tier === "pro" ? "Pro" : "Free"} — passes the Bank without debit.`,
       approved_model: model_id,
       veritas_cost: 0,
     };
@@ -136,9 +143,10 @@ async function firstFreeFallback(): Promise<string> {
   const { data } = await supabaseAdmin
     .from("toolbox_models")
     .select("model_id")
-    .eq("tier", "free-premium")
+    .in("venice_tier", ["pro", "free"])
+    .eq("auto_fallback_enabled", true)
     .eq("active", true)
-    .order("veritas_cost_per_1k_tokens", { ascending: true })
+    .order("fallback_rank", { ascending: true, nullsFirst: false })
     .limit(1)
     .maybeSingle();
   return data?.model_id ?? "google/gemini-2.5-flash";
