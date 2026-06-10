@@ -1,0 +1,1 @@
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS tier_map_unmatched jsonb NOT NULL DEFAULT '[]'::jsonb;
