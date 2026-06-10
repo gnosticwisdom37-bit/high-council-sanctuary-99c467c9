@@ -18,6 +18,9 @@ type ToolboxRow = {
   model_id: string;
   display_name: string;
   tier: "free-premium" | "premium" | "image";
+  venice_tier?: "pro" | "free" | "paid" | "image";
+  auto_fallback_enabled?: boolean;
+  fallback_rank?: number | null;
   best_for: string[];
   veritas_cost_per_1k_tokens: number;
   active: boolean;
@@ -109,15 +112,16 @@ export function ProviderCompactPanel() {
     setSettings({ ...settings, provider_compact: { ...settings.provider_compact, fallback_chain: chain } });
   }
 
-  function addAllFreePremium() {
+  function addAllApprovedFallback() {
     if (!settings) return;
     const existing = new Set(settings.provider_compact.fallback_chain);
-    const freeIds = models
-      .filter((m) => m.tier === "free-premium")
+    const approvedIds = models
+      .filter((m) => m.auto_fallback_enabled && (m.venice_tier === "pro" || m.venice_tier === "free"))
+      .sort((a, b) => (a.fallback_rank ?? 9999) - (b.fallback_rank ?? 9999))
       .map((m) => m.model_id)
       .filter((id) => !existing.has(id));
-    if (freeIds.length === 0) return;
-    const chain = [...settings.provider_compact.fallback_chain, ...freeIds];
+    if (approvedIds.length === 0) return;
+    const chain = [...settings.provider_compact.fallback_chain, ...approvedIds];
     setSettings({ ...settings, provider_compact: { ...settings.provider_compact, fallback_chain: chain } });
   }
 
@@ -127,6 +131,8 @@ export function ProviderCompactPanel() {
 
   const chain = settings.provider_compact.fallback_chain;
   const available = models.filter((m) => !chain.includes(m.model_id));
+  const approvedAvailable = available.filter((m) => m.auto_fallback_enabled && (m.venice_tier === "pro" || m.venice_tier === "free"));
+  const paidBlockedCount = models.filter((m) => m.venice_tier === "paid" && !m.auto_fallback_enabled).length;
 
   return (
     <article className="space-y-6" style={{ color: "var(--dawn-ink)" }}>
