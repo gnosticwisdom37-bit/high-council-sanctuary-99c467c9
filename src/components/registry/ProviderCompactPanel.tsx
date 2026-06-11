@@ -244,6 +244,17 @@ export function ProviderCompactPanel() {
         </p>
       </section>
 
+      {/* All models · sorted by cost ascending */}
+      <AllModelsByCost
+        models={models}
+        defaultModelId={settings.default_model_id}
+        costFilter={costFilter}
+        setCostFilter={setCostFilter}
+        onSetDefault={(id) => setSettings({ ...settings, default_model_id: id })}
+      />
+
+
+
       {/* Fallback chain */}
       <section>
         <p className="text-xs uppercase tracking-[0.25em]" style={{ color: "color-mix(in oklab, var(--dawn-ink) 70%, transparent)" }}>
