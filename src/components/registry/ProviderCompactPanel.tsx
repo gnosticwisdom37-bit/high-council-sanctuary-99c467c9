@@ -96,15 +96,15 @@ export function ProviderCompactPanel() {
     const [settingsRes, modelsRes] = await Promise.all([
       supabase
         .from("settings")
-        .select("provider_compact, premium_daily_veritas_cap, premium_per_soul_daily_cap, premium_freeze")
+        .select("provider_compact, premium_daily_veritas_cap, premium_per_soul_daily_cap, premium_freeze, default_model_id")
         .eq("id", true)
         .single(),
       supabase
         .from("toolbox_models")
         .select("*")
         .eq("active", true)
-        .order("tier")
-        .order("veritas_cost_per_1k_tokens"),
+        .order("cost_rank", { ascending: true, nullsFirst: false })
+        .order("veritas_cost_per_1k_tokens", { ascending: true }),
     ]);
     if (settingsRes.error) {
       setError(settingsRes.error.message);
@@ -113,6 +113,7 @@ export function ProviderCompactPanel() {
     setSettings(settingsRes.data as unknown as SettingsRow);
     setModels((modelsRes.data ?? []) as ToolboxRow[]);
   }
+
 
   async function save() {
     if (!settings) return;
