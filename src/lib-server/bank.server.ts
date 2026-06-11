@@ -20,11 +20,28 @@ export async function petitionBankImpl(data: {
 }): Promise<BankDecision> {
   const { soul_id, model_id, est_tokens, task_summary } = data;
 
+  // 0. Free default short-circuit — the baseline voice. No ledger row, no debit.
+  const { data: settingsForDefault } = await supabaseAdmin
+    .from("settings")
+    .select("default_model_id")
+    .eq("id", true)
+    .single();
+  const defaultModelId = settingsForDefault?.default_model_id ?? "venice-uncensored-1-2";
+  if (model_id === defaultModelId) {
+    return {
+      decision: "approved",
+      reason: "Free default voice — no decision to log.",
+      approved_model: model_id,
+      veritas_cost: 0,
+    };
+  }
+
   const { data: model, error: modelErr } = await supabaseAdmin
     .from("toolbox_models")
     .select("tier, venice_tier, auto_fallback_enabled, active, veritas_cost_per_1k_tokens, model_id")
     .eq("model_id", model_id)
     .maybeSingle();
+
 
   if (modelErr || !model) {
     const reason = `Unknown model: ${model_id}`;
