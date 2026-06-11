@@ -23,6 +23,7 @@ type ToolboxRow = {
   venice_tier?: "pro" | "free" | "paid" | "image";
   auto_fallback_enabled?: boolean;
   fallback_rank?: number | null;
+  cost_rank?: number | null;
   best_for: string[];
   veritas_cost_per_1k_tokens: number;
   active: boolean;
@@ -33,7 +34,10 @@ type SettingsRow = {
   premium_daily_veritas_cap: number;
   premium_per_soul_daily_cap: number;
   premium_freeze: boolean;
+  default_model_id: string;
 };
+
+type CostFilter = "all" | "free" | "under1" | "pro" | "paid";
 
 function membershipLabel(model?: ToolboxRow | null): string {
   if (!model) return "unknown";
@@ -42,6 +46,15 @@ function membershipLabel(model?: ToolboxRow | null): string {
   if (model.venice_tier === "image") return "Image";
   return "Paid/blocked";
 }
+
+function costChipFor(m: ToolboxRow, isDefault: boolean): { text: string; tone: "free" | "low" | "mid" | "high" } {
+  if (isDefault || m.veritas_cost_per_1k_tokens === 0) return { text: "Free", tone: "free" };
+  const c = m.veritas_cost_per_1k_tokens;
+  if (c < 1) return { text: `${c} V/1k`, tone: "low" };
+  if (c < 5) return { text: `${c} V/1k`, tone: "mid" };
+  return { text: `${c} V/1k`, tone: "high" };
+}
+
 
 export function ProviderCompactPanel() {
   const [settings, setSettings] = useState<SettingsRow | null>(null);
