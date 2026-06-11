@@ -23,6 +23,7 @@ type ToolboxRow = {
   venice_tier?: "pro" | "free" | "paid" | "image";
   auto_fallback_enabled?: boolean;
   fallback_rank?: number | null;
+  cost_rank?: number | null;
   best_for: string[];
   veritas_cost_per_1k_tokens: number;
   active: boolean;
@@ -33,7 +34,10 @@ type SettingsRow = {
   premium_daily_veritas_cap: number;
   premium_per_soul_daily_cap: number;
   premium_freeze: boolean;
+  default_model_id: string;
 };
+
+type CostFilter = "all" | "free" | "under1" | "pro" | "paid";
 
 function membershipLabel(model?: ToolboxRow | null): string {
   if (!model) return "unknown";
@@ -43,6 +47,15 @@ function membershipLabel(model?: ToolboxRow | null): string {
   return "Paid/blocked";
 }
 
+function costChipFor(m: ToolboxRow, isDefault: boolean): { text: string; tone: "free" | "low" | "mid" | "high" } {
+  if (isDefault || m.veritas_cost_per_1k_tokens === 0) return { text: "Free", tone: "free" };
+  const c = m.veritas_cost_per_1k_tokens;
+  if (c < 1) return { text: `${c} V/1k`, tone: "low" };
+  if (c < 5) return { text: `${c} V/1k`, tone: "mid" };
+  return { text: `${c} V/1k`, tone: "high" };
+}
+
+
 export function ProviderCompactPanel() {
   const [settings, setSettings] = useState<SettingsRow | null>(null);
   const [models, setModels] = useState<ToolboxRow[]>([]);
@@ -51,7 +64,9 @@ export function ProviderCompactPanel() {
   const [error, setError] = useState<string | null>(null);
   const [failedIdx, setFailedIdx] = useState<number>(-1); // -1 = none failed; simulates first N unavailable
   const [rebuilding, setRebuilding] = useState(false);
+  const [costFilter, setCostFilter] = useState<CostFilter>("all");
   const rebuild = useServerFn(rebuildFallbackChain);
+
 
   async function handleRebuild() {
     setRebuilding(true);
@@ -81,15 +96,15 @@ export function ProviderCompactPanel() {
     const [settingsRes, modelsRes] = await Promise.all([
       supabase
         .from("settings")
-        .select("provider_compact, premium_daily_veritas_cap, premium_per_soul_daily_cap, premium_freeze")
+        .select("provider_compact, premium_daily_veritas_cap, premium_per_soul_daily_cap, premium_freeze, default_model_id")
         .eq("id", true)
         .single(),
       supabase
         .from("toolbox_models")
         .select("*")
         .eq("active", true)
-        .order("tier")
-        .order("veritas_cost_per_1k_tokens"),
+        .order("cost_rank", { ascending: true, nullsFirst: false })
+        .order("veritas_cost_per_1k_tokens", { ascending: true }),
     ]);
     if (settingsRes.error) {
       setError(settingsRes.error.message);
@@ -98,6 +113,7 @@ export function ProviderCompactPanel() {
     setSettings(settingsRes.data as unknown as SettingsRow);
     setModels((modelsRes.data ?? []) as ToolboxRow[]);
   }
+
 
   async function save() {
     if (!settings) return;
@@ -111,8 +127,10 @@ export function ProviderCompactPanel() {
         premium_daily_veritas_cap: settings.premium_daily_veritas_cap,
         premium_per_soul_daily_cap: settings.premium_per_soul_daily_cap,
         premium_freeze: settings.premium_freeze,
+        default_model_id: settings.default_model_id,
       })
       .eq("id", true);
+
     setSaving(false);
     if (error) {
       setError(error.message);
@@ -225,6 +243,17 @@ export function ProviderCompactPanel() {
           One Key, Many Souls — voices all 13. Swap and seal to switch gateways.
         </p>
       </section>
+
+      {/* All models · sorted by cost ascending */}
+      <AllModelsByCost
+        models={models}
+        defaultModelId={settings.default_model_id}
+        costFilter={costFilter}
+        setCostFilter={setCostFilter}
+        onSetDefault={(id) => setSettings({ ...settings, default_model_id: id })}
+      />
+
+
 
       {/* Fallback chain */}
       <section>
@@ -536,3 +565,144 @@ function FreezeCard({ frozen, onToggle }: { frozen: boolean; onToggle: (v: boole
     </div>
   );
 }
+
+function AllModelsByCost({
+  models,
+  defaultModelId,
+  costFilter,
+  setCostFilter,
+  onSetDefault,
+}: {
+  models: ToolboxRow[];
+  defaultModelId: string;
+  costFilter: CostFilter;
+  setCostFilter: (f: CostFilter) => void;
+  onSetDefault: (modelId: string) => void;
+}) {
+  const filtered = models.filter((m) => {
+    if (m.venice_tier === "image") return false;
+    switch (costFilter) {
+      case "free":
+        return m.model_id === defaultModelId || m.veritas_cost_per_1k_tokens === 0;
+      case "under1":
+        return m.veritas_cost_per_1k_tokens < 1;
+      case "pro":
+        return m.venice_tier === "pro";
+      case "paid":
+        return m.venice_tier === "paid";
+      default:
+        return true;
+    }
+  });
+
+  // Pin the default to the very top
+  const sorted = [...filtered].sort((a, b) => {
+    if (a.model_id === defaultModelId) return -1;
+    if (b.model_id === defaultModelId) return 1;
+    const ra = a.cost_rank ?? 9999;
+    const rb = b.cost_rank ?? 9999;
+    if (ra !== rb) return ra - rb;
+    return a.veritas_cost_per_1k_tokens - b.veritas_cost_per_1k_tokens;
+  });
+
+  const FILTERS: Array<{ id: CostFilter; label: string }> = [
+    { id: "all", label: "All" },
+    { id: "free", label: "Free" },
+    { id: "under1", label: "Under 1 V/1k" },
+    { id: "pro", label: "Pro-tier" },
+    { id: "paid", label: "Paid" },
+  ];
+
+  return (
+    <section>
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <p className="text-xs uppercase tracking-[0.25em]" style={{ color: "color-mix(in oklab, var(--dawn-ink) 70%, transparent)" }}>
+          All models · sorted by cost
+        </p>
+        <p className="text-[11px] italic opacity-60">
+          ★ marks the free default every Soul uses unless overridden.
+        </p>
+      </div>
+
+      <div className="mt-2 flex flex-wrap gap-2">
+        {FILTERS.map((f) => (
+          <button
+            key={f.id}
+            onClick={() => setCostFilter(f.id)}
+            className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.2em] transition-all"
+            style={{
+              background:
+                costFilter === f.id
+                  ? "var(--gradient-dawn)"
+                  : "color-mix(in oklab, var(--dawn-gold) 12%, transparent)",
+              color: costFilter === f.id ? "var(--dawn-parchment)" : "var(--dawn-ink)",
+              border: "1px solid color-mix(in oklab, var(--dawn-gold) 45%, transparent)",
+            }}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      <ul className="mt-3 space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
+        {sorted.map((m) => {
+          const isDefault = m.model_id === defaultModelId;
+          const chip = costChipFor(m, isDefault);
+          const toneBg =
+            chip.tone === "free" ? "color-mix(in oklab, var(--dawn-gold) 35%, transparent)"
+            : chip.tone === "low" ? "color-mix(in oklab, var(--dawn-mid) 18%, transparent)"
+            : chip.tone === "mid" ? "color-mix(in oklab, var(--dawn-ember) 22%, transparent)"
+            : "color-mix(in oklab, var(--dawn-ember) 40%, transparent)";
+          return (
+            <li
+              key={m.model_id}
+              className="flex items-center justify-between gap-3 rounded-lg px-3 py-2"
+              style={{
+                background: isDefault
+                  ? "color-mix(in oklab, var(--dawn-gold) 18%, transparent)"
+                  : "color-mix(in oklab, var(--dawn-parchment) 92%, transparent)",
+                border: `1px solid color-mix(in oklab, var(--dawn-gold) ${isDefault ? 65 : 30}%, transparent)`,
+              }}
+            >
+              <div className="min-w-0">
+                <p className="truncate font-serif text-sm">
+                  {isDefault && <span className="mr-1">★</span>}
+                  {m.display_name}
+                </p>
+                <p className="truncate text-[10px] opacity-60">
+                  {membershipLabel(m)} · {m.model_id}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <span
+                  className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                  style={{ background: toneBg, color: "var(--dawn-ink)" }}
+                >
+                  {chip.text}
+                </span>
+                {!isDefault && m.veritas_cost_per_1k_tokens === 0 && (
+                  <button
+                    onClick={() => onSetDefault(m.model_id)}
+                    className="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.2em]"
+                    style={{
+                      background: "color-mix(in oklab, var(--dawn-gold) 20%, transparent)",
+                      border: "1px solid color-mix(in oklab, var(--dawn-gold) 55%, transparent)",
+                      color: "var(--dawn-ink)",
+                    }}
+                    title="Make this the new free default (don't forget to seal)"
+                  >
+                    Set default
+                  </button>
+                )}
+              </div>
+            </li>
+          );
+        })}
+        {sorted.length === 0 && (
+          <li className="text-xs italic opacity-60">No models match this filter.</li>
+        )}
+      </ul>
+    </section>
+  );
+}
+

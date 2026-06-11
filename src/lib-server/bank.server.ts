@@ -20,11 +20,28 @@ export async function petitionBankImpl(data: {
 }): Promise<BankDecision> {
   const { soul_id, model_id, est_tokens, task_summary } = data;
 
+  // 0. Free default short-circuit — the baseline voice. No ledger row, no debit.
+  const { data: settingsForDefault } = await supabaseAdmin
+    .from("settings")
+    .select("default_model_id")
+    .eq("id", true)
+    .single();
+  const defaultModelId = settingsForDefault?.default_model_id ?? "venice-uncensored-1-2";
+  if (model_id === defaultModelId) {
+    return {
+      decision: "approved",
+      reason: "Free default voice — no decision to log.",
+      approved_model: model_id,
+      veritas_cost: 0,
+    };
+  }
+
   const { data: model, error: modelErr } = await supabaseAdmin
     .from("toolbox_models")
     .select("tier, venice_tier, auto_fallback_enabled, active, veritas_cost_per_1k_tokens, model_id")
     .eq("model_id", model_id)
     .maybeSingle();
+
 
   if (modelErr || !model) {
     const reason = `Unknown model: ${model_id}`;
@@ -140,17 +157,16 @@ export async function petitionBankImpl(data: {
 }
 
 async function firstFreeFallback(): Promise<string> {
-  const { data } = await supabaseAdmin
-    .from("toolbox_models")
-    .select("model_id")
-    .in("venice_tier", ["pro", "free"])
-    .eq("auto_fallback_enabled", true)
-    .eq("active", true)
-    .order("fallback_rank", { ascending: true, nullsFirst: false })
-    .limit(1)
-    .maybeSingle();
-  return data?.model_id ?? "google/gemini-2.5-flash";
+  // Always prefer the configured free default model.
+  const { data: s } = await supabaseAdmin
+    .from("settings")
+    .select("default_model_id")
+    .eq("id", true)
+    .single();
+  if (s?.default_model_id) return s.default_model_id;
+  return "venice-uncensored-1-2";
 }
+
 
 async function writeLedger(args: {
   soul_id: string;

@@ -173,6 +173,40 @@ export async function runVeniceSync(): Promise<SyncResult> {
         .not("model_id", "in", `(${liveIds.map((s) => `"${s}"`).join(",")})`);
     }
 
+    // Recompute cost_rank: free default = 0, then ascending by cost.
+    const { data: settingsForDefault } = await supabase
+      .from("settings")
+      .select("default_model_id")
+      .eq("id", true)
+      .single();
+    const defaultModelId =
+      (settingsForDefault?.default_model_id as string | null) ?? "venice-uncensored-1-2";
+
+    const { data: allActive } = await supabase
+      .from("toolbox_models")
+      .select("id, model_id, veritas_cost_per_1k_tokens")
+      .eq("active", true);
+    const sorted = (allActive ?? [])
+      .filter((r) => r.model_id !== defaultModelId)
+      .sort((a, b) => {
+        const ca = (a.veritas_cost_per_1k_tokens as number | null) ?? 0;
+        const cb = (b.veritas_cost_per_1k_tokens as number | null) ?? 0;
+        if (ca !== cb) return ca - cb;
+        return String(a.model_id).localeCompare(String(b.model_id));
+      });
+    await supabase
+      .from("toolbox_models")
+      .update({ cost_rank: 0 })
+      .eq("model_id", defaultModelId);
+    for (let i = 0; i < sorted.length; i++) {
+      await supabase
+        .from("toolbox_models")
+        .update({ cost_rank: i + 1 })
+        .eq("id", sorted[i].id as string);
+    }
+
+
+
     // Rebuild the Compact's fallback chain from the curated arrays,
     // filtered to what Venice actually has live right now.
     const liveSet = new Set(liveIds);
