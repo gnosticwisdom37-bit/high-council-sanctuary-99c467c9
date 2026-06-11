@@ -127,8 +127,10 @@ export function ProviderCompactPanel() {
         premium_daily_veritas_cap: settings.premium_daily_veritas_cap,
         premium_per_soul_daily_cap: settings.premium_per_soul_daily_cap,
         premium_freeze: settings.premium_freeze,
+        default_model_id: settings.default_model_id,
       })
       .eq("id", true);
+
     setSaving(false);
     if (error) {
       setError(error.message);
