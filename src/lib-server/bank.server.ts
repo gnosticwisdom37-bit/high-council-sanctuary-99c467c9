@@ -157,17 +157,16 @@ export async function petitionBankImpl(data: {
 }
 
 async function firstFreeFallback(): Promise<string> {
-  const { data } = await supabaseAdmin
-    .from("toolbox_models")
-    .select("model_id")
-    .in("venice_tier", ["pro", "free"])
-    .eq("auto_fallback_enabled", true)
-    .eq("active", true)
-    .order("fallback_rank", { ascending: true, nullsFirst: false })
-    .limit(1)
-    .maybeSingle();
-  return data?.model_id ?? "google/gemini-2.5-flash";
+  // Always prefer the configured free default model.
+  const { data: s } = await supabaseAdmin
+    .from("settings")
+    .select("default_model_id")
+    .eq("id", true)
+    .single();
+  if (s?.default_model_id) return s.default_model_id;
+  return "venice-uncensored-1-2";
 }
+
 
 async function writeLedger(args: {
   soul_id: string;
