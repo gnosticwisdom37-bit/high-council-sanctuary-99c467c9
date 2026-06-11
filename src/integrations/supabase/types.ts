@@ -1056,6 +1056,7 @@ export type Database = {
           active_provider: string
           created_at: string
           default_ink_color: string
+          default_model_id: string
           id: boolean
           premium_daily_veritas_cap: number
           premium_freeze: boolean
@@ -1071,6 +1072,7 @@ export type Database = {
           active_provider?: string
           created_at?: string
           default_ink_color?: string
+          default_model_id?: string
           id?: boolean
           premium_daily_veritas_cap?: number
           premium_freeze?: boolean
@@ -1086,6 +1088,7 @@ export type Database = {
           active_provider?: string
           created_at?: string
           default_ink_color?: string
+          default_model_id?: string
           id?: boolean
           premium_daily_veritas_cap?: number
           premium_freeze?: boolean
@@ -1290,6 +1293,7 @@ export type Database = {
           active: boolean
           auto_fallback_enabled: boolean
           best_for: string[]
+          cost_rank: number | null
           created_at: string
           display_name: string
           fallback_rank: number | null
@@ -1307,6 +1311,7 @@ export type Database = {
           active?: boolean
           auto_fallback_enabled?: boolean
           best_for?: string[]
+          cost_rank?: number | null
           created_at?: string
           display_name: string
           fallback_rank?: number | null
@@ -1324,6 +1329,7 @@ export type Database = {
           active?: boolean
           auto_fallback_enabled?: boolean
           best_for?: string[]
+          cost_rank?: number | null
           created_at?: string
           display_name?: string
           fallback_rank?: number | null
