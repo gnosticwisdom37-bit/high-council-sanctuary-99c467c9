@@ -1,67 +1,47 @@
-# Plan — Cost-First Model Triage + GitHub Backup
+## Per-Model On/Off Toggle
 
-## The shift in doctrine
+### The shift
 
-Venice's update means **no model is truly free except one** (Venice Uncensored 1.2). Pro membership now buys *discounted rates*, not free access. So the doctrine becomes:
+Right now `toolbox_models.active` exists but is set true on every synced model — it's a sync flag, not a curation flag. We split that: keep `active` as "Venice published it," add **`king_enabled`** as "I allow this model to be selectable + appear in fallback chains." Default new models to `king_enabled = false` so future Venice additions don't silently become spendable.
 
-> Every Soul speaks through **Venice Uncensored 1.2** by default. Anything else costs Veritas. Within daily caps, the Bank auto-approves silently. Beyond caps, it falls back to the free model and logs why.
+### What changes
 
-This actually *fits* Veritas perfectly — the Bank's whole purpose is to make these decisions automatic and visible.
+**1. DB (migration)**
+- Add `king_enabled boolean default false` to `toolbox_models`.
+- Backfill: set `king_enabled = true` for `venice-uncensored-1-2` (the free default) and for any model currently in active use by a Soul (`preferred_model` lookup). Everything else starts off.
+- `runVeniceSync` keeps `king_enabled` untouched on existing rows; new models always insert as `false`.
 
-## What I'll do
+**2. Bank guardrail (`bank.server.ts`)**
+- Anywhere a model is requested or used as fallback: if `king_enabled = false`, refuse and fall back to the free default. Ledger row marked `denied` with reason "Model not enabled by King."
+- `firstFreeFallback` only returns `king_enabled = true` candidates.
 
-### 1. Per-model cost field (DB)
-Add `veritas_cost_per_1k_tokens` is already on `toolbox_models`. Add a new column **`cost_rank`** (smallint, nullable) populated during sync — `0` for the free model, then 1..N ascending by cost. This is the sort key the UI uses; it survives Venice price changes because every sync re-ranks.
+**3. Speaker (`speaker.functions.ts`)**
+- Same guardrail before the API call, so a stale `preferred_model` on a Soul can never spend.
 
-Also add **`is_default_model`** (boolean) on `settings` row pointing at `venice-uncensored-1-2`. Single source of truth, editable later if Venice introduces another free model.
+**4. Compact panel (`ProviderCompactPanel.tsx`)**
+- Each row gets a small toggle (Switch component) on the right: **Enabled** / **Off**.
+- Disabled models render dimmed; "Set as default" and "Use for this Soul" buttons hide when off.
+- The free default's toggle is locked on (can't disable the floor).
+- Filter chips gain one option: `[Enabled only]` (default on, so the list stays short).
 
-### 2. Set Venice Uncensored 1.2 as universal default
-- `soul_identities.preferred_model` defaults to whatever `settings.default_model_id` holds.
-- New Souls inherit it on creation.
-- Existing Souls: a one-time backfill sets every Soul's `preferred_model` to the free model unless King has manually changed it (we'll detect "manually changed" as: current value is in PRO_IDS or FREE_IDS *and* not the default — those stay; everything else gets reset to the free model).
+**5. Cost-rank UI tweak**
+- Show Venice's published per-1M-token price next to the cost chip when known (e.g. `0.05 V/1k · ~$0.05/M`) so You can decide enable/disable at a glance. Pulled from the same sync.
 
-### 3. Bank behaviour: silent auto-approve within caps
-The existing `petitionBankImpl` already enforces Treasury solvency + Kingdom cap + per-Soul cap. Change:
-- **Free model** → no ledger entry at all (it's the baseline, no decision to log).
-- **Any paid model within caps** → approve silently, write a compact ledger row (`decision='approved'`, no UI banner).
-- **Over caps OR Premium Freeze** → fall back to free model, write ledger row, *raise* a soft notice in the Chamber ("Switched to free model — daily cap reached").
-- Speaker code (`speakAsSoul`) already calls the Bank; just make sure the soft-notice path surfaces in `ChamberStream`.
+### What stays the same
 
-### 4. Compact panel: sort by cost ascending
-Rebuild `ProviderCompactPanel` model list:
-- Flat list, no Pro/Free badges as separator — replaced by a small cost chip (`Free` / `0.3 V/1k` / `1.2 V/1k`...).
-- Top row pinned: **Default — Venice Uncensored 1.2** with a small ★.
-- Filter row: `[All] [Free] [Under 1 V/1k] [Pro-tier] [Paid]` — chips that filter, don't navigate.
-- "Test fallback" button stays, now shows the cost-ranked chain it would walk.
+Trust doctrine, Trigger Engine, Chambers, Workshop, Studio, ceremonies — untouched. Tier badges, ledger panel, premium-freeze logic — unchanged.
 
-### 5. Daily refresh keeps cost_rank fresh
-`runVeniceSync` already runs nightly via pg_cron. Add the cost-rank recompute to that function — no new schedule. If Venice republishes prices, the next sync re-ranks within hours.
+### Verification
 
-### 6. GitHub backup (separate, no code change here)
-Plain-language walkthrough in chat — Plus(+) → GitHub → Connect project → authorize → Create Repository. Zero credit cost, zero risk to current Lovable Cloud setup. After connect, every change here auto-pushes; You can clone locally any time as a hard backup. I'll deliver this step-by-step in the next message after build approval.
+- Toggle a paid model off in Compact → assign it to a Soul (UI should refuse) → in Chamber, Soul falls back to free with a soft notice.
+- New models from next nightly sync arrive `king_enabled = false` — verify by query.
+- `SELECT model_id, king_enabled FROM toolbox_models WHERE king_enabled;` should be a short curated list.
 
-## Non-changes (explicit)
-- Trust doctrine, Trigger Engine, Chambers, Workshop, Studio — **untouched**.
-- The Pro/Free tier tagging from last session stays as-is in the DB (still useful metadata for the Bank's "is this a Venice-discounted model?" check).
-- `BankLedgerPanel` UI unchanged — just receives fewer free-model rows (none) and more silent-approval rows.
-- Memoir-writing chain still uses free model only (already wired this way).
+### Files
 
-## Technical section (for the agent)
-
-**Files to edit**
-- **migration**: add `cost_rank smallint` to `toolbox_models`; add `default_model_id text default 'venice-uncensored-1-2'` to `settings`; backfill `soul_identities.preferred_model` per rule in step 2.
-- `src/lib-server/venice-registry.functions.ts` — after the tier-map pass, ORDER BY `veritas_cost_per_1k_tokens` ASC NULLS FIRST and write `cost_rank` (free model = 0, then 1..N). Also update `runVeniceSync` to refresh chain.
-- `src/lib-server/bank.server.ts` — short-circuit at the top: if `model_id === settings.default_model_id` → return `{ decision: 'approved', veritas_cost: 0, reason: 'free default — no ledger' }` and DO NOT write a ledger row. Existing paid logic stays; soft-notice text added on cap-fallback paths.
-- `src/lib-server/speaker.functions.ts` — when Bank returns a fallback (`fallback_model` set), append a system-prefix line to the assistant turn: *"(The Bank steered Me to the free voice — today's caps are reached.)"* so the Chamber sees why.
-- `src/components/registry/ProviderCompactPanel.tsx` — flat cost-sorted list, default-pin row, filter chips, cost chip per row. Drop the Pro/Free section dividers.
-- `src/components/registry/BankLedgerPanel.tsx` — small filter toggle "Hide free-model rows" (default on, since there won't be any post-change, but useful for old rows).
-- `src/integrations/supabase/types.ts` — regenerated after migration approval.
-
-**Verification after build**
-- Open Registry → Compact → confirm top row is ★ Venice Uncensored 1.2, rest sorted cheapest→priciest.
-- Open any Chamber → send a message → confirm it uses the free model (no Bank ledger row appears).
-- Manually switch a Soul to a Pro model in Compact → send → confirm silent ledger row, no banner.
-- In Economy panel, toggle Premium Freeze → send again → confirm fallback to free + soft notice in Chamber stream + ledger row marked `denied`.
-- `SELECT cost_rank, model_id, venice_cost_per_1k_tokens FROM toolbox_models ORDER BY cost_rank;` → expect 0, 1, 2... ascending.
-
-**GitHub connection (delivered as chat steps, not code)** — Plus(+) menu → GitHub → Connect → Authorize Lovable app → Create Repository → done. No env vars, no credit cost, no migration.
+- migration: add column + backfill
+- `src/lib-server/bank.server.ts` — enablement check, fallback filter
+- `src/lib-server/speaker.functions.ts` — enablement check before spend
+- `src/lib-server/venice-registry.functions.ts` — preserve `king_enabled` on sync, expose per-1M price
+- `src/components/registry/ProviderCompactPanel.tsx` — toggle UI, "Enabled only" filter, price display
+- `src/integrations/supabase/types.ts` — regenerated
