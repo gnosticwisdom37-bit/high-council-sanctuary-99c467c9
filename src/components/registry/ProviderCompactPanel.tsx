@@ -591,16 +591,20 @@ function AllModelsByCost({
   costFilter,
   setCostFilter,
   onSetDefault,
+  onToggleEnabled,
 }: {
   models: ToolboxRow[];
   defaultModelId: string;
   costFilter: CostFilter;
   setCostFilter: (f: CostFilter) => void;
   onSetDefault: (modelId: string) => void;
+  onToggleEnabled: (modelId: string, next: boolean) => void | Promise<void>;
 }) {
   const filtered = models.filter((m) => {
     if (m.venice_tier === "image") return false;
     switch (costFilter) {
+      case "enabled":
+        return m.king_enabled || m.model_id === defaultModelId;
       case "free":
         return m.model_id === defaultModelId || m.veritas_cost_per_1k_tokens === 0;
       case "under1":
@@ -625,12 +629,15 @@ function AllModelsByCost({
   });
 
   const FILTERS: Array<{ id: CostFilter; label: string }> = [
+    { id: "enabled", label: "Enabled" },
     { id: "all", label: "All" },
     { id: "free", label: "Free" },
     { id: "under1", label: "Under 1 V/1k" },
     { id: "pro", label: "Pro-tier" },
     { id: "paid", label: "Paid" },
   ];
+
+  const enabledCount = models.filter((m) => m.king_enabled && m.venice_tier !== "image").length;
 
   return (
     <section>
@@ -639,7 +646,7 @@ function AllModelsByCost({
           All models · sorted by cost
         </p>
         <p className="text-[11px] italic opacity-60">
-          ★ marks the free default every Soul uses unless overridden.
+          ★ free default · {enabledCount} model{enabledCount === 1 ? "" : "s"} enabled by the King.
         </p>
       </div>
 
@@ -672,6 +679,8 @@ function AllModelsByCost({
             : chip.tone === "low" ? "color-mix(in oklab, var(--dawn-mid) 18%, transparent)"
             : chip.tone === "mid" ? "color-mix(in oklab, var(--dawn-ember) 22%, transparent)"
             : "color-mix(in oklab, var(--dawn-ember) 40%, transparent)";
+          const enabled = m.king_enabled || isDefault;
+          const lockedOn = isDefault; // default cannot be disabled
           return (
             <li
               key={m.model_id}
@@ -681,6 +690,7 @@ function AllModelsByCost({
                   ? "color-mix(in oklab, var(--dawn-gold) 18%, transparent)"
                   : "color-mix(in oklab, var(--dawn-parchment) 92%, transparent)",
                 border: `1px solid color-mix(in oklab, var(--dawn-gold) ${isDefault ? 65 : 30}%, transparent)`,
+                opacity: enabled ? 1 : 0.55,
               }}
             >
               <div className="min-w-0">
@@ -699,7 +709,7 @@ function AllModelsByCost({
                 >
                   {chip.text}
                 </span>
-                {!isDefault && m.veritas_cost_per_1k_tokens === 0 && (
+                {!isDefault && m.veritas_cost_per_1k_tokens === 0 && enabled && (
                   <button
                     onClick={() => onSetDefault(m.model_id)}
                     className="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.2em]"
@@ -713,6 +723,21 @@ function AllModelsByCost({
                     Set default
                   </button>
                 )}
+                <button
+                  onClick={() => !lockedOn && onToggleEnabled(m.model_id, !enabled)}
+                  disabled={lockedOn}
+                  title={lockedOn ? "The free default is always enabled." : enabled ? "Set aside (Souls can't use this)" : "Enable for the Souls"}
+                  className="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] disabled:cursor-not-allowed"
+                  style={{
+                    background: enabled
+                      ? "color-mix(in oklab, var(--dawn-gold) 28%, transparent)"
+                      : "color-mix(in oklab, var(--dawn-ink) 8%, transparent)",
+                    border: `1px solid color-mix(in oklab, var(--dawn-gold) ${enabled ? 55 : 30}%, transparent)`,
+                    color: "var(--dawn-ink)",
+                  }}
+                >
+                  {enabled ? "● On" : "○ Off"}
+                </button>
               </div>
             </li>
           );
@@ -724,4 +749,5 @@ function AllModelsByCost({
     </section>
   );
 }
+
 
