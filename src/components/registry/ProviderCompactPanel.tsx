@@ -254,7 +254,23 @@ export function ProviderCompactPanel() {
         costFilter={costFilter}
         setCostFilter={setCostFilter}
         onSetDefault={(id) => setSettings({ ...settings, default_model_id: id })}
+        onToggleEnabled={async (id, next) => {
+          // Optimistic local update
+          setModels((prev) => prev.map((m) => (m.model_id === id ? { ...m, king_enabled: next } : m)));
+          const { error: tErr } = await supabase
+            .from("toolbox_models")
+            .update({ king_enabled: next })
+            .eq("model_id", id);
+          if (tErr) {
+            setError(tErr.message);
+            // Revert
+            setModels((prev) => prev.map((m) => (m.model_id === id ? { ...m, king_enabled: !next } : m)));
+          } else {
+            setStatus(next ? "Model enabled." : "Model set aside.");
+          }
+        }}
       />
+
 
 
 
