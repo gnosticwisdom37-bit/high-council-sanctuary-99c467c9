@@ -66,7 +66,7 @@ export function ProviderCompactPanel() {
   const [error, setError] = useState<string | null>(null);
   const [failedIdx, setFailedIdx] = useState<number>(-1); // -1 = none failed; simulates first N unavailable
   const [rebuilding, setRebuilding] = useState(false);
-  const [costFilter, setCostFilter] = useState<CostFilter>("all");
+  const [costFilter, setCostFilter] = useState<CostFilter>("enabled");
   const rebuild = useServerFn(rebuildFallbackChain);
 
 
