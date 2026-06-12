@@ -108,6 +108,7 @@ export function ProviderCompactPanel() {
         .order("cost_rank", { ascending: true, nullsFirst: false })
         .order("veritas_cost_per_1k_tokens", { ascending: true }),
     ]);
+
     if (settingsRes.error) {
       setError(settingsRes.error.message);
       return;
