@@ -1298,6 +1298,7 @@ export type Database = {
           display_name: string
           fallback_rank: number | null
           id: string
+          king_enabled: boolean
           last_seen_at: string
           model_id: string
           notes: string | null
@@ -1316,6 +1317,7 @@ export type Database = {
           display_name: string
           fallback_rank?: number | null
           id?: string
+          king_enabled?: boolean
           last_seen_at?: string
           model_id: string
           notes?: string | null
@@ -1334,6 +1336,7 @@ export type Database = {
           display_name?: string
           fallback_rank?: number | null
           id?: string
+          king_enabled?: boolean
           last_seen_at?: string
           model_id?: string
           notes?: string | null
