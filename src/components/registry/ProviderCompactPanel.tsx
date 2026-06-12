@@ -27,6 +27,7 @@ type ToolboxRow = {
   best_for: string[];
   veritas_cost_per_1k_tokens: number;
   active: boolean;
+  king_enabled: boolean;
 };
 
 type SettingsRow = {
@@ -37,7 +38,8 @@ type SettingsRow = {
   default_model_id: string;
 };
 
-type CostFilter = "all" | "free" | "under1" | "pro" | "paid";
+type CostFilter = "all" | "enabled" | "free" | "under1" | "pro" | "paid";
+
 
 function membershipLabel(model?: ToolboxRow | null): string {
   if (!model) return "unknown";
