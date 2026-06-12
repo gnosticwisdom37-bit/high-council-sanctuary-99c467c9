@@ -38,7 +38,7 @@ export async function petitionBankImpl(data: {
 
   const { data: model, error: modelErr } = await supabaseAdmin
     .from("toolbox_models")
-    .select("tier, venice_tier, auto_fallback_enabled, active, veritas_cost_per_1k_tokens, model_id")
+    .select("tier, venice_tier, auto_fallback_enabled, active, king_enabled, veritas_cost_per_1k_tokens, model_id")
     .eq("model_id", model_id)
     .maybeSingle();
 
@@ -48,6 +48,15 @@ export async function petitionBankImpl(data: {
     await writeLedger({ soul_id, model_id, veritas_cost: 0, decision: "denied", reason, task_summary, fallback_used: null });
     return { decision: "denied", reason, veritas_cost: 0, fallback_model: await firstFreeFallback() };
   }
+
+  // King's curation gate — if the King has not enabled this model, refuse.
+  if (!model.king_enabled) {
+    const reason = `Model ${model_id} is not enabled by the King.`;
+    const fallback = await firstFreeFallback();
+    await writeLedger({ soul_id, model_id, veritas_cost: 0, decision: "denied", reason, task_summary, fallback_used: fallback });
+    return { decision: "denied", reason, veritas_cost: 0, fallback_model: fallback };
+  }
+
 
   if (!model.active || !model.auto_fallback_enabled || !["pro", "free"].includes(model.venice_tier ?? "paid")) {
     const reason = `Model ${model_id} is not approved for automatic fallback.`;
