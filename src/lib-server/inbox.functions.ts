@@ -1059,7 +1059,7 @@ export const draftLetter = createServerFn({ method: "POST" })
         subject: z.string().min(1).max(300),
         curator_soul_id: z.string().min(1).max(64).nullable(),
         editor_soul_id: z.string().min(1).max(64),
-        intent: z.string().max(2000).optional(),
+        intent: z.string().max(20000).optional(),
       })
       .parse(input),
   )
