@@ -130,6 +130,22 @@ export function VeniceRegistryPanel() {
     }
   }
 
+  async function toggleEnabled(modelId: string, next: boolean) {
+    setRows((prev) => prev.map((r) => (r.model_id === modelId ? { ...r, king_enabled: next } : r)));
+    const { error } = await supabase
+      .from("toolbox_models")
+      .update({ king_enabled: next })
+      .eq("model_id", modelId);
+    if (error) {
+      setRows((prev) => prev.map((r) => (r.model_id === modelId ? { ...r, king_enabled: !next } : r)));
+      setStatus(`Toggle failed: ${error.message}`);
+    } else {
+      setStatus(next ? "Model enabled — the Bank will allow it." : "Model set aside — the Bank will refuse it.");
+    }
+  }
+
+  const enabledCount = rows.filter((r) => r.king_enabled || r.model_id === defaultModelId).length;
+
   const byTier = (t: VeniceTier) => rows.filter((r) => (r.venice_tier ?? (r.tier === "image" ? "image" : "paid")) === t);
 
   return (
