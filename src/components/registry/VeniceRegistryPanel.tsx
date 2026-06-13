@@ -19,6 +19,7 @@ type Row = {
   best_for: string[];
   veritas_cost_per_1k_tokens: number;
   notes: string | null;
+  king_enabled?: boolean;
 };
 
 type VeniceTier = "pro" | "free" | "paid" | "image";
