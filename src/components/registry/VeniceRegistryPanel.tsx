@@ -175,6 +175,7 @@ export function VeniceRegistryPanel() {
             style={{ color: "color-mix(in oklab, var(--dawn-ink) 60%, transparent)" }}
           >
             Live catalogue from Venice · auto-synced daily{lastSyncedAt ? ` · last ${formatAgo(lastSyncedAt)}` : ""}
+            {rows.length > 0 ? ` · ${enabledCount} enabled by the King` : ""}
           </p>
         </div>
         <button
