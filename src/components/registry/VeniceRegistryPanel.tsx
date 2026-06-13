@@ -276,13 +276,16 @@ export function VeniceRegistryPanel() {
                             : usdIn != null
                               ? `≈ $${usdIn}/M in · paid/blocked`
                               : "paid/blocked";
+                      const isDefault = r.model_id === defaultModelId;
+                      const enabled = r.king_enabled || isDefault;
                       return (
                         <li
                           key={r.id}
                           className="flex flex-col gap-1 px-3 py-2 text-[12px] sm:flex-row sm:items-center sm:justify-between"
-                          style={{ color: "var(--dawn-ink)" }}
+                          style={{ color: "var(--dawn-ink)", opacity: enabled ? 1 : 0.55 }}
                         >
                           <div className="min-w-0 flex-1">
+                            {isDefault && <span className="mr-1">★</span>}
                             <code className="font-mono text-[12px] opacity-90">{r.model_id}</code>
                             <span className="ml-2 opacity-55">· {owner}</span>
                             {r.best_for.length > 0 && (
@@ -291,7 +294,25 @@ export function VeniceRegistryPanel() {
                               </span>
                             )}
                           </div>
-                          <span className="shrink-0 opacity-70">{costLabel}</span>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <span className="opacity-70">{costLabel}</span>
+                            <button
+                              type="button"
+                              onClick={() => !isDefault && void toggleEnabled(r.model_id, !enabled)}
+                              disabled={isDefault}
+                              title={isDefault ? "The free default is always enabled." : enabled ? "Set aside — the Bank will refuse it" : "Enable — the Bank will allow it"}
+                              className="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] disabled:cursor-not-allowed"
+                              style={{
+                                background: enabled
+                                  ? "color-mix(in oklab, var(--dawn-gold) 28%, transparent)"
+                                  : "color-mix(in oklab, var(--dawn-ink) 8%, transparent)",
+                                border: `1px solid color-mix(in oklab, var(--dawn-gold) ${enabled ? 55 : 30}%, transparent)`,
+                                color: "var(--dawn-ink)",
+                              }}
+                            >
+                              {enabled ? "● On" : "○ Off"}
+                            </button>
+                          </div>
                         </li>
                       );
                     })}
