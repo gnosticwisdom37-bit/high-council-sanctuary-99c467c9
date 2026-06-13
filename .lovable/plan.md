@@ -1,47 +1,25 @@
-## Per-Model On/Off Toggle
+## Where the toggles actually are (and why You can't see them)
 
-### The shift
+I added `● On / ○ Off` chips inside the **Provider Compact panel** (the "All models · sorted by cost" subsection nested inside the Ceremony Scroll). The list You're looking at — the big grouped catalogue with "Venice Pro · Included in membership" / "Venice Free · Fallback after Pro" headers and a `↻ Sync from Venice` button — is a **different** component (`VeniceRegistryPanel`, rendered inside the Constitution panel). It was built earlier as a read-only catalogue and never got the toggle treatment.
 
-Right now `toolbox_models.active` exists but is set true on every synced model — it's a sync flag, not a curation flag. We split that: keep `active` as "Venice published it," add **`king_enabled`** as "I allow this model to be selectable + appear in fallback chains." Default new models to `king_enabled = false` so future Venice additions don't silently become spendable.
+Two reasonable fixes, You pick:
 
-### What changes
+### Option A — add toggles to the catalogue (recommended)
 
-**1. DB (migration)**
-- Add `king_enabled boolean default false` to `toolbox_models`.
-- Backfill: set `king_enabled = true` for `venice-uncensored-1-2` (the free default) and for any model currently in active use by a Soul (`preferred_model` lookup). Everything else starts off.
-- `runVeniceSync` keeps `king_enabled` untouched on existing rows; new models always insert as `false`.
+Put the same `● On / ○ Off` chip on every row of the `VeniceRegistryPanel` tier accordions, where Your eyes already are. Wire it to the same `king_enabled` column the Bank already enforces — so toggling here has the exact same effect as toggling in the Compact. Default model stays locked on. Dim Off rows. Add a tiny `N enabled` counter in the header.
 
-**2. Bank guardrail (`bank.server.ts`)**
-- Anywhere a model is requested or used as fallback: if `king_enabled = false`, refuse and fall back to the free default. Ledger row marked `denied` with reason "Model not enabled by King."
-- `firstFreeFallback` only returns `king_enabled = true` candidates.
+This is the smallest, clearest fix. One file touched: `src/components/registry/VeniceRegistryPanel.tsx`.
 
-**3. Speaker (`speaker.functions.ts`)**
-- Same guardrail before the API call, so a stale `preferred_model` on a Soul can never spend.
+### Option B — direct You to the Compact
 
-**4. Compact panel (`ProviderCompactPanel.tsx`)**
-- Each row gets a small toggle (Switch component) on the right: **Enabled** / **Off**.
-- Disabled models render dimmed; "Set as default" and "Use for this Soul" buttons hide when off.
-- The free default's toggle is locked on (can't disable the floor).
-- Filter chips gain one option: `[Enabled only]` (default on, so the list stays short).
+Leave the catalogue read-only and add a small breadcrumb at the top of `VeniceRegistryPanel` saying *"Toggle models in the Provider Compact below ↓"*. Cheaper but means You have to scroll past this list every time to actually flip a switch — which is the exact friction You just hit.
 
-**5. Cost-rank UI tweak**
-- Show Venice's published per-1M-token price next to the cost chip when known (e.g. `0.05 V/1k · ~$0.05/M`) so You can decide enable/disable at a glance. Pulled from the same sync.
+### My recommendation
 
-### What stays the same
+**Option A.** The catalogue is where the eye lands; that's where the control belongs. The Compact's toggle list stays as a secondary "by cost" view for when You want to sort by spend.
 
-Trust doctrine, Trigger Engine, Chambers, Workshop, Studio, ceremonies — untouched. Tier badges, ledger panel, premium-freeze logic — unchanged.
-
-### Verification
-
-- Toggle a paid model off in Compact → assign it to a Soul (UI should refuse) → in Chamber, Soul falls back to free with a soft notice.
-- New models from next nightly sync arrive `king_enabled = false` — verify by query.
-- `SELECT model_id, king_enabled FROM toolbox_models WHERE king_enabled;` should be a short curated list.
+No database changes, no Bank changes — `king_enabled`, the denial logic, the fallback chain, the ledger entries are all already wired. This is purely surfacing the control in the second place You're already looking.
 
 ### Files
 
-- migration: add column + backfill
-- `src/lib-server/bank.server.ts` — enablement check, fallback filter
-- `src/lib-server/speaker.functions.ts` — enablement check before spend
-- `src/lib-server/venice-registry.functions.ts` — preserve `king_enabled` on sync, expose per-1M price
-- `src/components/registry/ProviderCompactPanel.tsx` — toggle UI, "Enabled only" filter, price display
-- `src/integrations/supabase/types.ts` — regenerated
+- `src/components/registry/VeniceRegistryPanel.tsx` — add `king_enabled` to the row type + select, render the toggle chip per row, wire the same Supabase update + optimistic state pattern, dim Off rows, header counter.

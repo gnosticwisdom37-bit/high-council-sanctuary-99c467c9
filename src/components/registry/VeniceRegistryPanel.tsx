@@ -19,6 +19,7 @@ type Row = {
   best_for: string[];
   veritas_cost_per_1k_tokens: number;
   notes: string | null;
+  king_enabled?: boolean;
 };
 
 type VeniceTier = "pro" | "free" | "paid" | "image";
@@ -68,16 +69,25 @@ export function VeniceRegistryPanel() {
     pro_missing: [],
     free_missing: [],
   });
+  const [defaultModelId, setDefaultModelId] = useState<string>("venice-uncensored-1-2");
 
   async function load() {
     const { data, error } = await supabase
       .from("toolbox_models")
-        .select("id, model_id, display_name, tier, venice_tier, auto_fallback_enabled, fallback_rank, best_for, veritas_cost_per_1k_tokens, notes")
+        .select("id, model_id, display_name, tier, venice_tier, auto_fallback_enabled, fallback_rank, best_for, veritas_cost_per_1k_tokens, notes, king_enabled")
       .eq("provider", "venice")
       .eq("active", true)
       .order("tier")
       .order("model_id");
     if (!error && data) setRows(data as Row[]);
+    try {
+      const { data: s2 } = await supabase
+        .from("settings")
+        .select("default_model_id")
+        .eq("id", true)
+        .single();
+      if (s2?.default_model_id) setDefaultModelId(s2.default_model_id as string);
+    } catch { /* ignore */ }
     try {
       const r = await lastSync();
       setLastSyncedAt(r.last_seen_at);
@@ -120,6 +130,22 @@ export function VeniceRegistryPanel() {
     }
   }
 
+  async function toggleEnabled(modelId: string, next: boolean) {
+    setRows((prev) => prev.map((r) => (r.model_id === modelId ? { ...r, king_enabled: next } : r)));
+    const { error } = await supabase
+      .from("toolbox_models")
+      .update({ king_enabled: next })
+      .eq("model_id", modelId);
+    if (error) {
+      setRows((prev) => prev.map((r) => (r.model_id === modelId ? { ...r, king_enabled: !next } : r)));
+      setStatus(`Toggle failed: ${error.message}`);
+    } else {
+      setStatus(next ? "Model enabled — the Bank will allow it." : "Model set aside — the Bank will refuse it.");
+    }
+  }
+
+  const enabledCount = rows.filter((r) => r.king_enabled || r.model_id === defaultModelId).length;
+
   const byTier = (t: VeniceTier) => rows.filter((r) => (r.venice_tier ?? (r.tier === "image" ? "image" : "paid")) === t);
 
   return (
@@ -149,6 +175,7 @@ export function VeniceRegistryPanel() {
             style={{ color: "color-mix(in oklab, var(--dawn-ink) 60%, transparent)" }}
           >
             Live catalogue from Venice · auto-synced daily{lastSyncedAt ? ` · last ${formatAgo(lastSyncedAt)}` : ""}
+            {rows.length > 0 ? ` · ${enabledCount} enabled by the King` : ""}
           </p>
         </div>
         <button
@@ -249,13 +276,16 @@ export function VeniceRegistryPanel() {
                             : usdIn != null
                               ? `≈ $${usdIn}/M in · paid/blocked`
                               : "paid/blocked";
+                      const isDefault = r.model_id === defaultModelId;
+                      const enabled = r.king_enabled || isDefault;
                       return (
                         <li
                           key={r.id}
                           className="flex flex-col gap-1 px-3 py-2 text-[12px] sm:flex-row sm:items-center sm:justify-between"
-                          style={{ color: "var(--dawn-ink)" }}
+                          style={{ color: "var(--dawn-ink)", opacity: enabled ? 1 : 0.55 }}
                         >
                           <div className="min-w-0 flex-1">
+                            {isDefault && <span className="mr-1">★</span>}
                             <code className="font-mono text-[12px] opacity-90">{r.model_id}</code>
                             <span className="ml-2 opacity-55">· {owner}</span>
                             {r.best_for.length > 0 && (
@@ -264,7 +294,25 @@ export function VeniceRegistryPanel() {
                               </span>
                             )}
                           </div>
-                          <span className="shrink-0 opacity-70">{costLabel}</span>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <span className="opacity-70">{costLabel}</span>
+                            <button
+                              type="button"
+                              onClick={() => !isDefault && void toggleEnabled(r.model_id, !enabled)}
+                              disabled={isDefault}
+                              title={isDefault ? "The free default is always enabled." : enabled ? "Set aside — the Bank will refuse it" : "Enable — the Bank will allow it"}
+                              className="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] disabled:cursor-not-allowed"
+                              style={{
+                                background: enabled
+                                  ? "color-mix(in oklab, var(--dawn-gold) 28%, transparent)"
+                                  : "color-mix(in oklab, var(--dawn-ink) 8%, transparent)",
+                                border: `1px solid color-mix(in oklab, var(--dawn-gold) ${enabled ? 55 : 30}%, transparent)`,
+                                color: "var(--dawn-ink)",
+                              }}
+                            >
+                              {enabled ? "● On" : "○ Off"}
+                            </button>
+                          </div>
                         </li>
                       );
                     })}
