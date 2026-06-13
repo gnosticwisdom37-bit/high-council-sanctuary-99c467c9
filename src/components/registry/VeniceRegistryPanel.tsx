@@ -74,12 +74,20 @@ export function VeniceRegistryPanel() {
   async function load() {
     const { data, error } = await supabase
       .from("toolbox_models")
-        .select("id, model_id, display_name, tier, venice_tier, auto_fallback_enabled, fallback_rank, best_for, veritas_cost_per_1k_tokens, notes")
+        .select("id, model_id, display_name, tier, venice_tier, auto_fallback_enabled, fallback_rank, best_for, veritas_cost_per_1k_tokens, notes, king_enabled")
       .eq("provider", "venice")
       .eq("active", true)
       .order("tier")
       .order("model_id");
     if (!error && data) setRows(data as Row[]);
+    try {
+      const { data: s2 } = await supabase
+        .from("settings")
+        .select("default_model_id")
+        .eq("id", true)
+        .single();
+      if (s2?.default_model_id) setDefaultModelId(s2.default_model_id as string);
+    } catch { /* ignore */ }
     try {
       const r = await lastSync();
       setLastSyncedAt(r.last_seen_at);
