@@ -69,6 +69,7 @@ export function VeniceRegistryPanel() {
     pro_missing: [],
     free_missing: [],
   });
+  const [defaultModelId, setDefaultModelId] = useState<string>("venice-uncensored-1-2");
 
   async function load() {
     const { data, error } = await supabase
