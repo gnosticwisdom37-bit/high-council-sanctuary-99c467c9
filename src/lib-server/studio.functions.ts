@@ -406,6 +406,7 @@ export const curateBlogSources = createServerFn({ method: "POST" })
     const systemBase = buildSystemPrompt({
       constitution: settings.system_constitution as string,
       soul: curator,
+      memoirs: await loadSoulMemoirsForPrompt(supabaseAdmin, curator.soul_id),
     });
     const systemPrompt =
       systemBase +
