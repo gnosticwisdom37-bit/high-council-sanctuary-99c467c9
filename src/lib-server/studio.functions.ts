@@ -245,6 +245,7 @@ export const draftNewPost = createServerFn({ method: "POST" })
     const systemBase = buildSystemPrompt({
       constitution: common.settings.system_constitution as string,
       soul: common.soul,
+      memoirs: await loadSoulMemoirsForPrompt(supabaseAdmin, common.soul.soul_id),
     });
 
     const mode = sourcePost ? "REPURPOSE an existing post for a fresh audience" : "WRITE a new original blog post";
