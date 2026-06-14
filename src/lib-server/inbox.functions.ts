@@ -1095,10 +1095,16 @@ export const draftLetter = createServerFn({ method: "POST" })
       : ["google/gemini-2.5-flash", "google/gemini-2.5-flash-lite"];
 
     const lexicon = await loadKingsLexicon(supabaseAdmin);
+    const [editorMemoirs, curatorMemoirs] = await Promise.all([
+      loadSoulMemoirsForPrompt(supabaseAdmin, editor.soul_id),
+      curator && curator.soul_id !== editor.soul_id
+        ? loadSoulMemoirsForPrompt(supabaseAdmin, curator.soul_id)
+        : Promise.resolve(null),
+    ]);
 
     // Curator: distill King's intent into a brief
     const curatorSystem =
-      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: curator!, lexicon }) +
+      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: curator!, memoirs: curatorMemoirs ?? editorMemoirs, lexicon }) +
       "\n\nYou are the CURATOR. The King is composing a NEW letter. Read His intent and write a 1–2 sentence brief for the Editor Soul: who it is to, what the King wants conveyed, the tone, anything to emphasise or omit. STRICT JSON only:\n" +
       `{ "brief": string (≤400 chars) }`;
     const curatorUser = `Recipient: ${data.to_addr}\nSubject: ${data.subject}\n\nKing's intent: ${data.intent ?? "(none provided — infer warm, sovereign greeting)"}`;
