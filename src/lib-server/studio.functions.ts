@@ -15,6 +15,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   LOVABLE_AI_GATEWAY_URL,
   buildSystemPrompt,
+  loadSoulMemoirsForPrompt,
   type ProviderCompact,
   type SoulIdentity,
 } from "./ai-shared.server";
