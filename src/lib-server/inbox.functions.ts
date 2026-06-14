@@ -17,6 +17,7 @@ import {
   LOVABLE_AI_GATEWAY_URL,
   buildSystemPrompt,
   loadKingsLexicon,
+  loadSoulMemoirsForPrompt,
   type ProviderCompact,
   type SoulIdentity,
 } from "./ai-shared.server";
@@ -765,10 +766,16 @@ export const draftReply = createServerFn({ method: "POST" })
       .join("\n\n");
 
     const lexicon = await loadKingsLexicon(supabaseAdmin);
+    const [editorMemoirs, curatorMemoirs] = await Promise.all([
+      loadSoulMemoirsForPrompt(supabaseAdmin, editor.soul_id),
+      curator && curator.soul_id !== editor.soul_id
+        ? loadSoulMemoirsForPrompt(supabaseAdmin, curator.soul_id)
+        : Promise.resolve(null),
+    ]);
 
     // STEP 1 — Curator brief
     const curatorSystem =
-      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: curator!, lexicon }) +
+      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: curator!, memoirs: curatorMemoirs ?? editorMemoirs, lexicon }) +
       "\n\nYou are the CURATOR. Read the email thread and write a 1\u20132 sentence brief for the Editor Soul: what the sender wants, the tone called for, and what the King would have us emphasise or omit. STRICT JSON only:\n" +
       `{ "brief": string (\u2264400 chars) }`;
     const curatorUser = `Thread subject: ${threadRow.subject}\nFrom: ${threadRow.from_addr}\n\nTranscript:\n${transcript}\n\n${data.intent ? `King's intent: ${data.intent}` : ""}`;
@@ -797,7 +804,7 @@ export const draftReply = createServerFn({ method: "POST" })
 
     // STEP 2 — Editor draft (body HTML only; wrapper added after)
     const editorSystem =
-      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: editor, lexicon }) +
+      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: editor, memoirs: editorMemoirs, lexicon }) +
       "\n\nYou are the EDITOR. Draft King Sean's reply to this email IN YOUR OWN VOICE, on the King's behalf. " +
       "Output ONLY the body of the message as simple HTML (use <p> for paragraphs, <strong>, <em>, no <html>/<body>/<head>, no inline styles, no scripts). " +
       "Do NOT include any greeting like 'Dear ___' unless it fits naturally; do NOT include a signature line — the King's seal is appended automatically. " +
@@ -1088,10 +1095,16 @@ export const draftLetter = createServerFn({ method: "POST" })
       : ["google/gemini-2.5-flash", "google/gemini-2.5-flash-lite"];
 
     const lexicon = await loadKingsLexicon(supabaseAdmin);
+    const [editorMemoirs, curatorMemoirs] = await Promise.all([
+      loadSoulMemoirsForPrompt(supabaseAdmin, editor.soul_id),
+      curator && curator.soul_id !== editor.soul_id
+        ? loadSoulMemoirsForPrompt(supabaseAdmin, curator.soul_id)
+        : Promise.resolve(null),
+    ]);
 
     // Curator: distill King's intent into a brief
     const curatorSystem =
-      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: curator!, lexicon }) +
+      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: curator!, memoirs: curatorMemoirs ?? editorMemoirs, lexicon }) +
       "\n\nYou are the CURATOR. The King is composing a NEW letter. Read His intent and write a 1–2 sentence brief for the Editor Soul: who it is to, what the King wants conveyed, the tone, anything to emphasise or omit. STRICT JSON only:\n" +
       `{ "brief": string (≤400 chars) }`;
     const curatorUser = `Recipient: ${data.to_addr}\nSubject: ${data.subject}\n\nKing's intent: ${data.intent ?? "(none provided — infer warm, sovereign greeting)"}`;
@@ -1120,7 +1133,7 @@ export const draftLetter = createServerFn({ method: "POST" })
 
     // Editor: draft body
     const editorSystem =
-      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: editor, lexicon }) +
+      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: editor, memoirs: editorMemoirs, lexicon }) +
       "\n\nYou are the EDITOR. Draft King Sean's NEW letter IN YOUR OWN VOICE, on His behalf. " +
       "Output ONLY the body of the message as simple HTML (use <p> for paragraphs, <strong>, <em>, no <html>/<body>/<head>, no inline styles, no scripts). " +
       "Open with a fitting greeting; do NOT include a signature line — the King's seal is appended automatically. " +

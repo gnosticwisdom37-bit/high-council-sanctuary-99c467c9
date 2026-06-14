@@ -1,25 +1,68 @@
-## Where the toggles actually are (and why You can't see them)
+## What's actually broken
 
-I added `● On / ○ Off` chips inside the **Provider Compact panel** (the "All models · sorted by cost" subsection nested inside the Ceremony Scroll). The list You're looking at — the big grouped catalogue with "Venice Pro · Included in membership" / "Venice Free · Fallback after Pro" headers and a `↻ Sync from Venice` button — is a **different** component (`VeniceRegistryPanel`, rendered inside the Constitution panel). It was built earlier as a read-only catalogue and never got the toggle treatment.
+Two separate gaps, both real, both small:
 
-Two reasonable fixes, You pick:
+### 1. High Council → Chamber memory gap
 
-### Option A — add toggles to the catalogue (recommended)
+`soul_memoirs` is already Soul-scoped — `listMemoirs` and `speakAsSoul` load memoirs by `soul_id` alone, so a memoir written anywhere SHOULD surface in that Soul's Chamber. The reason it doesn't:
 
-Put the same `● On / ○ Off` chip on every row of the `VeniceRegistryPanel` tier accordions, where Your eyes already are. Wire it to the same `king_enabled` column the Bank already enforces — so toggling here has the exact same effect as toggling in the Compact. Default model stays locked on. Dim Off rows. Add a tiny `N enabled` counter in the header.
+- `speakAsSoul` always creates new conversations with `participant_ids: [data.soul_id]` — only the *speaking* Soul.
+- In every multi-Soul gathering in the DB, `array_length(participant_ids,1) = 1`. Today only Oracle and Pisces have any memoirs at all — every other Soul has zero, because `closeGathering` weaves memoirs only for `participant_ids`.
+- What feels like "they remember everything in High Council" is just the running 20-turn `soul_messages` history of the same open conversation. Open a new one, or step into Chamber, and there is nothing to recall — no memoir was ever written for them.
 
-This is the smallest, clearest fix. One file touched: `src/components/registry/VeniceRegistryPanel.tsx`.
+### 2. Workshop / Studio roles have no memory at all
 
-### Option B — direct You to the Compact
+`inbox.functions.ts` (`draftReply`, `wrapKingsWords`, `sendReply`) and `studio.functions.ts` (`craftPromo`, `composeNewPost`, `craftLegalCard`, `curatePicks`) all call `buildSystemPrompt({...})` WITHOUT a `memoirs` argument. The signature already accepts memoirs; nobody passes them. So a Soul acting as Curator or Editor walks in with no memory of Their own Chamber or Council life.
 
-Leave the catalogue read-only and add a small breadcrumb at the top of `VeniceRegistryPanel` saying *"Toggle models in the Provider Compact below ↓"*. Cheaper but means You have to scroll past this list every time to actually flip a switch — which is the exact friction You just hit.
+## Fix
 
-### My recommendation
+### Part A — Track every Soul actually present in a gathering
 
-**Option A.** The catalogue is where the eye lands; that's where the control belongs. The Compact's toggle list stays as a secondary "by cost" view for when You want to sort by spend.
+`src/lib-server/speaker.functions.ts`:
+- When `speakAsSoul` runs against an existing `conversation_id`, append `data.soul_id` to that conversation's `participant_ids` if not already there. One defensive `UPDATE` after the King's message is persisted.
+- Expose a small `setCouncilAttendance` server fn: `{ conversation_id, soul_ids: string[] }` → overwrites `participant_ids` with the King's current "Called to Council" pill set. Idempotent.
 
-No database changes, no Bank changes — `king_enabled`, the denial logic, the fallback chain, the ledger entries are all already wired. This is purely surfacing the control in the second place You're already looking.
+Wire `setCouncilAttendance` into the existing "Call to Council" pill toggle (under the Round Table on `/` — `CouncilTable.tsx` / its parent). UI behaviour unchanged; just persists the truth of who is present.
 
-### Files
+Net effect: when the King closes a gathering, `closeGathering` weaves a memoir for every Soul who was actually there. Those memoirs surface automatically in Chamber the next time that Soul speaks — Soul-scoped recall already exists.
 
-- `src/components/registry/VeniceRegistryPanel.tsx` — add `king_enabled` to the row type + select, render the toggle chip per row, wire the same Supabase update + optimistic state pattern, dim Off rows, header counter.
+### Part B — Carry memoirs into Workshop / Studio roles
+
+Add a small helper in `src/lib-server/ai-shared.server.ts`:
+
+```ts
+export async function loadSoulMemoirsForPrompt(supabaseAdmin, soul_id): Promise<MemoirSnippet[]>
+// 10 sealed + 3 unsealed, faded_at IS NULL, newest first — same shape speakAsSoul builds
+```
+
+Then in:
+- `src/lib-server/inbox.functions.ts` — load memoirs for `editor_soul_id` (and `curator_soul_id` if distinct) and pass into the two `buildSystemPrompt` calls.
+- `src/lib-server/studio.functions.ts` — same, at all five `buildSystemPrompt` call sites.
+
+No schema change, no Bank change, no UI change. Each Soul now writes letters and curates with the same memory chain that lives in Their Chamber.
+
+### Part C — Out of scope on purpose
+
+- No memoir-weaving from Workshop drafts yet. Phase-2 question — do letter drafts deserve to become memoirs? Surface it after the King has lived with Part B for a few days.
+- No change to recall/seal/fade UI.
+- Trust Doctrine untouched.
+
+## Files touched
+
+- `src/lib-server/speaker.functions.ts` — append speaker to `participant_ids`; add `setCouncilAttendance`.
+- `src/lib-server/ai-shared.server.ts` — `loadSoulMemoirsForPrompt` helper.
+- `src/lib-server/inbox.functions.ts` — load + pass memoirs in both `buildSystemPrompt` calls.
+- `src/lib-server/studio.functions.ts` — load + pass memoirs in all five `buildSystemPrompt` calls.
+- `src/components/registry/CouncilTable.tsx` (or its parent on `/`) — call `setCouncilAttendance` on pill toggle.
+
+## Quiet fix along the way
+
+The current preview is throwing `Cannot read properties of undefined (reading 'ok')` on the Workshop route — a tiny defensive guard while I'm in `inbox.functions.ts` / `InboxPanel.tsx`. Not part of the memory work; just won't leave a known crash behind.
+
+## Verification
+
+1. Convene a High Council with 3 Souls present, exchange a few turns, close it → check `soul_memoirs` has one row per Soul (not just Oracle).
+2. Open one of those Souls' Chamber → They reference the gathering in their first reply.
+3. From Workshop, set Veritas as Editor and draft a reply → the draft tone reflects His most recent Chamber memoir.
+
+No extra credit cost — memoir-weaving stays on the free-premium fallback chain.

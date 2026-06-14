@@ -15,6 +15,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   LOVABLE_AI_GATEWAY_URL,
   buildSystemPrompt,
+  loadSoulMemoirsForPrompt,
   type ProviderCompact,
   type SoulIdentity,
 } from "./ai-shared.server";
@@ -165,6 +166,7 @@ export const draftPromoFromBlog = createServerFn({ method: "POST" })
     const systemBase = buildSystemPrompt({
       constitution: common.settings.system_constitution as string,
       soul: common.soul,
+      memoirs: await loadSoulMemoirsForPrompt(supabaseAdmin, common.soul.soul_id),
     });
 
     const brief = (data.curator_brief ?? "").trim();
@@ -243,6 +245,7 @@ export const draftNewPost = createServerFn({ method: "POST" })
     const systemBase = buildSystemPrompt({
       constitution: common.settings.system_constitution as string,
       soul: common.soul,
+      memoirs: await loadSoulMemoirsForPrompt(supabaseAdmin, common.soul.soul_id),
     });
 
     const mode = sourcePost ? "REPURPOSE an existing post for a fresh audience" : "WRITE a new original blog post";
@@ -306,6 +309,7 @@ export const draftLegalCard = createServerFn({ method: "POST" })
     const systemBase = buildSystemPrompt({
       constitution: common.settings.system_constitution as string,
       soul: common.soul,
+      memoirs: await loadSoulMemoirsForPrompt(supabaseAdmin, common.soul.soul_id),
     });
 
     const systemPrompt =
@@ -402,6 +406,7 @@ export const curateBlogSources = createServerFn({ method: "POST" })
     const systemBase = buildSystemPrompt({
       constitution: settings.system_constitution as string,
       soul: curator,
+      memoirs: await loadSoulMemoirsForPrompt(supabaseAdmin, curator.soul_id),
     });
     const systemPrompt =
       systemBase +
