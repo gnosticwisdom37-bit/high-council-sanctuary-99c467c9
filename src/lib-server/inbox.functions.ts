@@ -17,6 +17,7 @@ import {
   LOVABLE_AI_GATEWAY_URL,
   buildSystemPrompt,
   loadKingsLexicon,
+  loadSoulMemoirsForPrompt,
   type ProviderCompact,
   type SoulIdentity,
 } from "./ai-shared.server";
