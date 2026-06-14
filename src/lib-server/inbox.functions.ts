@@ -765,10 +765,16 @@ export const draftReply = createServerFn({ method: "POST" })
       .join("\n\n");
 
     const lexicon = await loadKingsLexicon(supabaseAdmin);
+    const [editorMemoirs, curatorMemoirs] = await Promise.all([
+      loadSoulMemoirsForPrompt(supabaseAdmin, editor.soul_id),
+      curator && curator.soul_id !== editor.soul_id
+        ? loadSoulMemoirsForPrompt(supabaseAdmin, curator.soul_id)
+        : Promise.resolve(null),
+    ]);
 
     // STEP 1 — Curator brief
     const curatorSystem =
-      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: curator!, lexicon }) +
+      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: curator!, memoirs: curatorMemoirs ?? editorMemoirs, lexicon }) +
       "\n\nYou are the CURATOR. Read the email thread and write a 1\u20132 sentence brief for the Editor Soul: what the sender wants, the tone called for, and what the King would have us emphasise or omit. STRICT JSON only:\n" +
       `{ "brief": string (\u2264400 chars) }`;
     const curatorUser = `Thread subject: ${threadRow.subject}\nFrom: ${threadRow.from_addr}\n\nTranscript:\n${transcript}\n\n${data.intent ? `King's intent: ${data.intent}` : ""}`;
