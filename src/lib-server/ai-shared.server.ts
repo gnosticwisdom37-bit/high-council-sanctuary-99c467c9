@@ -139,3 +139,42 @@ export async function loadKingsLexicon(
     return [];
   }
 }
+
+/**
+ * Load a Soul's memoirs in the shape buildSystemPrompt expects:
+ * 10 most-recent sealed + 3 most-recent unsealed, faded entries excluded.
+ * Used by Workshop/Studio roles so a Soul acting as Editor or Curator
+ * walks in with the same memory chain that lives in Their Chamber.
+ */
+export async function loadSoulMemoirsForPrompt(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabaseAdmin: any,
+  soul_id: string,
+): Promise<MemoirSnippet[]> {
+  try {
+    const [{ data: sealed }, { data: unsealed }] = await Promise.all([
+      supabaseAdmin
+        .from("soul_memoirs")
+        .select("content, sealed, created_at")
+        .eq("soul_id", soul_id)
+        .eq("sealed", true)
+        .is("faded_at", null)
+        .order("created_at", { ascending: false })
+        .limit(10),
+      supabaseAdmin
+        .from("soul_memoirs")
+        .select("content, sealed, created_at")
+        .eq("soul_id", soul_id)
+        .eq("sealed", false)
+        .is("faded_at", null)
+        .order("created_at", { ascending: false })
+        .limit(3),
+    ]);
+    return [
+      ...((sealed ?? []) as MemoirSnippet[]),
+      ...((unsealed ?? []) as MemoirSnippet[]),
+    ];
+  } catch {
+    return [];
+  }
+}
