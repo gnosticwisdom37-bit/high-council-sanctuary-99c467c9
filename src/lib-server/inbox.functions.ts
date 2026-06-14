@@ -1133,7 +1133,7 @@ export const draftLetter = createServerFn({ method: "POST" })
 
     // Editor: draft body
     const editorSystem =
-      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: editor, lexicon }) +
+      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: editor, memoirs: editorMemoirs, lexicon }) +
       "\n\nYou are the EDITOR. Draft King Sean's NEW letter IN YOUR OWN VOICE, on His behalf. " +
       "Output ONLY the body of the message as simple HTML (use <p> for paragraphs, <strong>, <em>, no <html>/<body>/<head>, no inline styles, no scripts). " +
       "Open with a fitting greeting; do NOT include a signature line — the King's seal is appended automatically. " +
