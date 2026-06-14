@@ -166,6 +166,7 @@ export const draftPromoFromBlog = createServerFn({ method: "POST" })
     const systemBase = buildSystemPrompt({
       constitution: common.settings.system_constitution as string,
       soul: common.soul,
+      memoirs: await loadSoulMemoirsForPrompt(supabaseAdmin, common.soul.soul_id),
     });
 
     const brief = (data.curator_brief ?? "").trim();
