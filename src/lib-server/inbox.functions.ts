@@ -804,7 +804,7 @@ export const draftReply = createServerFn({ method: "POST" })
 
     // STEP 2 — Editor draft (body HTML only; wrapper added after)
     const editorSystem =
-      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: editor, lexicon }) +
+      buildSystemPrompt({ constitution: settings.system_constitution as string, soul: editor, memoirs: editorMemoirs, lexicon }) +
       "\n\nYou are the EDITOR. Draft King Sean's reply to this email IN YOUR OWN VOICE, on the King's behalf. " +
       "Output ONLY the body of the message as simple HTML (use <p> for paragraphs, <strong>, <em>, no <html>/<body>/<head>, no inline styles, no scripts). " +
       "Do NOT include any greeting like 'Dear ___' unless it fits naturally; do NOT include a signature line — the King's seal is appended automatically. " +
