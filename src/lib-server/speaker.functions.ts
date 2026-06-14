@@ -116,6 +116,21 @@ export const speakAsSoul = createServerFn({ method: "POST" })
         return { ok: false as const, error: "The Chamber could not be opened." };
       }
       conversationId = created.id;
+    } else {
+      // Joining an existing gathering — ensure this Soul is recorded as
+      // truly Present, so closeGathering weaves a memoir for Them.
+      const { data: existingConvo } = await supabaseAdmin
+        .from("soul_conversations")
+        .select("participant_ids")
+        .eq("id", conversationId)
+        .single();
+      const current = (existingConvo?.participant_ids as string[] | null) ?? [];
+      if (!current.includes(data.soul_id)) {
+        await supabaseAdmin
+          .from("soul_conversations")
+          .update({ participant_ids: [...current, data.soul_id] })
+          .eq("id", conversationId);
+      }
     }
 
     // 4. Persist the King's message
