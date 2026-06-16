@@ -985,7 +985,6 @@ export const sendReply = createServerFn({ method: "POST" })
     }
 
 
-    const kingFrom = await getKingAddress(headers);
     const fromHeader = kingFrom
       ? `${encodeHeader(stationery.sign_off_name as string)} <${kingFrom}>`
       : null;
