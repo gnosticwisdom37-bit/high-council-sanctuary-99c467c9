@@ -51,6 +51,47 @@ async function getKingAddress(headers: Record<string, string>): Promise<string |
   }
 }
 
+// Resolve the correct reply recipient for a local thread row, skipping
+// any message whose From is the King's own address (Sent-folder threads
+// store the King as From on the first message). Returns the most recent
+// counterparty address found in the thread.
+async function resolveReplyRecipient(
+  threadId: string,
+  kingFrom: string | null,
+  threadRowFromAddr: string | null,
+): Promise<{ to: string | null; lastMsgId: string | null }> {
+  const { data: rows } = await supabaseAdmin
+    .from("email_messages")
+    .select("gmail_message_id, from_addr, to_addr, sent_at")
+    .eq("thread_id", threadId)
+    .order("sent_at", { ascending: false })
+    .limit(50);
+
+  const kingNorm = (kingFrom ?? "").toLowerCase();
+  const isKing = (addr: string | null | undefined) =>
+    kingNorm.length > 0 && (addr ?? "").toLowerCase().includes(kingNorm);
+
+  // Most recent message whose From is NOT the King
+  for (const m of rows ?? []) {
+    const f = m.from_addr as string | null;
+    if (f && !isKing(f)) {
+      return { to: f, lastMsgId: (m.gmail_message_id as string) ?? null };
+    }
+  }
+  // Otherwise the most recent To we sent to (sent-only thread)
+  for (const m of rows ?? []) {
+    const t = m.to_addr as string | null;
+    if (t && !isKing(t)) {
+      return { to: t, lastMsgId: (m.gmail_message_id as string) ?? null };
+    }
+  }
+  // Fall back to the thread row, unless that too is the King
+  if (threadRowFromAddr && !isKing(threadRowFromAddr)) {
+    return { to: threadRowFromAddr, lastMsgId: null };
+  }
+  return { to: null, lastMsgId: null };
+}
+
 // Encode a UTF-8 string as wrapped base64 (76-char lines per RFC 2045)
 function base64BodyWrapped(body: string): string {
   const bytes = new TextEncoder().encode(body);
