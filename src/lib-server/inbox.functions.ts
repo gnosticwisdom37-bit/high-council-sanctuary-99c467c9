@@ -1348,10 +1348,36 @@ export const scheduleEmail = createServerFn({ method: "POST" })
     if (sendAt.getTime() < Date.now() - 60_000)
       return { ok: false as const, error: "Send time is in the past." };
 
+    // For replies, always re-resolve the recipient server-side from the
+    // thread itself — this guards against Sent-folder threads where the
+    // client may have picked the King's own address as the reply target.
+    let toAddr = data.to_addr;
+    if (data.kind === "reply" && data.thread_id) {
+      const headers = gmailHeaders();
+      const kingFrom = headers ? await getKingAddress(headers) : null;
+      const { data: threadRow } = await supabaseAdmin
+        .from("email_threads")
+        .select("from_addr")
+        .eq("id", data.thread_id)
+        .maybeSingle();
+      const resolved = await resolveReplyRecipient(
+        data.thread_id,
+        kingFrom,
+        (threadRow?.from_addr as string | null) ?? null,
+      );
+      if (resolved.to) toAddr = resolved.to;
+      else if (!toAddr || toAddr.trim().length < 3) {
+        return {
+          ok: false as const,
+          error: "Could not determine recipient for this scheduled reply.",
+        };
+      }
+    }
+
     const { error } = await supabaseAdmin.from("scheduled_emails").insert({
       kind: data.kind,
       thread_id: data.thread_id,
-      to_addr: data.to_addr,
+      to_addr: toAddr,
       cc_addr: data.cc_addr ?? "",
       bcc_addr: data.bcc_addr ?? "",
       subject: data.subject,
