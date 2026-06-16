@@ -1715,7 +1715,12 @@ export const openSentThread = createServerFn({ method: "POST" })
     const first = msgs[0];
     const last = msgs[msgs.length - 1];
     const subject = pickHeader(first.payload?.headers ?? [], "Subject") || "(no subject)";
-    const fromAddr = pickHeader(first.payload?.headers ?? [], "From") || "";
+    // For a Sent thread, the first message's From is the King — store the
+    // original recipient (To) instead so the thread row carries the
+    // counterparty's address (matches how inbound threads behave).
+    const firstTo = pickHeader(first.payload?.headers ?? [], "To") || "";
+    const firstFrom = pickHeader(first.payload?.headers ?? [], "From") || "";
+    const fromAddr = firstTo || firstFrom;
     const lastDateMs = last.internalDate ? Number(last.internalDate) : Date.now();
 
     await supabaseAdmin
