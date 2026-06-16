@@ -923,7 +923,7 @@ export const sendReply = createServerFn({ method: "POST" })
     const headers = gmailHeaders();
     if (!headers) return { ok: false as const, error: "Gmail connection not configured." };
 
-    const [{ data: threadRow }, { data: stationery }, { data: lastInbound }] = await Promise.all([
+    const [{ data: threadRow }, { data: stationery }] = await Promise.all([
       supabaseAdmin
         .from("email_threads")
         .select("id, gmail_thread_id, subject, from_addr")
@@ -934,18 +934,23 @@ export const sendReply = createServerFn({ method: "POST" })
         .select("*")
         .eq("id", true)
         .single(),
-      supabaseAdmin
-        .from("email_messages")
-        .select("gmail_message_id, from_addr")
-        .eq("thread_id", data.thread_id)
-        .eq("direction", "inbound")
-        .order("sent_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
     ]);
 
     if (!threadRow) return { ok: false as const, error: "Thread not found." };
     if (!stationery) return { ok: false as const, error: "Stationery missing." };
+
+    const kingFrom = await getKingAddress(headers);
+    const resolved = await resolveReplyRecipient(
+      data.thread_id,
+      kingFrom,
+      threadRow.from_addr as string | null,
+    );
+    if (!resolved.to) {
+      return {
+        ok: false as const,
+        error: "Could not determine recipient — this thread has no counterparty address.",
+      };
+    }
 
     const inkColor = data.ink_color ?? (await resolveDefaultInk());
     const wrapped = wrapInStationery(
@@ -955,18 +960,17 @@ export const sendReply = createServerFn({ method: "POST" })
       }),
     );
 
-    // Extract reply-to addr (the "From" of the last inbound message)
-    const replyTo = (lastInbound?.from_addr as string | undefined) ?? (threadRow.from_addr as string);
+    const replyTo = resolved.to;
     const subject = (threadRow.subject as string).toLowerCase().startsWith("re:")
       ? (threadRow.subject as string)
       : `Re: ${threadRow.subject}`;
 
-    // Fetch the last inbound message to get its Message-ID for threading headers
+    // Fetch the prior message's Message-ID for threading headers
     let inReplyTo = "";
     let references = "";
-    if (lastInbound?.gmail_message_id) {
+    if (resolved.lastMsgId) {
       const r = await fetch(
-        `${GMAIL_GATEWAY}/users/me/messages/${lastInbound.gmail_message_id}?format=metadata&metadataHeaders=Message-ID&metadataHeaders=References`,
+        `${GMAIL_GATEWAY}/users/me/messages/${resolved.lastMsgId}?format=metadata&metadataHeaders=Message-ID&metadataHeaders=References`,
         { headers },
       );
       if (r.ok) {
@@ -979,6 +983,7 @@ export const sendReply = createServerFn({ method: "POST" })
         references = existingRefs ? `${existingRefs} ${inReplyTo}`.trim() : inReplyTo;
       }
     }
+
 
     const kingFrom = await getKingAddress(headers);
     const fromHeader = kingFrom
