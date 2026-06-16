@@ -51,6 +51,47 @@ async function getKingAddress(headers: Record<string, string>): Promise<string |
   }
 }
 
+// Resolve the correct reply recipient for a local thread row, skipping
+// any message whose From is the King's own address (Sent-folder threads
+// store the King as From on the first message). Returns the most recent
+// counterparty address found in the thread.
+async function resolveReplyRecipient(
+  threadId: string,
+  kingFrom: string | null,
+  threadRowFromAddr: string | null,
+): Promise<{ to: string | null; lastMsgId: string | null }> {
+  const { data: rows } = await supabaseAdmin
+    .from("email_messages")
+    .select("gmail_message_id, from_addr, to_addr, sent_at")
+    .eq("thread_id", threadId)
+    .order("sent_at", { ascending: false })
+    .limit(50);
+
+  const kingNorm = (kingFrom ?? "").toLowerCase();
+  const isKing = (addr: string | null | undefined) =>
+    kingNorm.length > 0 && (addr ?? "").toLowerCase().includes(kingNorm);
+
+  // Most recent message whose From is NOT the King
+  for (const m of rows ?? []) {
+    const f = m.from_addr as string | null;
+    if (f && !isKing(f)) {
+      return { to: f, lastMsgId: (m.gmail_message_id as string) ?? null };
+    }
+  }
+  // Otherwise the most recent To we sent to (sent-only thread)
+  for (const m of rows ?? []) {
+    const t = m.to_addr as string | null;
+    if (t && !isKing(t)) {
+      return { to: t, lastMsgId: (m.gmail_message_id as string) ?? null };
+    }
+  }
+  // Fall back to the thread row, unless that too is the King
+  if (threadRowFromAddr && !isKing(threadRowFromAddr)) {
+    return { to: threadRowFromAddr, lastMsgId: null };
+  }
+  return { to: null, lastMsgId: null };
+}
+
 // Encode a UTF-8 string as wrapped base64 (76-char lines per RFC 2045)
 function base64BodyWrapped(body: string): string {
   const bytes = new TextEncoder().encode(body);
@@ -882,7 +923,7 @@ export const sendReply = createServerFn({ method: "POST" })
     const headers = gmailHeaders();
     if (!headers) return { ok: false as const, error: "Gmail connection not configured." };
 
-    const [{ data: threadRow }, { data: stationery }, { data: lastInbound }] = await Promise.all([
+    const [{ data: threadRow }, { data: stationery }] = await Promise.all([
       supabaseAdmin
         .from("email_threads")
         .select("id, gmail_thread_id, subject, from_addr")
@@ -893,18 +934,23 @@ export const sendReply = createServerFn({ method: "POST" })
         .select("*")
         .eq("id", true)
         .single(),
-      supabaseAdmin
-        .from("email_messages")
-        .select("gmail_message_id, from_addr")
-        .eq("thread_id", data.thread_id)
-        .eq("direction", "inbound")
-        .order("sent_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
     ]);
 
     if (!threadRow) return { ok: false as const, error: "Thread not found." };
     if (!stationery) return { ok: false as const, error: "Stationery missing." };
+
+    const kingFrom = await getKingAddress(headers);
+    const resolved = await resolveReplyRecipient(
+      data.thread_id,
+      kingFrom,
+      threadRow.from_addr as string | null,
+    );
+    if (!resolved.to) {
+      return {
+        ok: false as const,
+        error: "Could not determine recipient — this thread has no counterparty address.",
+      };
+    }
 
     const inkColor = data.ink_color ?? (await resolveDefaultInk());
     const wrapped = wrapInStationery(
@@ -914,18 +960,17 @@ export const sendReply = createServerFn({ method: "POST" })
       }),
     );
 
-    // Extract reply-to addr (the "From" of the last inbound message)
-    const replyTo = (lastInbound?.from_addr as string | undefined) ?? (threadRow.from_addr as string);
+    const replyTo = resolved.to;
     const subject = (threadRow.subject as string).toLowerCase().startsWith("re:")
       ? (threadRow.subject as string)
       : `Re: ${threadRow.subject}`;
 
-    // Fetch the last inbound message to get its Message-ID for threading headers
+    // Fetch the prior message's Message-ID for threading headers
     let inReplyTo = "";
     let references = "";
-    if (lastInbound?.gmail_message_id) {
+    if (resolved.lastMsgId) {
       const r = await fetch(
-        `${GMAIL_GATEWAY}/users/me/messages/${lastInbound.gmail_message_id}?format=metadata&metadataHeaders=Message-ID&metadataHeaders=References`,
+        `${GMAIL_GATEWAY}/users/me/messages/${resolved.lastMsgId}?format=metadata&metadataHeaders=Message-ID&metadataHeaders=References`,
         { headers },
       );
       if (r.ok) {
@@ -939,7 +984,7 @@ export const sendReply = createServerFn({ method: "POST" })
       }
     }
 
-    const kingFrom = await getKingAddress(headers);
+
     const fromHeader = kingFrom
       ? `${encodeHeader(stationery.sign_off_name as string)} <${kingFrom}>`
       : null;
@@ -1303,10 +1348,36 @@ export const scheduleEmail = createServerFn({ method: "POST" })
     if (sendAt.getTime() < Date.now() - 60_000)
       return { ok: false as const, error: "Send time is in the past." };
 
+    // For replies, always re-resolve the recipient server-side from the
+    // thread itself — this guards against Sent-folder threads where the
+    // client may have picked the King's own address as the reply target.
+    let toAddr = data.to_addr;
+    if (data.kind === "reply" && data.thread_id) {
+      const headers = gmailHeaders();
+      const kingFrom = headers ? await getKingAddress(headers) : null;
+      const { data: threadRow } = await supabaseAdmin
+        .from("email_threads")
+        .select("from_addr")
+        .eq("id", data.thread_id)
+        .maybeSingle();
+      const resolved = await resolveReplyRecipient(
+        data.thread_id,
+        kingFrom,
+        (threadRow?.from_addr as string | null) ?? null,
+      );
+      if (resolved.to) toAddr = resolved.to;
+      else if (!toAddr || toAddr.trim().length < 3) {
+        return {
+          ok: false as const,
+          error: "Could not determine recipient for this scheduled reply.",
+        };
+      }
+    }
+
     const { error } = await supabaseAdmin.from("scheduled_emails").insert({
       kind: data.kind,
       thread_id: data.thread_id,
-      to_addr: data.to_addr,
+      to_addr: toAddr,
       cc_addr: data.cc_addr ?? "",
       bcc_addr: data.bcc_addr ?? "",
       subject: data.subject,
@@ -1670,7 +1741,12 @@ export const openSentThread = createServerFn({ method: "POST" })
     const first = msgs[0];
     const last = msgs[msgs.length - 1];
     const subject = pickHeader(first.payload?.headers ?? [], "Subject") || "(no subject)";
-    const fromAddr = pickHeader(first.payload?.headers ?? [], "From") || "";
+    // For a Sent thread, the first message's From is the King — store the
+    // original recipient (To) instead so the thread row carries the
+    // counterparty's address (matches how inbound threads behave).
+    const firstTo = pickHeader(first.payload?.headers ?? [], "To") || "";
+    const firstFrom = pickHeader(first.payload?.headers ?? [], "From") || "";
+    const fromAddr = firstTo || firstFrom;
     const lastDateMs = last.internalDate ? Number(last.internalDate) : Date.now();
 
     await supabaseAdmin
