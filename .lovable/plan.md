@@ -1,40 +1,49 @@
-## The bug
+## Plan: restore Councillor drafting across Scriptorium and Studio
 
-When You open a thread from the Sent folder and send (or schedule) a reply, the letter goes to Your own address instead of to the original recipient. Two places conspire:
+### Goal
+Fix the universal drafting failure showing:
 
-1. `openSentThread` (in `src/lib-server/inbox.functions.ts`) seeds the local `email_threads` row using the first message's **From** header — for a Sent thread that's *You*. So `thread.from_addr` becomes Your own address.
-2. `sendReply` falls back to `threadRow.from_addr` whenever there's no prior **inbound** message in the thread — which is exactly the case for a fresh Sent thread. Result: reply addressed to You.
-3. `handleScheduleReply` in `InboxPanel.tsx` has the same shape: it picks `messages[last].from_addr`, which for a Sent-only thread is also You.
+```text
+zai-org-glm-4.6: 400 Bad Request
+All models in the fallback chain failed
+```
 
-## The fix (one small surgical change per layer)
+This affects AI-assisted drafting only; self-curation/manual writing remains untouched.
 
-### 1. `src/lib-server/inbox.functions.ts` — `openSentThread`
-Parse the first message's **To** header (already requested in `metadataHeaders`) and store *that* as the thread's `from_addr` (the counterparty). Keep everything else identical. Sent threads then look like inbound threads from the recipient's perspective, which matches how the rest of the UI already reasons about a "thread partner."
+### What I will change
+1. **Create one shared drafting gateway helper**
+   - Add a server-only helper that all Studio/Scriptorium drafting code can use.
+   - It will choose the correct gateway from the active provider, call models safely, and report clearer errors.
 
-### 2. `src/lib-server/inbox.functions.ts` — `sendReply` (~line 918)
-Strengthen the fallback chain so it never picks an address that equals Your own `kingFrom`:
-- prefer last **inbound** `from_addr`
-- else last **outbound** `to_addr` (the actual recipient of the last sealed letter We sent)
-- else `threadRow.from_addr`
+2. **Sanitize the fallback chain before drafting**
+   - Filter out stale/known-bad Venice model IDs such as `zai-org-glm-4.6` for Lovable AI Gateway drafting.
+   - Fall back to the current safe default chain when the saved compact chain is unusable:
+     - `google/gemini-3-flash-preview`
+     - `google/gemini-2.5-flash`
+     - `google/gemini-2.5-flash-lite`
 
-This makes Sent-thread replies correct even on rows that were opened before the patch.
+3. **Patch all affected Councillor drafting paths**
+   - Scriptorium reply drafting.
+   - Scriptorium new-letter drafting.
+   - Workshop intake drawer promo-card drafting.
+   - Studio Blog Archive → Promo Card.
+   - Studio New Post.
+   - Studio Legal Docket → Milestone Card.
+   - Studio Curator source selection.
 
-### 3. `src/components/workshop/InboxPanel.tsx` — `handleScheduleReply` (~line 431)
-Mirror the same rule when picking `replyTo`:
-- last message with `direction === "inbound"` → its `from_addr`
-- else last message with `direction === "outbound"` → its `to_addr`
-- else `selected.from_addr`
+4. **Improve error messages**
+   - Include response body snippets for 400/404/410 failures so future model retirements are diagnosable.
+   - Preserve specific credit/rate-limit messages.
 
-(The `ThreadMessage` type already carries `to_addr`; `direction` is on the server-side row. The minimum extra needed is to expose `direction` on `ThreadMessage` from `getThread` if it isn't already — I'll check during the build turn and add it only if needed.)
+5. **Keep the working email send/reply-recipient fix intact**
+   - No changes to recipient resolution, sent-folder reply logic, scheduling, or self-curation/manual compose flows.
 
-## Not in scope
+### Technical notes
+- The root cause appears to be the database `provider_compact.fallback_chain` still containing `zai-org-glm-4.6`, which the gateway now rejects with 400.
+- I will avoid spending paid credits and keep the Credit Hierarchy Doctrine intact.
+- I will not edit generated files such as `src/routeTree.gen.ts` or auto-generated backend integration files.
 
-No DB migration, no schema change, no UI redesign. Existing Sent rows already stored with the wrong `from_addr` will be self-healing the next time You click them (openSentThread upserts).
-
-## After the fix
-
-You'd test by:
-1. Open a Sent thread → schedule a reply 2 min out → confirm the cancel-modal preview shows the original recipient, not You.
-2. Open the same Sent thread → send a reply immediately → confirm Gmail's Sent folder shows the right To.
-
-Quick, contained, and clears the way for tonight's memory testing.
+### Verification
+- Confirm all AI draft call sites use the shared safe helper.
+- Check the relevant server-function output path so a failed stale Venice model no longer blocks the whole drafting flow.
+- If possible, verify one lightweight draft call or inspect logs after implementation.

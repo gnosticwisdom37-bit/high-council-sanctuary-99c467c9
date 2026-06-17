@@ -13,14 +13,14 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
-  LOVABLE_AI_GATEWAY_URL,
   buildSystemPrompt,
+  callDraftGateway,
   loadSoulMemoirsForPrompt,
   type ProviderCompact,
   type SoulIdentity,
 } from "./ai-shared.server";
 
-type Compact = { fallback_chain?: string[] };
+type Compact = { fallback_chain?: string[]; active_provider?: string };
 
 async function loadCommon(workshop_id: string, editor_soul_id_override?: string | null) {
   const [{ data: workshop }, { data: settings }] = await Promise.all([
@@ -68,41 +68,15 @@ async function callGateway(
   compact: Compact,
   temperature = 0.75,
 ): Promise<{ ok: true; text: string; model: string } | { ok: false; error: string }> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) return { ok: false, error: "Gateway key not configured." };
-  const chain = compact.fallback_chain?.length
-    ? compact.fallback_chain
-    : ["google/gemini-2.5-flash", "google/gemini-2.5-flash-lite"];
-  let lastErr = "";
-  for (const model of chain) {
-    try {
-      const res = await fetch(LOVABLE_AI_GATEWAY_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          temperature,
-        }),
-      });
-      if (res.status === 429) { lastErr = `${model}: rate-limited`; continue; }
-      if (res.status === 402) { lastErr = `${model}: credits exhausted`; continue; }
-      if (!res.ok) { lastErr = `${model}: ${res.status}`; continue; }
-      const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-      const text = (json.choices?.[0]?.message?.content ?? "").trim();
-      if (!text) { lastErr = `${model}: empty`; continue; }
-      return { ok: true, text, model };
-    } catch (e) {
-      lastErr = `${model}: ${e instanceof Error ? e.message : String(e)}`;
-    }
-  }
-  return { ok: false, error: `All models failed. Last: ${lastErr}` };
+  const r = await callDraftGateway({
+    systemPrompt,
+    userPrompt,
+    activeProvider: compact.active_provider,
+    fallbackChain: compact.fallback_chain,
+    temperature,
+  });
+  if (!r.ok) return r;
+  return { ok: true, text: r.text, model: r.model };
 }
 
 function stripFence(raw: string): string {

@@ -14,8 +14,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
-  LOVABLE_AI_GATEWAY_URL,
   buildSystemPrompt,
+  callDraftGateway,
   loadKingsLexicon,
   loadSoulMemoirsForPrompt,
   type ProviderCompact,
@@ -753,9 +753,6 @@ export const draftReply = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) return { ok: false as const, error: "Gateway key not configured." };
-
     // Load thread + messages + stationery + settings
     const [
       { data: threadRow },
@@ -794,9 +791,6 @@ export const draftReply = createServerFn({ method: "POST" })
     const curator = data.curator_soul_id ? await loadSoul(data.curator_soul_id) : editor;
 
     const compact = settings.provider_compact as unknown as ProviderCompact;
-    const fallbackChain = compact?.fallback_chain?.length
-      ? compact.fallback_chain
-      : ["google/gemini-2.5-flash", "google/gemini-2.5-flash-lite"];
 
     const transcript = (msgs ?? [])
       .map((m, i) => {
@@ -822,24 +816,19 @@ export const draftReply = createServerFn({ method: "POST" })
     const curatorUser = `Thread subject: ${threadRow.subject}\nFrom: ${threadRow.from_addr}\n\nTranscript:\n${transcript}\n\n${data.intent ? `King's intent: ${data.intent}` : ""}`;
 
     let brief = "";
-    for (const model of fallbackChain) {
-      const res = await fetch(LOVABLE_AI_GATEWAY_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "system", content: curatorSystem }, { role: "user", content: curatorUser }],
-          temperature: 0.6,
-        }),
-      });
-      if (res.status === 429 || res.status === 402 || !res.ok) continue;
-      const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-      const raw = (json.choices?.[0]?.message?.content ?? "").replace(/^```json\s*|```\s*$/gi, "").trim();
+    const curatorOut = await callDraftGateway({
+      systemPrompt: curatorSystem,
+      userPrompt: curatorUser,
+      activeProvider: compact?.active_provider,
+      fallbackChain: compact?.fallback_chain,
+      temperature: 0.6,
+    });
+    if (curatorOut.ok) {
+      const raw = curatorOut.text.replace(/^```json\s*|```\s*$/gi, "").trim();
       const m = raw.match(/\{[\s\S]*\}/);
       if (m) {
         try { brief = JSON.parse(m[0]).brief ?? ""; } catch { brief = ""; }
       }
-      if (brief) break;
     }
     if (!brief) brief = "Reply in voice, honour the sender, keep it concise.";
 
@@ -853,35 +842,21 @@ export const draftReply = createServerFn({ method: "POST" })
       `Curator's brief: ${brief}`;
     const editorUser = `Subject: ${threadRow.subject}\nFrom: ${threadRow.from_addr}\n\nTranscript:\n${transcript}`;
 
-    let bodyHtml = "";
-    let modelUsed = "";
-    let lastErr = "";
-    for (const model of fallbackChain) {
-      try {
-        const res = await fetch(LOVABLE_AI_GATEWAY_URL, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model,
-            messages: [{ role: "system", content: editorSystem }, { role: "user", content: editorUser }],
-            temperature: 0.85,
-          }),
-        });
-        if (res.status === 429) { lastErr = `${model}: rate-limited`; continue; }
-        if (res.status === 402) { lastErr = `${model}: credits exhausted`; continue; }
-        if (!res.ok) { lastErr = `${model}: ${res.status}`; continue; }
-        const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-        bodyHtml = (json.choices?.[0]?.message?.content ?? "")
-          .replace(/^```html\s*|```\s*$/gi, "")
-          .trim();
-        if (bodyHtml) { modelUsed = model; break; }
-      } catch (e) {
-        lastErr = `${model}: ${e instanceof Error ? e.message : String(e)}`;
-      }
+    const editorOut = await callDraftGateway({
+      systemPrompt: editorSystem,
+      userPrompt: editorUser,
+      activeProvider: compact?.active_provider,
+      fallbackChain: compact?.fallback_chain,
+      temperature: 0.85,
+    });
+    if (!editorOut.ok) {
+      return { ok: false as const, error: `Editor could not draft. ${editorOut.error}` };
     }
+    const bodyHtml = editorOut.text.replace(/^```html\s*|```\s*$/gi, "").trim();
     if (!bodyHtml) {
-      return { ok: false as const, error: `Editor could not draft. ${lastErr}` };
+      return { ok: false as const, error: "Editor could not draft. Empty response." };
     }
+    const modelUsed = editorOut.model;
 
     // Wrap in stationery for preview
     const wrappedHtml = wrapInStationery(stationeryArgs(stationery as Record<string, unknown>, bodyHtml));
@@ -1116,9 +1091,6 @@ export const draftLetter = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) return { ok: false as const, error: "Gateway key not configured." };
-
     const [{ data: settings }, { data: stationery }] = await Promise.all([
       supabaseAdmin
         .from("settings")
@@ -1135,9 +1107,6 @@ export const draftLetter = createServerFn({ method: "POST" })
     const curator = data.curator_soul_id ? await loadSoul(data.curator_soul_id) : editor;
 
     const compact = settings.provider_compact as unknown as ProviderCompact;
-    const fallbackChain = compact?.fallback_chain?.length
-      ? compact.fallback_chain
-      : ["google/gemini-2.5-flash", "google/gemini-2.5-flash-lite"];
 
     const lexicon = await loadKingsLexicon(supabaseAdmin);
     const [editorMemoirs, curatorMemoirs] = await Promise.all([
@@ -1155,24 +1124,19 @@ export const draftLetter = createServerFn({ method: "POST" })
     const curatorUser = `Recipient: ${data.to_addr}\nSubject: ${data.subject}\n\nKing's intent: ${data.intent ?? "(none provided — infer warm, sovereign greeting)"}`;
 
     let brief = "";
-    for (const model of fallbackChain) {
-      const res = await fetch(LOVABLE_AI_GATEWAY_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "system", content: curatorSystem }, { role: "user", content: curatorUser }],
-          temperature: 0.6,
-        }),
-      });
-      if (!res.ok) continue;
-      const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-      const raw = (json.choices?.[0]?.message?.content ?? "").replace(/^```json\s*|```\s*$/gi, "").trim();
+    const curatorOut = await callDraftGateway({
+      systemPrompt: curatorSystem,
+      userPrompt: curatorUser,
+      activeProvider: compact?.active_provider,
+      fallbackChain: compact?.fallback_chain,
+      temperature: 0.6,
+    });
+    if (curatorOut.ok) {
+      const raw = curatorOut.text.replace(/^```json\s*|```\s*$/gi, "").trim();
       const m = raw.match(/\{[\s\S]*\}/);
       if (m) {
         try { brief = JSON.parse(m[0]).brief ?? ""; } catch { brief = ""; }
       }
-      if (brief) break;
     }
     if (!brief) brief = data.intent || "Write a warm, sovereign letter from the King.";
 
@@ -1186,31 +1150,17 @@ export const draftLetter = createServerFn({ method: "POST" })
       `Curator's brief: ${brief}`;
     const editorUser = `Recipient: ${data.to_addr}\nSubject: ${data.subject}\n\nKing's intent: ${data.intent ?? ""}`;
 
-    let bodyHtml = "";
-    let modelUsed = "";
-    let lastErr = "";
-    for (const model of fallbackChain) {
-      try {
-        const res = await fetch(LOVABLE_AI_GATEWAY_URL, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model,
-            messages: [{ role: "system", content: editorSystem }, { role: "user", content: editorUser }],
-            temperature: 0.85,
-          }),
-        });
-        if (!res.ok) { lastErr = `${model}: ${res.status}`; continue; }
-        const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-        bodyHtml = (json.choices?.[0]?.message?.content ?? "")
-          .replace(/^```html\s*|```\s*$/gi, "")
-          .trim();
-        if (bodyHtml) { modelUsed = model; break; }
-      } catch (e) {
-        lastErr = `${model}: ${e instanceof Error ? e.message : String(e)}`;
-      }
-    }
-    if (!bodyHtml) return { ok: false as const, error: `Editor could not draft. ${lastErr}` };
+    const editorOut = await callDraftGateway({
+      systemPrompt: editorSystem,
+      userPrompt: editorUser,
+      activeProvider: compact?.active_provider,
+      fallbackChain: compact?.fallback_chain,
+      temperature: 0.85,
+    });
+    if (!editorOut.ok) return { ok: false as const, error: `Editor could not draft. ${editorOut.error}` };
+    const bodyHtml = editorOut.text.replace(/^```html\s*|```\s*$/gi, "").trim();
+    if (!bodyHtml) return { ok: false as const, error: "Editor could not draft. Empty response." };
+    const modelUsed = editorOut.model;
 
     const wrappedHtml = wrapInStationery(stationeryArgs(stationery as Record<string, unknown>, bodyHtml));
 

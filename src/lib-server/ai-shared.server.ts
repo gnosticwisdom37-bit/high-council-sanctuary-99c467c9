@@ -36,6 +36,95 @@ export function resolveGateway(activeProvider: string | undefined): {
   };
 }
 
+/**
+ * Sanitize a fallback chain against the active provider. Lovable AI Gateway
+ * only accepts a small set of vendor-prefixed model IDs (google/, openai/),
+ * so if the chain was saved while a different provider was active, filter
+ * out IDs that the target gateway will reject with 400 and append safe
+ * defaults so drafting never dies on a stale model.
+ */
+const LOVABLE_AI_SAFE_DEFAULTS = [
+  "google/gemini-3-flash-preview",
+  "google/gemini-2.5-flash",
+  "google/gemini-2.5-flash-lite",
+];
+
+export function sanitizeFallbackChain(
+  chain: string[] | undefined,
+  providerLabel: "venice" | "lovable_ai_gateway",
+): string[] {
+  const input = (chain ?? []).filter((m) => typeof m === "string" && m.trim().length > 0);
+  if (providerLabel === "lovable_ai_gateway") {
+    // Lovable AI Gateway IDs always look like "vendor/model".
+    const filtered = input.filter((m) => /^[a-z0-9-]+\/.+/i.test(m));
+    const merged = [...filtered, ...LOVABLE_AI_SAFE_DEFAULTS];
+    return Array.from(new Set(merged));
+  }
+  // Venice: keep the chain as-is, but ensure at least one fallback exists.
+  if (input.length === 0) return ["venice-uncensored-1-2"];
+  return Array.from(new Set(input));
+}
+
+/**
+ * Shared drafting gateway caller. Resolves the right provider from the
+ * Compact, sanitizes the fallback chain, and walks it until one model
+ * returns a non-empty completion. Used by every "the Soul drafts X" path
+ * (Studio, Scriptorium, Workshop intake).
+ */
+export async function callDraftGateway(args: {
+  systemPrompt: string;
+  userPrompt: string;
+  activeProvider: string | undefined;
+  fallbackChain: string[] | undefined;
+  temperature?: number;
+}): Promise<
+  | { ok: true; text: string; model: string; provider: "venice" | "lovable_ai_gateway" }
+  | { ok: false; error: string }
+> {
+  const gateway = resolveGateway(args.activeProvider);
+  if (!gateway.apiKey) {
+    return {
+      ok: false,
+      error: `The ${gateway.label === "venice" ? "Venice" : "Lovable AI"} gateway key is not configured.`,
+    };
+  }
+  const chain = sanitizeFallbackChain(args.fallbackChain, gateway.label);
+  let lastErr = "no models tried";
+  for (const model of chain) {
+    try {
+      const res = await fetch(gateway.url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${gateway.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: args.systemPrompt },
+            { role: "user", content: args.userPrompt },
+          ],
+          temperature: args.temperature ?? 0.75,
+        }),
+      });
+      if (res.status === 429) { lastErr = `${model}: rate-limited`; continue; }
+      if (res.status === 402) { lastErr = `${model}: credits exhausted`; continue; }
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        lastErr = `${model}: ${res.status}${body ? ` - ${body.slice(0, 160)}` : ""}`;
+        continue;
+      }
+      const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+      const text = (json.choices?.[0]?.message?.content ?? "").trim();
+      if (!text) { lastErr = `${model}: empty`; continue; }
+      return { ok: true, text, model, provider: gateway.label };
+    } catch (e) {
+      lastErr = `${model}: ${e instanceof Error ? e.message : String(e)}`;
+    }
+  }
+  return { ok: false, error: `All models in the fallback chain failed. Last: ${lastErr}` };
+}
+
 export type SoulIdentity = {
   soul_id: string;
   title: string;
