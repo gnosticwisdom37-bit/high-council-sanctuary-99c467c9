@@ -183,11 +183,6 @@ export const draftPromoCard = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) {
-      return { ok: false as const, error: "The Gateway key is not configured." };
-    }
-
     // Load everything we need in parallel
     const [
       { data: workshop },
@@ -268,97 +263,51 @@ export const draftPromoCard = createServerFn({ method: "POST" })
       JSON.stringify(row, null, 2) +
       (row.url ? `\n\nDestination URL: ${row.url}` : "");
 
-    // Try the fallback chain (free-premium first per Credit Hierarchy)
-    const fallbackChain = compact?.fallback_chain?.length
-      ? compact.fallback_chain
-      : ["google/gemini-2.5-flash", "google/gemini-2.5-flash-lite"];
+    const out = await callDraftGateway({
+      systemPrompt,
+      userPrompt,
+      activeProvider: compact?.active_provider,
+      fallbackChain: compact?.fallback_chain,
+      temperature: 0.85,
+    });
+    if (!out.ok) return { ok: false as const, error: out.error };
 
-    let lastErr = "";
-    for (const model of fallbackChain) {
-      try {
-        const res = await fetch(LOVABLE_AI_GATEWAY_URL, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model,
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt },
-            ],
-            temperature: 0.85,
-          }),
-        });
-        if (res.status === 429) {
-          lastErr = `${model}: rate-limited`;
-          continue;
-        }
-        if (res.status === 402) {
-          lastErr = `${model}: credits exhausted`;
-          continue;
-        }
-        if (!res.ok) {
-          lastErr = `${model}: ${res.status} ${res.statusText}`;
-          continue;
-        }
-        const json = (await res.json()) as {
-          choices?: { message?: { content?: string } }[];
-        };
-        const raw = json.choices?.[0]?.message?.content ?? "";
-        // Strip code fences if the model added them anyway
-        const cleaned = raw
-          .replace(/^```(?:json)?\s*/i, "")
-          .replace(/```\s*$/i, "")
-          .trim();
-        let parsed: { title?: string; body?: string; hashtags?: string[] } = {};
-        try {
-          parsed = JSON.parse(cleaned);
-        } catch {
-          // try to extract a JSON object from the raw text
-          const m = cleaned.match(/\{[\s\S]*\}/);
-          if (m) {
-            try {
-              parsed = JSON.parse(m[0]);
-            } catch {
-              parsed = {};
-            }
-          }
-        }
-
-        const title = (parsed.title ?? row.title).slice(0, 120);
-        const body = (parsed.body ?? "").slice(0, 320);
-        const hashtags = Array.isArray(parsed.hashtags)
-          ? parsed.hashtags
-              .filter((h) => typeof h === "string")
-              .map((h) => (h.startsWith("#") ? h : `#${h}`))
-              .slice(0, 8)
-          : presets;
-
-        // Log to Bank ledger (free-premium chain by default)
-        await supabaseAdmin.from("bank_ledger").insert({
-          decision: "approved",
-          reason: "Workshop promo-card draft",
-          soul_id: workshop.steward_soul_id,
-          model_requested: model,
-          veritas_cost: 0,
-          task_summary: `Promo card: ${title}`,
-        });
-
-        return {
-          ok: true as const,
-          card: { title, body, hashtags, source_url: row.url ?? null },
-          model_used: model,
-        };
-      } catch (e) {
-        lastErr = `${model}: ${e instanceof Error ? e.message : String(e)}`;
+    const cleaned = out.text
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/```\s*$/i, "")
+      .trim();
+    let parsed: { title?: string; body?: string; hashtags?: string[] } = {};
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch {
+      const m = cleaned.match(/\{[\s\S]*\}/);
+      if (m) {
+        try { parsed = JSON.parse(m[0]); } catch { parsed = {}; }
       }
     }
 
+    const title = (parsed.title ?? row.title).slice(0, 120);
+    const body = (parsed.body ?? "").slice(0, 320);
+    const hashtags = Array.isArray(parsed.hashtags)
+      ? parsed.hashtags
+          .filter((h) => typeof h === "string")
+          .map((h) => (h.startsWith("#") ? h : `#${h}`))
+          .slice(0, 8)
+      : presets;
+
+    await supabaseAdmin.from("bank_ledger").insert({
+      decision: "approved",
+      reason: "Workshop promo-card draft",
+      soul_id: workshop.steward_soul_id,
+      model_requested: out.model,
+      veritas_cost: 0,
+      task_summary: `Promo card: ${title}`,
+    });
+
     return {
-      ok: false as const,
-      error: `All models in the fallback chain failed. Last: ${lastErr}`,
+      ok: true as const,
+      card: { title, body, hashtags, source_url: row.url ?? null },
+      model_used: out.model,
     };
   });
 
