@@ -82,7 +82,10 @@ type AttachmentMeta = {
   filename: string;
   mime_type: string;
   size: number;
+  public_url?: string;
+  appended_at?: string;
 };
+
 
 type ThreadMessage = {
   gmail_message_id: string;
