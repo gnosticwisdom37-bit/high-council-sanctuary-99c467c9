@@ -1,49 +1,39 @@
-## Plan: restore Councillor drafting across Scriptorium and Studio
+# Two small additions
 
-### Goal
-Fix the universal drafting failure showing:
+## 1. WordPress site binding (Workshop → Studio "Add website")
 
-```text
-zai-org-glm-4.6: 400 Bad Request
-All models in the fallback chain failed
-```
+The gateway plumbing already exists (`src/lib-server/wordpress.functions.ts`: `listWpSites`, `getWorkshopWpLink`, `setWorkshopWpSite`, `createWpPost`). The "Add website" button in the Studio just isn't wired to a picker yet.
 
-This affects AI-assisted drafting only; self-curation/manual writing remains untouched.
+**Build:**
+- Add a `WordPressSiteBinding` panel (small dialog) that:
+  - Calls `listWpSites` and shows the King's WP.com sites (name + URL).
+  - Lets King pick one site, optional default categories/tags, default status (`draft` recommended).
+  - Saves via `setWorkshopWpSite` keyed to the current Workshop.
+  - Shows current binding (site name + URL) once set, with a "Change site" affordance.
+- Wire the existing "Add website" button in `StudioPanel.tsx` to open this dialog.
+- If `WORDPRESS_COM_API_KEY` is missing, the panel shows a single inline "Connect WordPress.com" message (no fake values, no dashboard links) — connector linking is handled outside this flow.
 
-### What I will change
-1. **Create one shared drafting gateway helper**
-   - Add a server-only helper that all Studio/Scriptorium drafting code can use.
-   - It will choose the correct gateway from the active provider, call models safely, and report clearer errors.
+**Result:** New Post tab can publish drafts/scheduled/published posts to the bound site; Studio Blog Archive list reflects mirrored posts on next sync.
 
-2. **Sanitize the fallback chain before drafting**
-   - Filter out stale/known-bad Venice model IDs such as `zai-org-glm-4.6` for Lovable AI Gateway drafting.
-   - Fall back to the current safe default chain when the saved compact chain is unusable:
-     - `google/gemini-3-flash-preview`
-     - `google/gemini-2.5-flash`
-     - `google/gemini-2.5-flash-lite`
+## 2. Sent-folder attachments (Scriptorium)
 
-3. **Patch all affected Councillor drafting paths**
-   - Scriptorium reply drafting.
-   - Scriptorium new-letter drafting.
-   - Workshop intake drawer promo-card drafting.
-   - Studio Blog Archive → Promo Card.
-   - Studio New Post.
-   - Studio Legal Docket → Milestone Card.
-   - Studio Curator source selection.
+Today, attachments only attach during *compose*. Add an "Add attachment" affordance on **sent letters** for today's date.
 
-4. **Improve error messages**
-   - Include response body snippets for 400/404/410 failures so future model retirements are diagnosable.
-   - Preserve specific credit/rate-limit messages.
+**Build (frontend-only where possible):**
+- In the Sent folder letter view, when `sent_at` is today (King's local day), show an "Attach file" button.
+- Reuse the existing compose attachment uploader (same bucket, same size limits, same UI affordance).
+- Append uploaded attachment refs to the existing `email_messages.attachments` jsonb array for that message via a small server fn `appendSentAttachment({ message_id, attachments[] })` that:
+  - Verifies the message is owned by the King, is in Sent, and `sent_at >= start_of_today_local`.
+  - Appends rather than replaces; never mutates the original send.
+- These appear inline in the letter view alongside original attachments, labeled "Added [time]" so the King can see they were appended after send.
 
-5. **Keep the working email send/reply-recipient fix intact**
-   - No changes to recipient resolution, sent-folder reply logic, scheduling, or self-curation/manual compose flows.
+**Why "today only":** matches your intent — a same-day addition (e.g. forgot to attach the PDF), without rewriting historical sent mail.
 
-### Technical notes
-- The root cause appears to be the database `provider_compact.fallback_chain` still containing `zai-org-glm-4.6`, which the gateway now rejects with 400.
-- I will avoid spending paid credits and keep the Credit Hierarchy Doctrine intact.
-- I will not edit generated files such as `src/routeTree.gen.ts` or auto-generated backend integration files.
+**No changes** to: send/reply recipient resolution, threading, scheduling, drafting gateway (just shipped), or self-curation.
 
-### Verification
-- Confirm all AI draft call sites use the shared safe helper.
-- Check the relevant server-function output path so a failed stale Venice model no longer blocks the whole drafting flow.
-- If possible, verify one lightweight draft call or inspect logs after implementation.
+## Technical notes (for me)
+- New file: `src/components/workshop/WordPressSiteBinding.tsx`.
+- Edits: `src/components/workshop/StudioPanel.tsx` (wire button), `src/components/workshop/InboxPanel.tsx` or wherever Sent letter view lives (add attach button + handler), `src/lib-server/inbox.functions.ts` (`appendSentAttachment` server fn with `requireSupabaseAuth` + same-day guard).
+- No schema migration needed — `email_messages.attachments` jsonb already holds the array.
+
+Shall I build both, or want WordPress first and Sent-attachments next?
