@@ -1825,3 +1825,83 @@ export const deleteScheduledEmail = createServerFn({ method: "POST" })
     if (error) return { ok: false as const, error: error.message };
     return { ok: true as const };
   });
+
+// ─── appendSentAttachment: attach files to a sent letter (same day only) ─
+// Uploads files to kingdom-assets and appends them to the message's
+// `appended_attachments` jsonb. Only allowed while `sent_at` is within today
+// (King's UTC day) — historical sends are intentionally immutable.
+export const appendSentAttachment = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z.object({
+      thread_id: z.string().uuid(),
+      gmail_message_id: z.string().min(1).max(120).regex(/^[a-zA-Z0-9_-]+$/),
+      attachments: z.array(
+        z.object({
+          filename: z.string().min(1).max(255),
+          mime_type: z.string().min(1).max(120),
+          size: z.number().int().min(1).max(10 * 1024 * 1024),
+          data_base64: z.string().min(1).max(15_000_000),
+        }),
+      ).min(1).max(5),
+    }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    // Locate the message row
+    const { data: row, error: selErr } = await supabaseAdmin
+      .from("email_messages")
+      .select("id, sent_at, appended_attachments")
+      .eq("thread_id", data.thread_id)
+      .eq("gmail_message_id", data.gmail_message_id)
+      .maybeSingle();
+    if (selErr) return { ok: false as const, error: selErr.message };
+    if (!row) return { ok: false as const, error: "Sent letter not found." };
+
+    // Enforce same-day window
+    const sentAt = row.sent_at ? new Date(row.sent_at as string) : null;
+    if (!sentAt) return { ok: false as const, error: "This letter has no send time on record." };
+    const now = new Date();
+    const sameDay = sentAt.getUTCFullYear() === now.getUTCFullYear()
+      && sentAt.getUTCMonth() === now.getUTCMonth()
+      && sentAt.getUTCDate() === now.getUTCDate();
+    if (!sameDay) {
+      return { ok: false as const, error: "Attachments can only be added to letters sent today." };
+    }
+
+    const existing = (row.appended_attachments as unknown as AttachmentMeta[] | null) ?? [];
+    if (existing.length + data.attachments.length > 10) {
+      return { ok: false as const, error: "Too many attachments on this letter (max 10)." };
+    }
+
+    const safeBase = (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
+    const newOnes: AttachmentMeta[] = [];
+    for (const a of data.attachments) {
+      const bin = atob(a.data_base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const id = crypto.randomUUID();
+      const path = `sent-attachments/${row.id}/${id}-${safeBase(a.filename)}`;
+      const { error: upErr } = await supabaseAdmin.storage
+        .from("kingdom-assets")
+        .upload(path, bytes, { contentType: a.mime_type, upsert: false });
+      if (upErr) return { ok: false as const, error: upErr.message };
+      const { data: pub } = supabaseAdmin.storage.from("kingdom-assets").getPublicUrl(path);
+      newOnes.push({
+        attachment_id: `local:${id}`,
+        filename: a.filename,
+        mime_type: a.mime_type,
+        size: a.size,
+        public_url: pub.publicUrl,
+        appended_at: new Date().toISOString(),
+      });
+    }
+
+    const merged = [...existing, ...newOnes];
+    const { error: updErr } = await supabaseAdmin
+      .from("email_messages")
+      .update({ appended_attachments: merged as never })
+      .eq("id", row.id);
+    if (updErr) return { ok: false as const, error: updErr.message };
+
+    return { ok: true as const, attachments: newOnes };
+  });
+
