@@ -242,7 +242,10 @@ type AttachmentMeta = {
   filename: string;
   mime_type: string;
   size: number;
+  public_url?: string;
+  appended_at?: string;
 };
+
 
 function walkParts(
   part: GmailPart,
