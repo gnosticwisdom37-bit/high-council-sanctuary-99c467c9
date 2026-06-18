@@ -41,6 +41,7 @@ import {
   setWorkshopCalendar,
   createLegalEvent,
 } from "@/lib-server/calendar.functions";
+import { WordPressSiteBinding } from "@/components/workshop/WordPressSiteBinding";
 
 type TabKey = "promo" | "newpost" | "legal";
 
