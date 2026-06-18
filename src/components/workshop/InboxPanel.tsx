@@ -47,7 +47,9 @@ import {
   trashThread,
   wrapKingsWords,
   openSentThread,
+  appendSentAttachment,
 } from "@/lib-server/inbox.functions";
+
 import { listCouncilSouls } from "@/lib-server/studio.functions";
 import { listAddressBook, expandRecipients } from "@/lib-server/contacts.functions";
 import { CopyButton } from "@/components/ui/copy-button";
