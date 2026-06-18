@@ -240,10 +240,20 @@ export function InboxPanel({
   }, [trashThreadFn, selected]);
 
 
-  // Download an incoming attachment: fetch base64 via server fn, build a Blob, trigger save.
+  // Download an attachment: locally-appended ones use public_url directly;
+  // Gmail-hosted ones go through the server fn that fetches base64.
   const downloadAttachment = useCallback(
     async (m: ThreadMessage, a: AttachmentMeta) => {
       try {
+        if (a.public_url) {
+          const link = document.createElement("a");
+          link.href = a.public_url;
+          link.download = a.filename;
+          link.target = "_blank";
+          link.rel = "noreferrer";
+          document.body.appendChild(link); link.click(); link.remove();
+          return;
+        }
         const r = await getAttachmentFn({
           data: {
             gmail_message_id: m.gmail_message_id,
@@ -268,6 +278,41 @@ export function InboxPanel({
     },
     [getAttachmentFn],
   );
+
+  // Append attachments to a sent letter (today only).
+  const appendSentFn = useServerFn(appendSentAttachment);
+  const openThreadFn = useServerFn(getThread);
+  const reloadMessages = useCallback(async (threadId: string) => {
+    const r = await openThreadFn({ data: { thread_id: threadId } });
+    if (r.ok) setMessages(r.messages as ThreadMessage[]);
+  }, [openThreadFn]);
+  const handleAppendSent = useCallback(
+    async (m: ThreadMessage, files: OutgoingAttachment[]) => {
+      if (!selected) return;
+      const r = await appendSentFn({
+        data: {
+          thread_id: selected.id,
+          gmail_message_id: m.gmail_message_id,
+          attachments: files,
+        },
+      });
+      if (!r.ok) { setNotice({ kind: "err", text: r.error }); return; }
+      setNotice({ kind: "ok", text: `Attached ${r.attachments.length} file${r.attachments.length === 1 ? "" : "s"} to this letter.` });
+      await reloadMessages(selected.id);
+    },
+    [appendSentFn, selected, reloadMessages],
+  );
+
+  // True when a message was sent today (King's local day).
+  const isToday = (iso: string | null): boolean => {
+    if (!iso) return false;
+    const d = new Date(iso); const n = new Date();
+    return d.getFullYear() === n.getFullYear()
+      && d.getMonth() === n.getMonth()
+      && d.getDate() === n.getDate();
+  };
+
+
 
   // Load souls + contacts + scheduled + templates + default ink
   useEffect(() => {
