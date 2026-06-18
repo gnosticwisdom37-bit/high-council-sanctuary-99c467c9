@@ -538,6 +538,25 @@ export const getThread = createServerFn({ method: "POST" })
         .upsert(rows, { onConflict: "thread_id,gmail_message_id" });
     }
 
+    // Merge in any locally-appended attachments stored on email_messages
+    const gmailIds = messages.map((m) => m.gmail_message_id);
+    if (gmailIds.length > 0) {
+      const { data: rows } = await supabaseAdmin
+        .from("email_messages")
+        .select("gmail_message_id, appended_attachments")
+        .eq("thread_id", threadRow.id)
+        .in("gmail_message_id", gmailIds);
+      const byId = new Map<string, AttachmentMeta[]>();
+      for (const r of rows ?? []) {
+        const list = (r.appended_attachments as unknown as AttachmentMeta[] | null) ?? [];
+        if (list.length) byId.set(r.gmail_message_id as string, list);
+      }
+      for (const m of messages) {
+        const extra = byId.get(m.gmail_message_id);
+        if (extra && extra.length) m.attachments = [...m.attachments, ...extra];
+      }
+    }
+
     // Mark all unread messages as read
     const unreadIds = messages.filter((m) => m.unread).map((m) => m.gmail_message_id);
     for (const mid of unreadIds) {
@@ -564,6 +583,7 @@ export const getThread = createServerFn({ method: "POST" })
       messages,
     };
   });
+
 
 // ─── Stationery shell wrapper (inline-styled for email clients) ──────────
 function esc(s: string): string {
