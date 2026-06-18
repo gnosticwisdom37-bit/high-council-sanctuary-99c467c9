@@ -835,23 +835,42 @@ export function InboxPanel({
                               onClick={() => void downloadAttachment(m, a)}
                               className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px]"
                               style={{
-                                background: "color-mix(in oklab, var(--dawn-gold) 22%, transparent)",
+                                background: a.public_url
+                                  ? "color-mix(in oklab, var(--dawn-gold-bright) 28%, transparent)"
+                                  : "color-mix(in oklab, var(--dawn-gold) 22%, transparent)",
                                 border: "1px solid color-mix(in oklab, var(--dawn-gold) 50%, transparent)",
                                 color: "var(--dawn-ink)",
                                 fontFamily: "Georgia, serif",
                               }}
-                              title={`Download ${a.filename} (${formatBytes(a.size)})`}
+                              title={`Download ${a.filename} (${formatBytes(a.size)})${a.appended_at ? ` — added ${new Date(a.appended_at).toLocaleTimeString()}` : ""}`}
                             >
                               <Paperclip className="h-3 w-3" />
                               <span className="max-w-[160px] truncate">{a.filename}</span>
                               <span style={{ color: "color-mix(in oklab, var(--dawn-ink) 55%, transparent)" }}>
                                 · {formatBytes(a.size)}
                               </span>
+                              {a.appended_at && (
+                                <span style={{ color: "color-mix(in oklab, var(--dawn-ink) 55%, transparent)" }}>
+                                  · added {new Date(a.appended_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                                </span>
+                              )}
                               <Download className="h-3 w-3" />
                             </button>
                           ))}
                         </div>
                       )}
+                      {folder === "sent" && isToday(m.sent_at) && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <span
+                            className="text-[10px] uppercase tracking-[0.2em]"
+                            style={{ color: "color-mix(in oklab, var(--dawn-ink) 60%, transparent)" }}
+                          >
+                            Add attachment (today only):
+                          </span>
+                          <AppendAttachmentButton onPick={(files) => void handleAppendSent(m, files)} />
+                        </div>
+                      )}
+
                     </article>
                   ))}
                 </div>
