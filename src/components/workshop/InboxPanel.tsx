@@ -47,7 +47,9 @@ import {
   trashThread,
   wrapKingsWords,
   openSentThread,
+  appendSentAttachment,
 } from "@/lib-server/inbox.functions";
+
 import { listCouncilSouls } from "@/lib-server/studio.functions";
 import { listAddressBook, expandRecipients } from "@/lib-server/contacts.functions";
 import { CopyButton } from "@/components/ui/copy-button";
@@ -80,7 +82,10 @@ type AttachmentMeta = {
   filename: string;
   mime_type: string;
   size: number;
+  public_url?: string;
+  appended_at?: string;
 };
+
 
 type ThreadMessage = {
   gmail_message_id: string;
@@ -235,10 +240,20 @@ export function InboxPanel({
   }, [trashThreadFn, selected]);
 
 
-  // Download an incoming attachment: fetch base64 via server fn, build a Blob, trigger save.
+  // Download an attachment: locally-appended ones use public_url directly;
+  // Gmail-hosted ones go through the server fn that fetches base64.
   const downloadAttachment = useCallback(
     async (m: ThreadMessage, a: AttachmentMeta) => {
       try {
+        if (a.public_url) {
+          const link = document.createElement("a");
+          link.href = a.public_url;
+          link.download = a.filename;
+          link.target = "_blank";
+          link.rel = "noreferrer";
+          document.body.appendChild(link); link.click(); link.remove();
+          return;
+        }
         const r = await getAttachmentFn({
           data: {
             gmail_message_id: m.gmail_message_id,
@@ -263,6 +278,41 @@ export function InboxPanel({
     },
     [getAttachmentFn],
   );
+
+  // Append attachments to a sent letter (today only).
+  const appendSentFn = useServerFn(appendSentAttachment);
+  const openThreadFn = useServerFn(getThread);
+  const reloadMessages = useCallback(async (threadId: string) => {
+    const r = await openThreadFn({ data: { thread_id: threadId } });
+    if (r.ok) setMessages(r.messages as ThreadMessage[]);
+  }, [openThreadFn]);
+  const handleAppendSent = useCallback(
+    async (m: ThreadMessage, files: OutgoingAttachment[]) => {
+      if (!selected) return;
+      const r = await appendSentFn({
+        data: {
+          thread_id: selected.id,
+          gmail_message_id: m.gmail_message_id,
+          attachments: files,
+        },
+      });
+      if (!r.ok) { setNotice({ kind: "err", text: r.error }); return; }
+      setNotice({ kind: "ok", text: `Attached ${r.attachments.length} file${r.attachments.length === 1 ? "" : "s"} to this letter.` });
+      await reloadMessages(selected.id);
+    },
+    [appendSentFn, selected, reloadMessages],
+  );
+
+  // True when a message was sent today (King's local day).
+  const isToday = (iso: string | null): boolean => {
+    if (!iso) return false;
+    const d = new Date(iso); const n = new Date();
+    return d.getFullYear() === n.getFullYear()
+      && d.getMonth() === n.getMonth()
+      && d.getDate() === n.getDate();
+  };
+
+
 
   // Load souls + contacts + scheduled + templates + default ink
   useEffect(() => {
@@ -785,23 +835,42 @@ export function InboxPanel({
                               onClick={() => void downloadAttachment(m, a)}
                               className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px]"
                               style={{
-                                background: "color-mix(in oklab, var(--dawn-gold) 22%, transparent)",
+                                background: a.public_url
+                                  ? "color-mix(in oklab, var(--dawn-gold-bright) 28%, transparent)"
+                                  : "color-mix(in oklab, var(--dawn-gold) 22%, transparent)",
                                 border: "1px solid color-mix(in oklab, var(--dawn-gold) 50%, transparent)",
                                 color: "var(--dawn-ink)",
                                 fontFamily: "Georgia, serif",
                               }}
-                              title={`Download ${a.filename} (${formatBytes(a.size)})`}
+                              title={`Download ${a.filename} (${formatBytes(a.size)})${a.appended_at ? ` — added ${new Date(a.appended_at).toLocaleTimeString()}` : ""}`}
                             >
                               <Paperclip className="h-3 w-3" />
                               <span className="max-w-[160px] truncate">{a.filename}</span>
                               <span style={{ color: "color-mix(in oklab, var(--dawn-ink) 55%, transparent)" }}>
                                 · {formatBytes(a.size)}
                               </span>
+                              {a.appended_at && (
+                                <span style={{ color: "color-mix(in oklab, var(--dawn-ink) 55%, transparent)" }}>
+                                  · added {new Date(a.appended_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                                </span>
+                              )}
                               <Download className="h-3 w-3" />
                             </button>
                           ))}
                         </div>
                       )}
+                      {folder === "sent" && isToday(m.sent_at) && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <span
+                            className="text-[10px] uppercase tracking-[0.2em]"
+                            style={{ color: "color-mix(in oklab, var(--dawn-ink) 60%, transparent)" }}
+                          >
+                            Add attachment (today only):
+                          </span>
+                          <AppendAttachmentButton onPick={(files) => void handleAppendSent(m, files)} />
+                        </div>
+                      )}
+
                     </article>
                   ))}
                 </div>
@@ -1819,3 +1888,57 @@ function AttachmentPicker({
     </div>
   );
 }
+
+// Compact "Attach" button used in Sent view to append files to a sent letter.
+function AppendAttachmentButton({ onPick }: { onPick: (files: OutgoingAttachment[]) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const handle = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setErr(null);
+    setBusy(true);
+    try {
+      const picked = Array.from(files).slice(0, MAX_ATTACH_COUNT);
+      const out: OutgoingAttachment[] = [];
+      for (const f of picked) {
+        if (f.size > MAX_ATTACH_BYTES) { setErr(`${f.name} is larger than 10 MB.`); continue; }
+        out.push(await fileToOutgoing(f));
+      }
+      if (out.length) onPick(out);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(e) => { void handle(e.target.files); if (inputRef.current) inputRef.current.value = ""; }}
+      />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={busy}
+        className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] disabled:opacity-50"
+        style={{
+          background: "color-mix(in oklab, var(--dawn-gold-bright) 22%, transparent)",
+          border: "1px solid color-mix(in oklab, var(--dawn-gold) 50%, transparent)",
+          color: "var(--dawn-ink)",
+          fontFamily: "Cinzel, serif",
+        }}
+        title="Attach a file to this sent letter (today only). Max 10 MB each."
+      >
+        {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Paperclip className="h-3 w-3" />}
+        Attach
+      </button>
+      {err && <span className="text-[10px] italic" style={{ color: "var(--dawn-ember)" }}>{err}</span>}
+    </span>
+  );
+}
+

@@ -41,6 +41,7 @@ import {
   setWorkshopCalendar,
   createLegalEvent,
 } from "@/lib-server/calendar.functions";
+import { WordPressSiteBinding } from "@/components/workshop/WordPressSiteBinding";
 
 type TabKey = "promo" | "newpost" | "legal";
 
@@ -158,6 +159,9 @@ export function StudioPanel({
         </p>
       </div>
 
+      {/* Website binding — surfaced at the top so the King sees it on every tab */}
+      <WordPressSiteBinding workshopId={workshopId} />
+
       {/* Curator | Editor picker bar (Phase 10.1) */}
       <CuratorEditorBar
         souls={souls}
@@ -166,6 +170,7 @@ export function StudioPanel({
         onCurator={setCuratorId}
         onEditor={setEditorId}
       />
+
 
       {/* Tab strip */}
       <div className="mb-4 mt-4 flex flex-wrap gap-2">

@@ -425,6 +425,7 @@ export type Database = {
       }
       email_messages: {
         Row: {
+          appended_attachments: Json
           body_html: string
           body_text: string
           created_at: string
@@ -439,6 +440,7 @@ export type Database = {
           to_addr: string
         }
         Insert: {
+          appended_attachments?: Json
           body_html?: string
           body_text?: string
           created_at?: string
@@ -453,6 +455,7 @@ export type Database = {
           to_addr?: string
         }
         Update: {
+          appended_attachments?: Json
           body_html?: string
           body_text?: string
           created_at?: string
