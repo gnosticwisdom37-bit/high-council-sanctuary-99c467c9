@@ -1888,3 +1888,57 @@ function AttachmentPicker({
     </div>
   );
 }
+
+// Compact "Attach" button used in Sent view to append files to a sent letter.
+function AppendAttachmentButton({ onPick }: { onPick: (files: OutgoingAttachment[]) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const handle = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setErr(null);
+    setBusy(true);
+    try {
+      const picked = Array.from(files).slice(0, MAX_ATTACH_COUNT);
+      const out: OutgoingAttachment[] = [];
+      for (const f of picked) {
+        if (f.size > MAX_ATTACH_BYTES) { setErr(`${f.name} is larger than 10 MB.`); continue; }
+        out.push(await fileToOutgoing(f));
+      }
+      if (out.length) onPick(out);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(e) => { void handle(e.target.files); if (inputRef.current) inputRef.current.value = ""; }}
+      />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={busy}
+        className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] disabled:opacity-50"
+        style={{
+          background: "color-mix(in oklab, var(--dawn-gold-bright) 22%, transparent)",
+          border: "1px solid color-mix(in oklab, var(--dawn-gold) 50%, transparent)",
+          color: "var(--dawn-ink)",
+          fontFamily: "Cinzel, serif",
+        }}
+        title="Attach a file to this sent letter (today only). Max 10 MB each."
+      >
+        {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Paperclip className="h-3 w-3" />}
+        Attach
+      </button>
+      {err && <span className="text-[10px] italic" style={{ color: "var(--dawn-ember)" }}>{err}</span>}
+    </span>
+  );
+}
+
