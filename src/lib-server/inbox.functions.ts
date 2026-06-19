@@ -1312,9 +1312,11 @@ export const scheduleEmail = createServerFn({ method: "POST" })
         send_at: z.string().min(10).max(60),
         ink_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
         notice_header_html: z.string().max(4000).optional(),
+        attachments: outgoingAttachmentsSchema,
       })
       .parse(input),
   )
+
   .handler(async ({ data }) => {
     const sendAt = new Date(data.send_at);
     if (Number.isNaN(sendAt.getTime())) return { ok: false as const, error: "Invalid send time." };
@@ -1360,7 +1362,9 @@ export const scheduleEmail = createServerFn({ method: "POST" })
       status: "pending",
       ink_color: data.ink_color ?? "",
       notice_header_html: data.notice_header_html ?? "",
+      attachments: (data.attachments && data.attachments.length > 0 ? data.attachments : null) as never,
     });
+
     if (error) return { ok: false as const, error: error.message };
     return { ok: true as const };
   });
@@ -1443,10 +1447,12 @@ export const dispatchScheduledRow = createServerFn({ method: "POST" })
     editor_soul_id: string;
     ink_color?: string;
     notice_header_html?: string;
+    attachments?: Array<{ filename: string; mime_type: string; data_base64: string }> | null;
   }) => data)
   .handler(async ({ data: row }): Promise<{ ok: true } | { ok: false; error: string }> => {
     const headers = gmailHeaders();
     if (!headers) return { ok: false, error: "Gmail connection not configured." };
+
 
     const { data: stationery } = await supabaseAdmin
       .from("kingdom_stationery").select("*").eq("id", true).single();
@@ -1506,7 +1512,9 @@ export const dispatchScheduledRow = createServerFn({ method: "POST" })
       htmlBody: wrapped,
       inReplyTo: inReplyTo || undefined,
       references: references || undefined,
+      attachments: row.attachments ?? undefined,
     });
+
 
     const sendRes = await sendGmailRaw(headers, rfc2822, gmailThreadId);
     if (!sendRes.ok) return { ok: false, error: sendRes.error };
