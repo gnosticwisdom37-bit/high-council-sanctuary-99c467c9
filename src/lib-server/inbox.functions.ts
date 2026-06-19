@@ -1362,7 +1362,9 @@ export const scheduleEmail = createServerFn({ method: "POST" })
       status: "pending",
       ink_color: data.ink_color ?? "",
       notice_header_html: data.notice_header_html ?? "",
+      attachments: (data.attachments && data.attachments.length > 0 ? data.attachments : null) as never,
     });
+
     if (error) return { ok: false as const, error: error.message };
     return { ok: true as const };
   });
