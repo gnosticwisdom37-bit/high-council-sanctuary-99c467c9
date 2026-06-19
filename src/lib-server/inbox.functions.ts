@@ -1512,7 +1512,9 @@ export const dispatchScheduledRow = createServerFn({ method: "POST" })
       htmlBody: wrapped,
       inReplyTo: inReplyTo || undefined,
       references: references || undefined,
+      attachments: row.attachments ?? undefined,
     });
+
 
     const sendRes = await sendGmailRaw(headers, rfc2822, gmailThreadId);
     if (!sendRes.ok) return { ok: false, error: sendRes.error };
