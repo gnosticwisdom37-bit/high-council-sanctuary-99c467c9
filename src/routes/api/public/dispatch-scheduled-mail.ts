@@ -10,7 +10,7 @@ async function dispatch() {
   const now = new Date().toISOString();
   const { data: due, error } = await supabaseAdmin
     .from("scheduled_emails")
-    .select("id, kind, thread_id, to_addr, cc_addr, bcc_addr, subject, body_html, editor_soul_id, ink_color, notice_header_html")
+    .select("id, kind, thread_id, to_addr, cc_addr, bcc_addr, subject, body_html, editor_soul_id, ink_color, notice_header_html, attachments")
     .eq("status", "pending")
     .lte("send_at", now)
     .limit(20);
@@ -46,8 +46,10 @@ async function dispatch() {
         editor_soul_id: row.editor_soul_id as string,
         ink_color: (row.ink_color as string | undefined) ?? undefined,
         notice_header_html: (row.notice_header_html as string | undefined) ?? undefined,
+        attachments: (row.attachments as Array<{ filename: string; mime_type: string; data_base64: string }> | null) ?? undefined,
       },
     });
+
 
 
     if (result.ok) {
