@@ -1447,10 +1447,12 @@ export const dispatchScheduledRow = createServerFn({ method: "POST" })
     editor_soul_id: string;
     ink_color?: string;
     notice_header_html?: string;
+    attachments?: Array<{ filename: string; mime_type: string; data_base64: string }> | null;
   }) => data)
   .handler(async ({ data: row }): Promise<{ ok: true } | { ok: false; error: string }> => {
     const headers = gmailHeaders();
     if (!headers) return { ok: false, error: "Gmail connection not configured." };
+
 
     const { data: stationery } = await supabaseAdmin
       .from("kingdom_stationery").select("*").eq("id", true).single();
