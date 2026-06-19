@@ -1185,10 +1185,13 @@ function ComposeDrawer({
         editor_soul_id: editorId,
         ink_color: inkColor,
         notice_header_html: noticeHeaderHtml || undefined,
+        attachments: composeAttachments.length
+          ? composeAttachments.map(({ filename, mime_type, data_base64 }) => ({ filename, mime_type, data_base64 }))
+          : undefined,
       },
     });
     setSending(false);
-    if (r.ok) await onSent();
+    if (r.ok) { setComposeAttachments([]); await onSent(); }
     else setErr(r.error);
   };
 
@@ -1209,13 +1212,17 @@ function ComposeDrawer({
         send_at: iso,
         ink_color: inkColor,
         notice_header_html: noticeHeaderHtml || undefined,
+        attachments: composeAttachments.length
+          ? composeAttachments.map(({ filename, mime_type, data_base64 }) => ({ filename, mime_type, data_base64 }))
+          : undefined,
       },
     });
     setSending(false);
     setScheduleMenuOpen(false);
-    if (r.ok) await onScheduled();
+    if (r.ok) { setComposeAttachments([]); await onScheduled(); }
     else setErr(r.error);
   };
+
 
   return (
     <div
