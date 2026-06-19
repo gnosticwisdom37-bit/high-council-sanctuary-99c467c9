@@ -1369,7 +1369,15 @@ function ComposeDrawer({
             </button>
           </div>
 
+          <AttachmentPicker
+            attachments={composeAttachments}
+            onAdd={(a) => setComposeAttachments((p) => [...p, ...a])}
+            onRemove={(i) => setComposeAttachments((p) => p.filter((_, idx) => idx !== i))}
+          />
+
         </div>
+
+
 
         {err && (
           <p
