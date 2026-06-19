@@ -1,39 +1,49 @@
-# Two small additions
+## Goal
 
-## 1. WordPress site binding (Workshop → Studio "Add website")
+When You draft a **New Letter** from the Scriptorium (or a reply), there should be an "Attach files" affordance — and any files You attach should travel with the letter whether it sends now or on a schedule. Reply already supports this; Compose does not.
 
-The gateway plumbing already exists (`src/lib-server/wordpress.functions.ts`: `listWpSites`, `getWorkshopWpLink`, `setWorkshopWpSite`, `createWpPost`). The "Add website" button in the Studio just isn't wired to a picker yet.
+WordPress scope error is a separate piece — I'll address it next turn after this lands.
 
-**Build:**
-- Add a `WordPressSiteBinding` panel (small dialog) that:
-  - Calls `listWpSites` and shows the King's WP.com sites (name + URL).
-  - Lets King pick one site, optional default categories/tags, default status (`draft` recommended).
-  - Saves via `setWorkshopWpSite` keyed to the current Workshop.
-  - Shows current binding (site name + URL) once set, with a "Change site" affordance.
-- Wire the existing "Add website" button in `StudioPanel.tsx` to open this dialog.
-- If `WORDPRESS_COM_API_KEY` is missing, the panel shows a single inline "Connect WordPress.com" message (no fake values, no dashboard links) — connector linking is handled outside this flow.
+## Scope of this change
 
-**Result:** New Post tab can publish drafts/scheduled/published posts to the bound site; Studio Blog Archive list reflects mirrored posts on next sync.
+Frontend (Compose Drawer) + one server fn (scheduled mail) + the cron dispatcher. No new tables, no schema migration for live sends — `composeAndSend` already accepts `attachments`. Scheduled letters need one column to remember the files until send time.
 
-## 2. Sent-folder attachments (Scriptorium)
+## Changes
 
-Today, attachments only attach during *compose*. Add an "Add attachment" affordance on **sent letters** for today's date.
+### 1. `src/components/workshop/InboxPanel.tsx` — ComposeDrawer
+- Add `composeAttachments` state (mirrors the reply flow's `replyAttachments`).
+- Render the existing `<AttachmentPicker>` under the "Edit body HTML before sending" details block, same styling as in the reply view.
+- Pass `attachments: composeAttachments.map(({filename, mime_type, data_base64}) => …)` into both:
+  - `composeAndSendFn` (send now) — already supported server-side.
+  - `scheduleEmailFn` (schedule for later) — newly supported (see #2).
+- Reset `composeAttachments` after a successful send / schedule, same as reply does.
 
-**Build (frontend-only where possible):**
-- In the Sent folder letter view, when `sent_at` is today (King's local day), show an "Attach file" button.
-- Reuse the existing compose attachment uploader (same bucket, same size limits, same UI affordance).
-- Append uploaded attachment refs to the existing `email_messages.attachments` jsonb array for that message via a small server fn `appendSentAttachment({ message_id, attachments[] })` that:
-  - Verifies the message is owned by the King, is in Sent, and `sent_at >= start_of_today_local`.
-  - Appends rather than replaces; never mutates the original send.
-- These appear inline in the letter view alongside original attachments, labeled "Added [time]" so the King can see they were appended after send.
+### 2. `src/lib-server/inbox.functions.ts` — `scheduleEmail`
+- Extend the Zod input with the existing `outgoingAttachmentsSchema` (optional).
+- Persist into a new `attachments` jsonb column on `scheduled_emails` (array of `{filename, mime_type, data_base64}`).
+- No change to how recipients are resolved or how the row is claimed.
 
-**Why "today only":** matches your intent — a same-day addition (e.g. forgot to attach the PDF), without rewriting historical sent mail.
+### 3. `src/routes/api/public/dispatch-scheduled-mail.ts` — cron dispatcher
+- Select `attachments` along with the other fields.
+- Pass it into `dispatchScheduledRow({ data: { …, attachments } })`.
 
-**No changes** to: send/reply recipient resolution, threading, scheduling, drafting gateway (just shipped), or self-curation.
+### 4. `dispatchScheduledRow` (same file as #2)
+- Accept optional `attachments` in its input schema.
+- Forward to the existing RFC 2822 builder, which already handles attachments for `composeAndSend` / `sendReply`.
 
-## Technical notes (for me)
-- New file: `src/components/workshop/WordPressSiteBinding.tsx`.
-- Edits: `src/components/workshop/StudioPanel.tsx` (wire button), `src/components/workshop/InboxPanel.tsx` or wherever Sent letter view lives (add attach button + handler), `src/lib-server/inbox.functions.ts` (`appendSentAttachment` server fn with `requireSupabaseAuth` + same-day guard).
-- No schema migration needed — `email_messages.attachments` jsonb already holds the array.
+### 5. Migration — `scheduled_emails.attachments`
+- Add nullable `jsonb` column (default `null`); no backfill needed.
+- No RLS/grant changes (table policies already exist).
 
-Shall I build both, or want WordPress first and Sent-attachments next?
+## What I am NOT touching
+
+- Reply attachment flow (already works).
+- `appendSentAttachment` (today-only sent additions — already shipped).
+- Recipient resolution, threading, stationery wrap, drafting gateway.
+- WordPress scope issue (separate turn).
+
+## Notes for me
+
+- Cap stays at the existing `outgoingAttachmentsSchema` limits (≤10 MB raw / file, ≤5 files) for both send-now and scheduled.
+- Data is stored as base64 in the jsonb cell — fine for the existing 5-file × 10 MB cap; the dispatcher decodes and uploads to Gmail at send time, identical to the live send path.
+- After this ships, the next turn will tackle the WP `authorization_required` scope error by reconnecting the WordPress.com connection with the `posts` scope (and showing a friendly reconnect prompt in `WordPressSiteBinding` when the gateway returns 400/authorization_required).

@@ -913,6 +913,7 @@ export type Database = {
       }
       scheduled_emails: {
         Row: {
+          attachments: Json | null
           bcc_addr: string
           body_html: string
           cc_addr: string
@@ -933,6 +934,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          attachments?: Json | null
           bcc_addr?: string
           body_html: string
           cc_addr?: string
@@ -953,6 +955,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          attachments?: Json | null
           bcc_addr?: string
           body_html?: string
           cc_addr?: string
