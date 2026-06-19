@@ -1312,9 +1312,11 @@ export const scheduleEmail = createServerFn({ method: "POST" })
         send_at: z.string().min(10).max(60),
         ink_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
         notice_header_html: z.string().max(4000).optional(),
+        attachments: outgoingAttachmentsSchema,
       })
       .parse(input),
   )
+
   .handler(async ({ data }) => {
     const sendAt = new Date(data.send_at);
     if (Number.isNaN(sendAt.getTime())) return { ok: false as const, error: "Invalid send time." };
