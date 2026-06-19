@@ -1116,6 +1116,8 @@ function ComposeDrawer({
   const [scheduleMenuOpen, setScheduleMenuOpen] = useState(false);
   const [templateId, setTemplateId] = useState<string>("");
   const [noticeHeaderHtml, setNoticeHeaderHtml] = useState<string>("");
+  const [composeAttachments, setComposeAttachments] = useState<OutgoingAttachment[]>([]);
+
 
   const applyTemplate = (id: string) => {
     setTemplateId(id);
