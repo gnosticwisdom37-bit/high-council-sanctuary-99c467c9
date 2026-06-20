@@ -10,6 +10,17 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/wordpress_com";
+const DEFAULT_WP_SITE_HOST = "vondehnvisuals.wordpress.com";
+
+type WpSiteResponse = { ID: number; name: string; URL: string; slug?: string };
+
+function normalizeWpSite(site: WpSiteResponse) {
+  return {
+    id: String(site.ID),
+    name: site.name,
+    url: site.URL,
+  };
+}
 
 function headers() {
   const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;
@@ -40,16 +51,28 @@ export const listWpSites = createServerFn({ method: "POST" })
   .handler(async () => {
     try {
       const data = (await wpFetch("/rest/v1.1/me/sites")) as {
-        sites?: Array<{ ID: number; name: string; URL: string }>;
+        sites?: WpSiteResponse[];
       };
-      const sites = (data?.sites ?? []).map((s) => ({
-        id: String(s.ID),
-        name: s.name,
-        url: s.URL,
-      }));
+      const sites = (data?.sites ?? []).map(normalizeWpSite);
       return { ok: true as const, sites };
     } catch (e) {
-      return { ok: false as const, error: e instanceof Error ? e.message : String(e), sites: [] };
+      const message = e instanceof Error ? e.message : String(e);
+      if (!message.includes("authorization_required")) {
+        return { ok: false as const, error: message, sites: [] };
+      }
+
+      try {
+        const site = (await wpFetch(
+          `/rest/v1.1/sites/${encodeURIComponent(DEFAULT_WP_SITE_HOST)}`,
+        )) as WpSiteResponse;
+        return { ok: true as const, sites: [normalizeWpSite(site)] };
+      } catch (fallbackError) {
+        return {
+          ok: false as const,
+          error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+          sites: [],
+        };
+      }
     }
   });
 
