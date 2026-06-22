@@ -197,9 +197,86 @@ export const processDroppedFile = createServerFn({ method: "POST" })
 
     const ext = (filename.split(".").pop() ?? "").toLowerCase();
 
-    // ── CSV → blog_archive ──
+    // ── CSV → Jetpack stats (posts/downloads/countries) OR blog_archive ──
     if (ext === "csv") {
       const text = new TextDecoder().decode(bytes);
+
+      // Try Jetpack-shape detection first.
+      const allRows = parseCSV(text);
+      const kind = detectWpStatsKind(allRows);
+      if (kind) {
+        const period = parsePeriodFromFilename(filename);
+        const dataRows = allRows.filter((r) => r.some((c) => c && c.trim().length > 0));
+
+        const { data: upload, error: upErr } = await supabaseAdmin
+          .from("wp_stats_uploads")
+          .insert({
+            workshop_id,
+            kind,
+            source_filename: filename,
+            period_start: period.start,
+            period_end: period.end,
+            row_count: dataRows.length,
+          })
+          .select("id")
+          .single();
+        if (upErr || !upload) return { ok: false as const, error: upErr?.message ?? "Upload insert failed." };
+
+        if (kind === "posts") {
+          const payload = dataRows.map((r, i) => ({
+            upload_id: upload.id,
+            workshop_id,
+            title: (r[0] ?? "").trim().slice(0, 500) || "(untitled)",
+            url: r[2] && r[2].trim() ? r[2].trim().slice(0, 2000) : null,
+            views: parseInt((r[1] ?? "0").replace(/[,\s]/g, ""), 10) || 0,
+            position: i + 1,
+          }));
+          const { error } = await supabaseAdmin.from("wp_post_views").insert(payload);
+          if (error) return { ok: false as const, error: error.message };
+          return {
+            ok: true as const,
+            kind: "blog-archive" as const,
+            summary: `${payload.length} post${payload.length === 1 ? "" : "s"} catalogued${period.start ? ` · ${period.start}` : ""}.`,
+          };
+        }
+        if (kind === "downloads") {
+          const payload = dataRows.map((r) => ({
+            upload_id: upload.id,
+            workshop_id,
+            path: (r[0] ?? "").trim().slice(0, 2000),
+            filename: basenameFromPath((r[0] ?? "").trim()).slice(0, 500),
+            downloads: parseInt((r[1] ?? "0").replace(/[,\s]/g, ""), 10) || 0,
+          }));
+          const { error } = await supabaseAdmin.from("wp_file_downloads").insert(payload);
+          if (error) return { ok: false as const, error: error.message };
+          return {
+            ok: true as const,
+            kind: "blog-archive" as const,
+            summary: `${payload.length} download${payload.length === 1 ? "" : "s"} catalogued${period.start ? ` · ${period.start}` : ""}.`,
+          };
+        }
+        if (kind === "countries") {
+          const payload = dataRows.map((r) => {
+            const name = (r[0] ?? "").trim();
+            const iso = lookupCountryISO(name);
+            return {
+              upload_id: upload.id,
+              workshop_id,
+              country: name.slice(0, 200),
+              iso_a2: iso?.a2 ?? null,
+              views: parseInt((r[1] ?? "0").replace(/[,\s]/g, ""), 10) || 0,
+            };
+          });
+          const { error } = await supabaseAdmin.from("wp_country_views").insert(payload);
+          if (error) return { ok: false as const, error: error.message };
+          return {
+            ok: true as const,
+            kind: "blog-archive" as const,
+            summary: `${payload.length} countr${payload.length === 1 ? "y" : "ies"} mapped${period.start ? ` · ${period.start}` : ""}.`,
+          };
+        }
+      }
+
       const { rows, raw_headers } = csvToBlogRows(text);
       if (rows.length === 0) {
         return {
