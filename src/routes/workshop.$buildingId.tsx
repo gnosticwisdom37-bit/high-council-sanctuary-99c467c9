@@ -559,6 +559,14 @@ function WorkshopPage() {
           <InboxPanel workshopId={workshop.id} stewardSoulId={workshop.steward_soul_id} />
         </div>
 
+        {/* Blog Stats — Jetpack CSV analytics */}
+        <div className="mt-8">
+          <Pane title="Blog Stats" subtitle="Top posts · downloads · visitors map">
+            <BlogStatsPanel workshopId={workshop.id} />
+          </Pane>
+        </div>
+
+
 
 
         {/* Event-Spark Calendar */}
