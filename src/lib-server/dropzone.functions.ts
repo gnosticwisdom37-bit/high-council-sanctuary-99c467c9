@@ -15,6 +15,47 @@ import { z } from "zod";
 import { extractText, getDocumentProxy } from "unpdf";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { extractLegal } from "@/lib-server/legal-extractors";
+import { lookupCountryISO } from "@/lib/country-iso";
+
+// ─── Jetpack-style WP stats detection ──────────────────────────────────────
+type WpStatsKind = "posts" | "downloads" | "countries";
+
+function parsePeriodFromFilename(filename: string): { start: string | null; end: string | null } {
+  // Jetpack: -day-MM_DD_YYYY-MM_DD_YYYY.csv  (also -month-, -year-)
+  const m = filename.match(/-(?:day|month|year)-(\d{2})_(\d{2})_(\d{4})-(\d{2})_(\d{2})_(\d{4})\.csv$/i);
+  if (m) {
+    const [, m1, d1, y1, m2, d2, y2] = m;
+    return { start: `${y1}-${m1}-${d1}`, end: `${y2}-${m2}-${d2}` };
+  }
+  return { start: null, end: null };
+}
+
+function detectWpStatsKind(rows: string[][]): WpStatsKind | null {
+  // Sample non-empty data rows (Jetpack CSVs have no header row).
+  const sample = rows.filter((r) => r.some((c) => c && c.trim().length > 0)).slice(0, 8);
+  if (sample.length === 0) return null;
+  const cols = sample[0].length;
+
+  if (cols === 2) {
+    const firstCol = sample[0][0]?.trim() ?? "";
+    if (firstCol.startsWith("/")) return "downloads";
+    // Country if first col is a known country name on most rows.
+    const known = sample.filter((r) => lookupCountryISO(r[0] ?? "")).length;
+    if (known >= Math.max(1, Math.floor(sample.length / 2))) return "countries";
+    return null;
+  }
+  if (cols >= 2 && cols <= 4) {
+    // Posts: numeric 2nd col, optional URL 3rd col.
+    const numericSecond = sample.filter((r) => /^\d[\d,]*$/.test((r[1] ?? "").trim())).length;
+    if (numericSecond >= Math.max(1, Math.floor(sample.length / 2))) return "posts";
+  }
+  return null;
+}
+
+function basenameFromPath(p: string): string {
+  const slash = p.lastIndexOf("/");
+  return slash >= 0 ? p.slice(slash + 1) : p;
+}
 
 const MAX_BYTES = 6 * 1024 * 1024;
 
