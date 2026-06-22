@@ -28,6 +28,7 @@ import { BrandMark } from "@/components/kingdom/BrandMark";
 import { DropZone } from "@/components/workshop/DropZone";
 import { StudioPanel } from "@/components/workshop/StudioPanel";
 import { InboxPanel } from "@/components/workshop/InboxPanel";
+import { BlogStatsPanel } from "@/components/workshop/BlogStatsPanel";
 import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -557,6 +558,14 @@ function WorkshopPage() {
         <div className="mt-8">
           <InboxPanel workshopId={workshop.id} stewardSoulId={workshop.steward_soul_id} />
         </div>
+
+        {/* Blog Stats — Jetpack CSV analytics */}
+        <div className="mt-8">
+          <Pane title="Blog Stats" subtitle="Top posts · downloads · visitors map">
+            <BlogStatsPanel workshopId={workshop.id} />
+          </Pane>
+        </div>
+
 
 
 
