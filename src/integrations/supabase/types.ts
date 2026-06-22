@@ -1435,6 +1435,185 @@ export type Database = {
         }
         Relationships: []
       }
+      wp_country_views: {
+        Row: {
+          country: string
+          created_at: string
+          id: string
+          iso_a2: string | null
+          upload_id: string
+          views: number
+          workshop_id: string
+        }
+        Insert: {
+          country: string
+          created_at?: string
+          id?: string
+          iso_a2?: string | null
+          upload_id: string
+          views?: number
+          workshop_id: string
+        }
+        Update: {
+          country?: string
+          created_at?: string
+          id?: string
+          iso_a2?: string | null
+          upload_id?: string
+          views?: number
+          workshop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wp_country_views_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "wp_stats_uploads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wp_country_views_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wp_file_downloads: {
+        Row: {
+          created_at: string
+          downloads: number
+          filename: string | null
+          id: string
+          path: string
+          upload_id: string
+          workshop_id: string
+        }
+        Insert: {
+          created_at?: string
+          downloads?: number
+          filename?: string | null
+          id?: string
+          path: string
+          upload_id: string
+          workshop_id: string
+        }
+        Update: {
+          created_at?: string
+          downloads?: number
+          filename?: string | null
+          id?: string
+          path?: string
+          upload_id?: string
+          workshop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wp_file_downloads_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "wp_stats_uploads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wp_file_downloads_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wp_post_views: {
+        Row: {
+          created_at: string
+          id: string
+          position: number | null
+          title: string
+          upload_id: string
+          url: string | null
+          views: number
+          workshop_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          position?: number | null
+          title: string
+          upload_id: string
+          url?: string | null
+          views?: number
+          workshop_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          position?: number | null
+          title?: string
+          upload_id?: string
+          url?: string | null
+          views?: number
+          workshop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wp_post_views_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "wp_stats_uploads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wp_post_views_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wp_stats_uploads: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          period_end: string | null
+          period_start: string | null
+          row_count: number
+          source_filename: string
+          workshop_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          period_end?: string | null
+          period_start?: string | null
+          row_count?: number
+          source_filename: string
+          workshop_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          period_end?: string | null
+          period_start?: string | null
+          row_count?: number
+          source_filename?: string
+          workshop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wp_stats_uploads_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
