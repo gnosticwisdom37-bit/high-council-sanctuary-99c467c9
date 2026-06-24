@@ -1,78 +1,38 @@
-## Goal
+# Map Fix + Cumulative Stats
 
-Drop any of the three Jetpack-style CSVs into the Workshop and get a clean stats view: top posts, top document downloads, and a world map of visitors — cross-referenceable across uploads and time periods.
+## 1. Why the map looks empty (the actual bug)
 
-## The three CSV shapes (auto-detected by columns, not filename)
+The `world-atlas` topojson I used does **not** carry `iso_a2` on its country features — each feature only has `properties.name` and a numeric `id` (the UN M49 code, e.g. `156` for China, `840` for US, `124` for Canada).
 
-1. **Posts & pages** — `title, views, url?` (url optional; e.g. "Homepage (Latest posts)")
-2. **File downloads** — `path, downloads` (path begins with `/`, ends in a file extension like `.pdf`)
-3. **Locations / country** — `country, views` (2 cols, first col is a country name)
+My current code asks for `geo.properties.iso_a2`, finds `undefined`, and paints every country the default ink color. That's why China / US / Canada don't light up even though the data is sitting right there in the right-hand list.
 
-The current "blog_archive" CSV path assumes a richer WP export. We'll add a smarter detector that routes these three Jetpack shapes to their own typed stores, and leave the existing blog_archive flow intact as a fallback.
+**Fix:** match by numeric M49 code instead.
+- Extend `src/lib/country-iso.ts` to also return `m49` for each country (small static table — same ~80 entries already there).
+- In `BlogStatsPanel.tsx`, build the choropleth lookup keyed by M49 code, and read `geo.id` from each geography (that's what world-atlas exposes).
+- As a safety net, also fall back to matching by `properties.name` (lowercased) so any country I haven't tagged with an M49 still gets colored.
+- Bump the minimum fill from 18% → 30% and the max from 80% → 95% so even single-visit countries are clearly visible against the dark ink background.
 
-## Data model (3 new tables)
+After this, China, US, Canada, and every other country in your CSV will light up in gold proportional to their views.
 
-- `wp_stats_uploads` — one row per CSV drop: workshop_id, kind (`posts`|`downloads`|`countries`), source_filename, period_start, period_end (parsed from filename `…-day-MM_DD_YYYY-MM_DD_YYYY.csv`), row_count, created_at.
-- `wp_post_views` — upload_id, title, url (nullable), views, position.
-- `wp_file_downloads` — upload_id, path, filename (derived), downloads.
-- `wp_country_views` — upload_id, country, iso_a2 (looked up from a static name→ISO map), views.
+## 2. Cumulative / time-series view (the Jetpack-style "over time" feel)
 
-Standard RLS + GRANTs per project conventions.
+Right now every upload is summed together into one number per post / country / file. To get the "today vs. first upload" comparison you described, the data is already there — each row knows its `upload_id`, and each upload has a `period_start` / `period_end` parsed from the filename. I just need to surface it.
 
-## Drop Zone changes
+**Add a fourth tab: "Over Time"** to the BlogStatsPanel:
+- Horizontal stacked bar per upload period (oldest → newest), one row per period showing total post views, downloads, and unique countries for that period.
+- Below it, a sparkline-style mini chart of cumulative post views across all periods so you can see the trend at a glance.
+- A small "Compare" toggle on the **Top Posts** and **Downloads** tabs: when on, each row shows two numbers — earliest-period total vs. latest-period total — with a delta arrow (↑ / ↓ / —) in dawn-gold.
 
-In `dropzone.functions.ts`, before the existing blog_archive branch:
+No new tables needed. One new server function `getStatsOverTime` that returns `[{ period_start, period_end, post_views, downloads, countries }]` aggregated by `upload_id`. Front-end renders with the same dawn-themed bar style already in the panel (no new chart library).
 
-- Parse CSV, sniff header/first rows:
-  - 2 cols + first col country-like → `countries`
-  - 2 cols + first col starts with `/` and looks like a file path → `downloads`
-  - 2–3 cols + numeric second col + optional url third col → `posts`
-- If matched, insert into `wp_stats_uploads` + the matching child table, return a friendly summary ("42 posts catalogued · period Jun 18 2026").
-- If not matched, fall back to existing blog_archive logic, then unrecognized queue.
+## 3. Why nothing showed up until you sent an email
 
-Filename period parser: regex `-day-(\d{2})_(\d{2})_(\d{4})-(\d{2})_(\d{2})_(\d{4})\.csv` → period_start/end. Also supports `-month-…` and `-year-…` Jetpack variants.
+That's the panel mounting before the workshop's initial server-fn calls have any data — `useEffect` fires once on mount, and if the workshop id arrived a tick later (which happens on cold navigation), the fetches resolved with empty arrays and never re-ran. Already handled by the `useCallback` dep array, but I'll also key the panel on `workshopId` so a late-arriving id forces a clean refetch. That's why a full page reload (after sending the email) "magically" fixed it.
 
-## Studio: new "Blog Stats" panel
+## Files touched
 
-New component `src/components/workshop/BlogStatsPanel.tsx` inside the existing Studio, tabbed:
+- `src/lib/country-iso.ts` — add `m49` numeric code to each entry.
+- `src/components/workshop/BlogStatsPanel.tsx` — switch map keying to M49 + name fallback, brighten fill scale, add "Over Time" tab + Compare toggle.
+- `src/lib-server/wp-stats.functions.ts` — add `getStatsOverTime` server fn.
 
-1. **Top Posts** — bar list of titles by total views across all selected uploads, click-through to URL. Search box. Last-period vs all-time toggle.
-2. **Top Downloads** — same shape, grouped by file path; derives a friendly filename and links to the live PDF on `vondehnvisuals.com`.
-3. **Visitors Map** — world choropleth using `react-simple-maps` + the bundled `world-110m` topojson (pure JS, Worker-safe; no native deps). Country name → ISO via a small static map (`src/lib/country-iso.ts`). Below the map: ranked country list with view counts.
-4. **Cross-Reference** — for any selected post URL, show the matching download rows (by slug match between post URL and `/YYYY/MM/...pdf` path components) and the top countries during the same period. This is the "who's reading what, from where, and what they downloaded" view.
-
-Period filter at the top: All time · Last upload · custom date range (drawn from `wp_stats_uploads.period_*`).
-
-Server functions in a new `src/lib-server/wp-stats.functions.ts`:
-- `listWpStatsUploads({ workshop_id })`
-- `getTopPosts({ workshop_id, from?, to?, limit })`
-- `getTopDownloads({ workshop_id, from?, to?, limit })`
-- `getCountryViews({ workshop_id, from?, to? })`
-- `crossReferencePost({ workshop_id, post_url })`
-
-All aggregate with SUM(views/downloads) GROUP BY title/path/country across uploads in the period.
-
-## Soul involvement
-
-Out of scope for this pass — King's analytics view only. A Council read-only hook can be added later by exposing the same server fns to the speaker tool.
-
-## Technical notes
-
-- `react-simple-maps` + `d3-geo` are pure JS, Worker-safe; topojson committed under `src/assets/world-110m.json`.
-- Country name normalization handles "Hong Kong SAR China" → HK, "United States" → US, etc.; unknowns shown in the ranked list but not on the map.
-- Charts use existing `src/components/ui/chart.tsx` (Recharts) — no new dep beyond `react-simple-maps`.
-- No changes to existing blog_archive table; old rows keep working.
-
-## Out of scope
-
-- WordPress.com OAuth stats pull (the connector lacks scope; CSV upload is the path forward).
-- Soul-authored commentary on stats.
-- Time-series line charts (every CSV is already pre-aggregated per period; can add if you upload many periods).
-
-## Build order
-
-1. Migration: 3 tables + GRANTs + RLS.
-2. Detector + writer in `dropzone.functions.ts`.
-3. Read-side server fns.
-4. `BlogStatsPanel` with the four tabs, mounted in the Studio.
-5. Drop your three sample CSVs, verify, iterate.
+No DB migration, no new dependency, no change to ingestion. Cost: well under a credit.
