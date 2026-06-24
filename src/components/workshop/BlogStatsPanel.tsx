@@ -1,7 +1,7 @@
 /**
  * BlogStatsPanel — Jetpack-style WP analytics dashboard.
  *
- * Tabs: Top Posts · Top Downloads · Visitors Map.
+ * Tabs: Top Posts · Top Downloads · Visitors Map · Over Time.
  * Aggregates across all uploads for this workshop.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -11,15 +11,17 @@ import {
   Geographies,
   Geography,
 } from "react-simple-maps";
-import { BarChart3, Download, ExternalLink, Globe2, Loader2, RefreshCw } from "lucide-react";
+import { BarChart3, Download, ExternalLink, Globe2, Loader2, RefreshCw, TrendingUp } from "lucide-react";
 import {
   getTopPosts,
   getTopDownloads,
   getCountryViews,
   listWpStatsUploads,
+  getStatsOverTime,
 } from "@/lib-server/wp-stats.functions";
+import { A2_TO_M49 } from "@/lib/country-iso";
 
-type Tab = "posts" | "downloads" | "map";
+type Tab = "posts" | "downloads" | "map" | "time";
 
 type Post = { title: string; url: string | null; views: number };
 type FileDl = { path: string; filename: string | null; downloads: number };
@@ -33,6 +35,14 @@ type Upload = {
   row_count: number;
   created_at: string;
 };
+type Period = {
+  period_start: string | null;
+  period_end: string | null;
+  post_views: number;
+  downloads: number;
+  unique_countries: number;
+  country_views: number;
+};
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -42,30 +52,34 @@ export function BlogStatsPanel({ workshopId }: { workshopId: string }) {
   const [files, setFiles] = useState<FileDl[]>([]);
   const [countries, setCountries] = useState<Country[]>([]);
   const [uploads, setUploads] = useState<Upload[]>([]);
+  const [periods, setPeriods] = useState<Period[]>([]);
   const [loading, setLoading] = useState(false);
 
   const fetchPosts = useServerFn(getTopPosts);
   const fetchFiles = useServerFn(getTopDownloads);
   const fetchCountries = useServerFn(getCountryViews);
   const fetchUploads = useServerFn(listWpStatsUploads);
+  const fetchPeriods = useServerFn(getStatsOverTime);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, f, c, u] = await Promise.all([
+      const [p, f, c, u, t] = await Promise.all([
         fetchPosts({ data: { workshop_id: workshopId, limit: 50 } }),
         fetchFiles({ data: { workshop_id: workshopId, limit: 100 } }),
         fetchCountries({ data: { workshop_id: workshopId, limit: 500 } }),
         fetchUploads({ data: { workshop_id: workshopId } }),
+        fetchPeriods({ data: { workshop_id: workshopId } }),
       ]);
       if (p.ok) setPosts(p.posts);
       if (f.ok) setFiles(f.files);
       if (c.ok) setCountries(c.countries);
       if (u.ok) setUploads(u.uploads as Upload[]);
+      if (t.ok) setPeriods(t.periods);
     } finally {
       setLoading(false);
     }
-  }, [workshopId, fetchPosts, fetchFiles, fetchCountries, fetchUploads]);
+  }, [workshopId, fetchPosts, fetchFiles, fetchCountries, fetchUploads, fetchPeriods]);
 
   useEffect(() => {
     void refresh();
@@ -80,13 +94,18 @@ export function BlogStatsPanel({ workshopId }: { workshopId: string }) {
   const maxPost = posts[0]?.views ?? 1;
   const maxFile = files[0]?.downloads ?? 1;
 
-  // map ISO-A3 → views for the choropleth
-  const countryByA2 = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const c of countries) if (c.iso_a2) m.set(c.iso_a2, (m.get(c.iso_a2) ?? 0) + c.views);
-    return m;
+  // map M49-code → views (world-atlas uses geo.id = UN M49 numeric)
+  const { countryByM49, countryByName, maxCountry } = useMemo(() => {
+    const byM49 = new Map<string, number>();
+    const byName = new Map<string, number>();
+    for (const c of countries) {
+      const m49 = c.iso_a2 ? A2_TO_M49[c.iso_a2] : undefined;
+      if (m49) byM49.set(m49, (byM49.get(m49) ?? 0) + c.views);
+      if (c.country) byName.set(c.country.trim().toLowerCase(), (byName.get(c.country.trim().toLowerCase()) ?? 0) + c.views);
+    }
+    const max = Math.max(1, ...Array.from(byM49.values()), ...Array.from(byName.values()));
+    return { countryByM49: byM49, countryByName: byName, maxCountry: max };
   }, [countries]);
-  const maxCountry = Math.max(1, ...Array.from(countryByA2.values()));
 
   const goldBright = "var(--dawn-gold-bright)";
   const parchment = "var(--dawn-parchment)";
@@ -95,12 +114,13 @@ export function BlogStatsPanel({ workshopId }: { workshopId: string }) {
     <div>
       {/* Header strip */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {(
             [
               { k: "posts", label: "Top Posts", icon: BarChart3 },
               { k: "downloads", label: "Downloads", icon: Download },
               { k: "map", label: "Visitors Map", icon: Globe2 },
+              { k: "time", label: "Over Time", icon: TrendingUp },
             ] as { k: Tab; label: string; icon: typeof BarChart3 }[]
           ).map((t) => {
             const active = tab === t.k;
@@ -167,8 +187,14 @@ export function BlogStatsPanel({ workshopId }: { workshopId: string }) {
         />
       )}
       {tab === "map" && (
-        <MapView countries={countries} countryByA2={countryByA2} maxCountry={maxCountry} />
+        <MapView
+          countries={countries}
+          countryByM49={countryByM49}
+          countryByName={countryByName}
+          maxCountry={maxCountry}
+        />
       )}
+      {tab === "time" && <OverTimeView periods={periods} />}
 
       {/* Uploads ledger */}
       {uploads.length > 0 && (
@@ -276,11 +302,13 @@ function RankedList({
 
 function MapView({
   countries,
-  countryByA2,
+  countryByM49,
+  countryByName,
   maxCountry,
 }: {
   countries: Country[];
-  countryByA2: Map<string, number>;
+  countryByM49: Map<string, number>;
+  countryByName: Map<string, number>;
   maxCountry: number;
 }) {
   if (countries.length === 0) {
@@ -290,12 +318,13 @@ function MapView({
       </p>
     );
   }
-  const colorFor = (a2: string | undefined) => {
-    if (!a2) return "color-mix(in oklab, var(--dawn-ink) 60%, transparent)";
-    const v = countryByA2.get(a2) ?? 0;
+  const colorFor = (geo: { id?: string | number; properties?: { name?: string } }) => {
+    const m49 = geo.id != null ? String(geo.id).padStart(3, "0") : undefined;
+    const name = geo.properties?.name?.trim().toLowerCase();
+    const v = (m49 && countryByM49.get(m49)) || (name && countryByName.get(name)) || 0;
     if (v === 0) return "color-mix(in oklab, var(--dawn-ink) 60%, transparent)";
-    const pct = Math.max(0.18, Math.min(1, v / maxCountry));
-    return `color-mix(in oklab, var(--dawn-gold-bright) ${Math.round(pct * 80)}%, var(--dawn-ink))`;
+    const pct = Math.max(0.3, Math.min(1, v / maxCountry));
+    return `color-mix(in oklab, var(--dawn-gold-bright) ${Math.round(pct * 95)}%, var(--dawn-ink))`;
   };
 
   return (
@@ -310,27 +339,20 @@ function MapView({
         <ComposableMap projectionConfig={{ scale: 140 }} style={{ width: "100%", height: "auto" }}>
           <Geographies geography={GEO_URL}>
             {({ geographies }) =>
-              geographies.map((geo) => {
-                // world-atlas 110m uses ISO-A2 in properties when available, else `iso_a2` from properties
-                const a2 =
-                  (geo.properties as { iso_a2?: string; ISO_A2?: string; "ISO_A2_EH"?: string }).iso_a2 ||
-                  (geo.properties as { ISO_A2?: string }).ISO_A2 ||
-                  null;
-                return (
-                  <Geography
-                    key={geo.rsmKey}
-                    geography={geo}
-                    fill={colorFor(a2 ?? undefined)}
-                    stroke="color-mix(in oklab, var(--dawn-gold) 30%, transparent)"
-                    strokeWidth={0.3}
-                    style={{
-                      default: { outline: "none" },
-                      hover: { outline: "none", fill: "var(--dawn-gold-bright)" },
-                      pressed: { outline: "none" },
-                    }}
-                  />
-                );
-              })
+              geographies.map((geo) => (
+                <Geography
+                  key={geo.rsmKey}
+                  geography={geo}
+                  fill={colorFor(geo as { id?: string | number; properties?: { name?: string } })}
+                  stroke="color-mix(in oklab, var(--dawn-gold) 30%, transparent)"
+                  strokeWidth={0.3}
+                  style={{
+                    default: { outline: "none" },
+                    hover: { outline: "none", fill: "var(--dawn-gold-bright)" },
+                    pressed: { outline: "none" },
+                  }}
+                />
+              ))
             }
           </Geographies>
         </ComposableMap>
@@ -346,6 +368,92 @@ function MapView({
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function OverTimeView({ periods }: { periods: Period[] }) {
+  if (periods.length === 0) {
+    return (
+      <p className="rounded-md px-3 py-6 text-center text-xs italic" style={{ color: "var(--dawn-parchment)", opacity: 0.7 }}>
+        Drop CSVs covering different date ranges to see growth over time.
+      </p>
+    );
+  }
+  const maxViews = Math.max(1, ...periods.map((p) => p.post_views));
+  let cumulative = 0;
+  const cumulativeRows = periods.map((p) => {
+    cumulative += p.post_views;
+    return { ...p, cumulative };
+  });
+  const maxCum = Math.max(1, cumulative);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="mb-2 text-[10px] uppercase tracking-[0.3em]" style={{ color: "var(--dawn-gold-bright)" }}>
+          Per period
+        </p>
+        <ul className="space-y-1.5">
+          {periods.map((p, i) => {
+            const pct = Math.max(2, Math.round((p.post_views / maxViews) * 100));
+            const label = p.period_start
+              ? `${p.period_start}${p.period_end && p.period_end !== p.period_start ? ` → ${p.period_end}` : ""}`
+              : "Unknown period";
+            return (
+              <li
+                key={i}
+                className="relative overflow-hidden rounded-md px-3 py-2 text-xs"
+                style={{
+                  background: "color-mix(in oklab, var(--dawn-ink) 30%, transparent)",
+                  border: "1px solid color-mix(in oklab, var(--dawn-gold) 20%, transparent)",
+                  color: "var(--dawn-parchment)",
+                }}
+              >
+                <div
+                  className="absolute inset-y-0 left-0"
+                  style={{ width: `${pct}%`, background: "color-mix(in oklab, var(--dawn-gold-bright) 16%, transparent)" }}
+                />
+                <div className="relative flex items-center justify-between gap-3">
+                  <span className="font-medium">{label}</span>
+                  <span className="flex shrink-0 items-center gap-3">
+                    <span><span style={{ color: "var(--dawn-gold-bright)" }}>{p.post_views.toLocaleString()}</span> views</span>
+                    <span><span style={{ color: "var(--dawn-gold-bright)" }}>{p.downloads.toLocaleString()}</span> dl</span>
+                    <span><span style={{ color: "var(--dawn-gold-bright)" }}>{p.unique_countries}</span> ctry</span>
+                  </span>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+      <div>
+        <p className="mb-2 text-[10px] uppercase tracking-[0.3em]" style={{ color: "var(--dawn-gold-bright)" }}>
+          Cumulative views
+        </p>
+        <div
+          className="flex h-16 items-end gap-1 rounded-md p-2"
+          style={{
+            background: "color-mix(in oklab, var(--dawn-ink) 30%, transparent)",
+            border: "1px solid color-mix(in oklab, var(--dawn-gold) 20%, transparent)",
+          }}
+        >
+          {cumulativeRows.map((r, i) => {
+            const h = Math.max(4, Math.round((r.cumulative / maxCum) * 100));
+            return (
+              <div
+                key={i}
+                title={`${r.period_start ?? "?"} · ${r.cumulative.toLocaleString()}`}
+                className="flex-1 rounded-sm"
+                style={{ height: `${h}%`, background: "var(--dawn-gold-bright)", opacity: 0.4 + 0.6 * (i / Math.max(1, cumulativeRows.length - 1)) }}
+              />
+            );
+          })}
+        </div>
+        <p className="mt-1 text-[10px] opacity-60" style={{ color: "var(--dawn-parchment)" }}>
+          Total to date: <span style={{ color: "var(--dawn-gold-bright)" }}>{cumulative.toLocaleString()}</span> views across {periods.length} period{periods.length === 1 ? "" : "s"}.
+        </p>
+      </div>
     </div>
   );
 }
