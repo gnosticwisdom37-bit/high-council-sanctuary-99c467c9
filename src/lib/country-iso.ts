@@ -96,3 +96,20 @@ export function lookupCountryISO(name: string): { a2: string; a3: string } | nul
   const key = name.trim().toLowerCase();
   return NAME_TO_ISO[key] ?? null;
 }
+
+// ISO-A2 → UN M49 numeric code (as 3-digit string) — used to match
+// `world-atlas` topojson features whose `geo.id` is the M49 code.
+export const A2_TO_M49: Record<string, string> = {
+  US: "840", CA: "124", MX: "484", GB: "826", IE: "372", FR: "250", DE: "276",
+  ES: "724", PT: "620", IT: "380", NL: "528", BE: "056", CH: "756", AT: "040",
+  SE: "752", NO: "578", DK: "208", FI: "246", IS: "352", PL: "616", CZ: "203",
+  SK: "703", HU: "348", RO: "642", BG: "100", GR: "300", RS: "688", HR: "191",
+  SI: "705", BA: "070", AL: "008", UA: "804", RU: "643", TR: "792", IL: "376",
+  SA: "682", AE: "784", IR: "364", IQ: "368", EG: "818", ZA: "710", NG: "566",
+  KE: "404", MA: "504", DZ: "012", ET: "231", IN: "356", PK: "586", BD: "050",
+  LK: "144", CN: "156", HK: "344", MO: "446", TW: "158", JP: "392", KR: "410",
+  KP: "408", VN: "704", TH: "764", PH: "608", ID: "360", MY: "458", SG: "702",
+  AU: "036", NZ: "554", BR: "076", AR: "032", CL: "152", CO: "170", PE: "604",
+  VE: "862", UY: "858", EC: "218", BO: "068", PY: "600", CU: "192",
+};
+

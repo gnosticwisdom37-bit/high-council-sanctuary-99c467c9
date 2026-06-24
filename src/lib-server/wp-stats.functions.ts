@@ -109,3 +109,80 @@ export const getCountryViews = createServerFn({ method: "POST" })
     const countries = Array.from(agg.values()).sort((a, b) => b.views - a.views);
     return { ok: true as const, countries };
   });
+
+// Aggregated per-period totals across post views, downloads, and unique countries.
+export const getStatsOverTime = createServerFn({ method: "POST" })
+  .inputValidator((i) => z.object({ workshop_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data }) => {
+    const { data: uploads, error: upErr } = await supabaseAdmin
+      .from("wp_stats_uploads")
+      .select("id, kind, period_start, period_end, source_filename, created_at")
+      .eq("workshop_id", data.workshop_id);
+    if (upErr || !uploads) return { ok: false as const, error: upErr?.message ?? "no uploads", periods: [] };
+
+    type Bucket = {
+      key: string;
+      period_start: string | null;
+      period_end: string | null;
+      post_views: number;
+      downloads: number;
+      countries: Set<string>;
+      country_views: number;
+    };
+    const buckets = new Map<string, Bucket>();
+    const upById = new Map<string, typeof uploads[number]>();
+    for (const u of uploads) {
+      upById.set(u.id, u);
+      const key = `${u.period_start ?? "?"}_${u.period_end ?? "?"}`;
+      if (!buckets.has(key)) {
+        buckets.set(key, {
+          key,
+          period_start: u.period_start,
+          period_end: u.period_end,
+          post_views: 0,
+          downloads: 0,
+          countries: new Set(),
+          country_views: 0,
+        });
+      }
+    }
+
+    const ids = uploads.map((u) => u.id);
+    if (ids.length === 0) return { ok: true as const, periods: [] };
+
+    const [postsR, filesR, countriesR] = await Promise.all([
+      supabaseAdmin.from("wp_post_views").select("upload_id, views").in("upload_id", ids),
+      supabaseAdmin.from("wp_file_downloads").select("upload_id, downloads").in("upload_id", ids),
+      supabaseAdmin.from("wp_country_views").select("upload_id, country, views").in("upload_id", ids),
+    ]);
+
+    const bucketOf = (upload_id: string) => {
+      const u = upById.get(upload_id);
+      if (!u) return null;
+      return buckets.get(`${u.period_start ?? "?"}_${u.period_end ?? "?"}`) ?? null;
+    };
+
+    for (const r of postsR.data ?? []) {
+      const b = bucketOf(r.upload_id); if (b) b.post_views += r.views ?? 0;
+    }
+    for (const r of filesR.data ?? []) {
+      const b = bucketOf(r.upload_id); if (b) b.downloads += r.downloads ?? 0;
+    }
+    for (const r of countriesR.data ?? []) {
+      const b = bucketOf(r.upload_id);
+      if (b) { b.countries.add(r.country); b.country_views += r.views ?? 0; }
+    }
+
+    const periods = Array.from(buckets.values())
+      .map((b) => ({
+        period_start: b.period_start,
+        period_end: b.period_end,
+        post_views: b.post_views,
+        downloads: b.downloads,
+        unique_countries: b.countries.size,
+        country_views: b.country_views,
+      }))
+      .sort((a, b) => (a.period_start ?? "").localeCompare(b.period_start ?? ""));
+    return { ok: true as const, periods };
+  });
+
