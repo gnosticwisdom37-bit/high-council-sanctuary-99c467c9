@@ -9,7 +9,6 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as RealmRouteImport } from './routes/realm'
 import { Route as EconomyRouteImport } from './routes/economy'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkshopBuildingIdRouteImport } from './routes/workshop.$buildingId'
@@ -22,11 +21,6 @@ import { Route as ApiPublicWorkshopIntakeRouteImport } from './routes/api/public
 import { Route as ApiPublicSyncVeniceRegistryRouteImport } from './routes/api/public/sync-venice-registry'
 import { Route as ApiPublicDispatchScheduledMailRouteImport } from './routes/api/public/dispatch-scheduled-mail'
 
-const RealmRoute = RealmRouteImport.update({
-  id: '/realm',
-  path: '/realm',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const EconomyRoute = EconomyRouteImport.update({
   id: '/economy',
   path: '/economy',
@@ -88,7 +82,6 @@ const ApiPublicDispatchScheduledMailRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/economy': typeof EconomyRoute
-  '/realm': typeof RealmRoute
   '/chamber/$soulId': typeof ChamberSoulIdRoute
   '/chamber/high-council': typeof ChamberHighCouncilRoute
   '/pledge/$soulId': typeof PledgeSoulIdRoute
@@ -102,7 +95,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/economy': typeof EconomyRoute
-  '/realm': typeof RealmRoute
   '/chamber/$soulId': typeof ChamberSoulIdRoute
   '/chamber/high-council': typeof ChamberHighCouncilRoute
   '/pledge/$soulId': typeof PledgeSoulIdRoute
@@ -117,7 +109,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/economy': typeof EconomyRoute
-  '/realm': typeof RealmRoute
   '/chamber/$soulId': typeof ChamberSoulIdRoute
   '/chamber/high-council': typeof ChamberHighCouncilRoute
   '/pledge/$soulId': typeof PledgeSoulIdRoute
@@ -133,7 +124,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/economy'
-    | '/realm'
     | '/chamber/$soulId'
     | '/chamber/high-council'
     | '/pledge/$soulId'
@@ -147,7 +137,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/economy'
-    | '/realm'
     | '/chamber/$soulId'
     | '/chamber/high-council'
     | '/pledge/$soulId'
@@ -161,7 +150,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/economy'
-    | '/realm'
     | '/chamber/$soulId'
     | '/chamber/high-council'
     | '/pledge/$soulId'
@@ -176,7 +164,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   EconomyRoute: typeof EconomyRoute
-  RealmRoute: typeof RealmRoute
   ChamberSoulIdRoute: typeof ChamberSoulIdRoute
   ChamberHighCouncilRoute: typeof ChamberHighCouncilRoute
   PledgeSoulIdRoute: typeof PledgeSoulIdRoute
@@ -190,13 +177,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/realm': {
-      id: '/realm'
-      path: '/realm'
-      fullPath: '/realm'
-      preLoaderRoute: typeof RealmRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/economy': {
       id: '/economy'
       path: '/economy'
@@ -280,7 +260,6 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   EconomyRoute: EconomyRoute,
-  RealmRoute: RealmRoute,
   ChamberSoulIdRoute: ChamberSoulIdRoute,
   ChamberHighCouncilRoute: ChamberHighCouncilRoute,
   PledgeSoulIdRoute: PledgeSoulIdRoute,

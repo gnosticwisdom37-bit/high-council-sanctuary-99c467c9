@@ -1,5 +1,3 @@
-import { Link } from "@tanstack/react-router";
-
 type Props = {
   title: string;
   stewardName?: string | null;
@@ -7,12 +5,12 @@ type Props = {
 
 /**
  * Gold-rimmed scroll fragment shown beneath a Soul's reply when the King's
- * spoken intention has been auto-filed as a forged Item.
+ * spoken intention has been forged into an Item — a tool the Soul may now wield.
  */
 export function ItemForgedBanner({ title, stewardName }: Props) {
   return (
     <div
-      className="my-3 flex flex-col gap-2 rounded-2xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+      className="my-3 flex flex-col gap-2 rounded-2xl border px-4 py-3"
       style={{
         borderColor: "color-mix(in oklab, var(--dawn-gold-bright) 60%, transparent)",
         background:
@@ -37,25 +35,14 @@ export function ItemForgedBanner({ title, stewardName }: Props) {
             className="text-[10px] uppercase tracking-[0.3em]"
             style={{ color: "var(--dawn-gold-bright)" }}
           >
-            ❖ Item · Awaiting the King's Confirmation
+            ❖ Item · Forged
           </p>
           <p className="mt-0.5 font-serif text-base leading-tight">{title}</p>
           {stewardName && (
-            <p className="mt-0.5 text-xs opacity-75">Suggested keeper: {stewardName}</p>
+            <p className="mt-0.5 text-xs opacity-75">Keeper: {stewardName}</p>
           )}
         </div>
       </div>
-      <Link
-        to="/realm"
-        className="self-end whitespace-nowrap rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.25em] transition-all hover:scale-[1.04] sm:self-auto"
-        style={{
-          background: "linear-gradient(135deg, var(--dawn-gold) 0%, var(--dawn-gold-bright) 100%)",
-          color: "var(--dawn-ink)",
-          boxShadow: "var(--shadow-sigil)",
-        }}
-      >
-        Open the Gate →
-      </Link>
     </div>
   );
 }
