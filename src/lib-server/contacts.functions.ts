@@ -16,7 +16,7 @@ const EmailSchema = z
 export type ContactRow = {
   id: string;
   display_name: string;
-  email: string;
+  email: string | null;
   organization: string;
   role_title: string;
   phone: string;
