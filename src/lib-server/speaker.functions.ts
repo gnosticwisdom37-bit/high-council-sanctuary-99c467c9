@@ -323,6 +323,28 @@ export const speakAsSoul = createServerFn({ method: "POST" })
       }
     }
 
+    // 4e. Trigger Engine — Universal Rolodex (pending entry filed for King review)
+    let proposedContact: { id: string; name: string; context: string } | null = null;
+    let rolodexSystemNote = "";
+    const rolodexIntent = detectRolodexIntent(data.user_message);
+    if (rolodexIntent) {
+      const res = await proposeContactImpl({
+        name: rolodexIntent.name,
+        context: rolodexIntent.context,
+        mentioned_by_soul: data.soul_id,
+      });
+      if (res.ok) {
+        proposedContact = { id: res.id, name: rolodexIntent.name, context: rolodexIntent.context };
+        rolodexSystemNote =
+          `\n\n[Rolodex Notice]\n` +
+          `The King has named someone for the Universal Rolodex: ${rolodexIntent.name} — ${rolodexIntent.context}.\n` +
+          `The entry is filed as Pending and awaits the King's review in the Registry. ` +
+          `Briefly acknowledge that You will remember this person once the King confirms. One sentence, woven naturally.`;
+      }
+    }
+
+
+
     // 5. Load conversation history (last 20 turns) + memoirs (10 sealed + 3 unsealed + pending recalls)
     const [
       { data: history },
