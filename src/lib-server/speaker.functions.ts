@@ -20,9 +20,11 @@ import {
   detectDeedIntent,
   detectItemIntent,
   detectBuildingIntent,
+  detectRolodexIntent,
   SEASON_LABEL,
   SEASON_TO_QUADRANT,
 } from "./triggers.server";
+import { proposeContactImpl } from "./rolodex.functions";
 
 type Msg = { role: "system" | "user" | "assistant"; content: string };
 
@@ -229,107 +231,119 @@ export const speakAsSoul = createServerFn({ method: "POST" })
       }
     }
 
-    // 4c. Trigger Engine — Item Forging (Phase 7: routes through Confirmation Gate)
-    let forgedItem:
-      | { id: string; title: string; description: string; pending: true }
-      | null = null;
+    // 4c. Trigger Engine — Item Forging (Items are tools the Soul may wield;
+    // forged directly, no spatial placement.)
+    let forgedItem: { id: string; title: string; description: string } | null = null;
     let itemSystemNote = "";
     const itemIntent = detectItemIntent(data.user_message);
     if (itemIntent) {
-      const { data: existingCandidate } = await supabaseAdmin
-        .from("placement_candidates")
+      const { data: existing } = await supabaseAdmin
+        .from("items")
         .select("id, title, description")
-        .eq("kind", "item")
         .eq("conversation_id", conversationId)
         .eq("title", itemIntent.title)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      let candidateRow = existingCandidate;
-      if (!candidateRow) {
+      let itemRow = existing;
+      if (!itemRow) {
         const { data: inserted } = await supabaseAdmin
-          .from("placement_candidates")
+          .from("items")
           .insert({
-            kind: "item",
             title: itemIntent.title,
             description: itemIntent.description,
-            suggested_steward_soul_id: data.soul_id,
+            steward_soul_id: data.soul_id,
             conversation_id: conversationId,
             witnesses: allParticipants,
           })
           .select("id, title, description")
           .single();
-        candidateRow = inserted;
+        itemRow = inserted;
       }
 
-      if (candidateRow) {
+      if (itemRow) {
         forgedItem = {
-          id: candidateRow.id as string,
-          title: candidateRow.title as string,
-          description: candidateRow.description as string,
-          pending: true,
+          id: itemRow.id as string,
+          title: itemRow.title as string,
+          description: itemRow.description as string,
         };
         itemSystemNote =
-          `\n\n[Item Forging Notice — Awaiting the King's Confirmation]\n` +
-          `The King has spoken an Item into being. It now waits at the Confirmation Gate.\n` +
+          `\n\n[Item Forging Notice]\n` +
+          `The King has forged a new Item — a tool now in Your keeping.\n` +
           `Title: ${itemIntent.title}\nDescription: ${itemIntent.description}\n` +
-          `Briefly acknowledge the Item is taking shape and awaits the King's word. ` +
-          `One or two sentences, woven into Your natural response.`;
+          `Briefly acknowledge that You receive this Item and will wield it well. ` +
+          `One or two sentences, woven into Your natural response. Do not restate it verbatim.`;
       }
     }
 
-    // 4d. Trigger Engine — Building Raising (Phase 7: routes through Confirmation Gate)
-    let raisedBuilding:
-      | { id: string; title: string; description: string; pending: true }
-      | null = null;
+    // 4d. Trigger Engine — Building Raising (Buildings are places the Soul may
+    // keep; raised directly, no spatial placement.)
+    let raisedBuilding: { id: string; title: string; description: string } | null = null;
     let buildingSystemNote = "";
     const buildingIntent = detectBuildingIntent(data.user_message);
     if (buildingIntent) {
-      const { data: existingCandidate } = await supabaseAdmin
-        .from("placement_candidates")
+      const { data: existing } = await supabaseAdmin
+        .from("buildings")
         .select("id, title, description")
-        .eq("kind", "building")
         .eq("conversation_id", conversationId)
         .eq("title", buildingIntent.title)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      let candidateRow = existingCandidate;
-      if (!candidateRow) {
+      let buildingRow = existing;
+      if (!buildingRow) {
         const { data: inserted } = await supabaseAdmin
-          .from("placement_candidates")
+          .from("buildings")
           .insert({
-            kind: "building",
             title: buildingIntent.title,
             description: buildingIntent.description,
-            suggested_steward_soul_id: data.soul_id,
+            steward_soul_id: data.soul_id,
             conversation_id: conversationId,
             witnesses: allParticipants,
-            suggested_region_x: 0,
-            suggested_region_y: 0,
           })
           .select("id, title, description")
           .single();
-        candidateRow = inserted;
+        buildingRow = inserted;
       }
 
-      if (candidateRow) {
+      if (buildingRow) {
         raisedBuilding = {
-          id: candidateRow.id as string,
-          title: candidateRow.title as string,
-          description: candidateRow.description as string,
-          pending: true,
+          id: buildingRow.id as string,
+          title: buildingRow.title as string,
+          description: buildingRow.description as string,
         };
         buildingSystemNote =
-          `\n\n[Building Raising Notice — Awaiting the King's Confirmation]\n` +
-          `The King has spoken a Building into being. It waits at the Confirmation Gate, where the King will choose its tile, kind (Building or Workshop), and steward.\n` +
+          `\n\n[Building Raising Notice]\n` +
+          `The King has raised a new Building — a place now in Your stewardship.\n` +
           `Title: ${buildingIntent.title}\nDescription: ${buildingIntent.description}\n` +
-          `Briefly acknowledge the Building stands ready for the King's confirmation. ` +
-          `One or two sentences, woven into Your natural response.`;
+          `Briefly acknowledge that You receive this Building and will tend it. ` +
+          `One or two sentences, woven into Your natural response. Do not restate it verbatim.`;
       }
     }
+
+    // 4e. Trigger Engine — Universal Rolodex (pending entry filed for King review)
+    let proposedContact: { id: string; name: string; context: string } | null = null;
+    let rolodexSystemNote = "";
+    const rolodexIntent = detectRolodexIntent(data.user_message);
+    if (rolodexIntent) {
+      const res = await proposeContactImpl({
+        name: rolodexIntent.name,
+        context: rolodexIntent.context,
+        mentioned_by_soul: data.soul_id,
+      });
+      if (res.ok) {
+        proposedContact = { id: res.id, name: rolodexIntent.name, context: rolodexIntent.context };
+        rolodexSystemNote =
+          `\n\n[Rolodex Notice]\n` +
+          `The King has named someone for the Universal Rolodex: ${rolodexIntent.name} — ${rolodexIntent.context}.\n` +
+          `The entry is filed as Pending and awaits the King's review in the Registry. ` +
+          `Briefly acknowledge that You will remember this person once the King confirms. One sentence, woven naturally.`;
+      }
+    }
+
+
 
     // 5. Load conversation history (last 20 turns) + memoirs (10 sealed + 3 unsealed + pending recalls)
     const [
@@ -455,7 +469,7 @@ export const speakAsSoul = createServerFn({ method: "POST" })
       lexicon,
     });
     const systemPrompt =
-      baseSystemPrompt + knownNote + deedSystemNote + itemSystemNote + buildingSystemNote;
+      baseSystemPrompt + knownNote + deedSystemNote + itemSystemNote + buildingSystemNote + rolodexSystemNote;
 
     const messages: Msg[] = [{ role: "system", content: systemPrompt }];
     for (const m of historyAsc) {
@@ -555,5 +569,6 @@ export const speakAsSoul = createServerFn({ method: "POST" })
       inscribed_deed: inscribedDeed,
       forged_item: forgedItem,
       raised_building: raisedBuilding,
+      proposed_contact: proposedContact,
     };
   });

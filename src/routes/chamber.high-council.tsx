@@ -128,7 +128,7 @@ function HighCouncilPage() {
               ☉ Visit the Oracle's Chamber
             </Link>
             <Link
-              to="/realm"
+              to="/"
               className="rounded-full px-5 py-2 text-xs uppercase tracking-[0.3em] transition-all hover:-translate-y-0.5"
               style={{
                 background: "color-mix(in oklab, var(--dawn-gold) 18%, transparent)",
@@ -136,7 +136,7 @@ function HighCouncilPage() {
                 border: "1px solid color-mix(in oklab, var(--dawn-gold) 60%, transparent)",
               }}
             >
-              ← Return to the Realm
+              ← Return to the Registry
             </Link>
           </div>
         </section>

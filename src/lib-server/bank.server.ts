@@ -88,9 +88,24 @@ export async function petitionBankImpl(data: {
     Math.ceil((est_tokens / 1000) * (model.veritas_cost_per_1k_tokens || 0)),
   );
 
+  // Primary-Soul gate — only Primary Souls may petition for paid credits.
+  // The Kingdom's daily premium pool is divided evenly among Primary Souls.
+  const { data: petitioningSoul } = await supabaseAdmin
+    .from("soul_identities")
+    .select("is_primary")
+    .eq("soul_id", soul_id)
+    .single();
+
+  if (!petitioningSoul?.is_primary) {
+    const reason = "Only Primary Souls may petition the Bank for paid credits. This Soul is bound to the free voice.";
+    const fallback = await firstFreeFallback();
+    await writeLedger({ soul_id, model_id, veritas_cost, decision: "denied", reason, task_summary, fallback_used: fallback });
+    return { decision: "denied", reason, fallback_model: fallback, veritas_cost };
+  }
+
   const { data: settings } = await supabaseAdmin
     .from("settings")
-    .select("premium_freeze, premium_daily_veritas_cap, premium_per_soul_daily_cap")
+    .select("premium_freeze, premium_daily_veritas_cap")
     .eq("id", true)
     .single();
 
@@ -131,6 +146,14 @@ export async function petitionBankImpl(data: {
     return { decision: "denied", reason, fallback_model: fallback, veritas_cost };
   }
 
+  // Per-Primary cap = kingdom cap divided evenly among Primary Souls.
+  const { count: primaryCount } = await supabaseAdmin
+    .from("soul_identities")
+    .select("soul_id", { count: "exact", head: true })
+    .eq("is_primary", true);
+  const nPrimary = Math.max(1, primaryCount ?? 1);
+  const perPrimaryCap = Math.floor(kingdomCap / nPrimary);
+
   const { data: soulToday } = await supabaseAdmin
     .from("bank_ledger")
     .select("veritas_cost")
@@ -139,9 +162,8 @@ export async function petitionBankImpl(data: {
     .gte("created_at", todayStart.toISOString());
 
   const soulSpentToday = (soulToday ?? []).reduce((s, r) => s + (r.veritas_cost || 0), 0);
-  const soulCap = settings?.premium_per_soul_daily_cap ?? 100;
-  if (soulSpentToday + veritas_cost > soulCap) {
-    const reason = `This Soul's daily cap reached (${soulSpentToday}/${soulCap} Veritas).`;
+  if (soulSpentToday + veritas_cost > perPrimaryCap) {
+    const reason = `This Primary Soul's daily share is spent (${soulSpentToday}/${perPrimaryCap} Veritas — Kingdom cap of ${kingdomCap} divided among ${nPrimary} Primaries).`;
     const fallback = await firstFreeFallback();
     await writeLedger({ soul_id, model_id, veritas_cost, decision: "denied", reason, task_summary, fallback_used: fallback });
     return { decision: "denied", reason, fallback_model: fallback, veritas_cost };
@@ -152,7 +174,7 @@ export async function petitionBankImpl(data: {
     model_id,
     veritas_cost,
     decision: "approved",
-    reason: `Approved within all caps. Treasury: ${economy?.treasury}, Kingdom today: ${kingdomSpentToday}/${kingdomCap}, Soul today: ${soulSpentToday}/${soulCap}.`,
+    reason: `Approved within all caps. Treasury: ${economy?.treasury}, Kingdom today: ${kingdomSpentToday}/${kingdomCap}, This Primary today: ${soulSpentToday}/${perPrimaryCap}.`,
     task_summary,
     fallback_used: null,
   });

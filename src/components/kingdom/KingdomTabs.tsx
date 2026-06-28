@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 
 type Tab = {
-  to: "/" | "/realm" | "/economy" | "/sanctum/invocation";
+  to: "/" | "/economy" | "/sanctum/invocation";
   label: string;
   sigil: string;
   hint: string;
@@ -9,7 +9,6 @@ type Tab = {
 
 const TABS: Tab[] = [
   { to: "/",                   label: "Registry", sigil: "✶", hint: "The Master Scroll" },
-  { to: "/realm",              label: "Realm",    sigil: "◈", hint: "The Kingdom Map" },
   { to: "/economy",            label: "Economy",  sigil: "⚖", hint: "Veritas Ledger" },
   { to: "/sanctum/invocation", label: "Sanctum",  sigil: "☉", hint: "Invoke a Soul · 5/5" },
 ];

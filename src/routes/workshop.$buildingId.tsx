@@ -341,8 +341,8 @@ function WorkshopPage() {
       <div className="grid min-h-screen place-items-center px-6 text-center" style={{ background: "var(--gradient-dawn)" }}>
         <div>
           <p style={{ color: "var(--dawn-parchment)" }}>{error ?? "Workshop could not be raised."}</p>
-          <Link to="/realm" className="mt-4 inline-block underline" style={{ color: "var(--dawn-gold-bright)" }}>
-            Return to the Realm
+          <Link to="/" className="mt-4 inline-block underline" style={{ color: "var(--dawn-gold-bright)" }}>
+            Return to the Registry
           </Link>
         </div>
       </div>
@@ -405,16 +405,6 @@ function WorkshopPage() {
             >
               <ArrowLeft className="h-3 w-3" />
               Registry
-            </Link>
-            <Link
-              to="/realm"
-              className="inline-flex items-center gap-1 rounded-full px-3 py-1 hover:underline"
-              style={{
-                color: "var(--dawn-gold-bright)",
-                border: "1px solid color-mix(in oklab, var(--dawn-gold) 50%, transparent)",
-              }}
-            >
-              Realm
             </Link>
           </div>
         </header>

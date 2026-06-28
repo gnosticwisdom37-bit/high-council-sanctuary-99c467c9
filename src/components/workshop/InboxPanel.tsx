@@ -214,11 +214,13 @@ export function InboxPanel({
     const r = await listAddressBookFn({});
     if (!r.ok) return;
     setBookContacts(
-      r.contacts.map((c) => ({
-        addr: c.email,
-        name: c.display_name,
-        last: "",
-      })),
+      r.contacts
+        .filter((c) => !!c.email)
+        .map((c) => ({
+          addr: c.email as string,
+          name: c.display_name,
+          last: "",
+        })),
     );
     setGroupTokens(
       r.groups.map((g) => ({

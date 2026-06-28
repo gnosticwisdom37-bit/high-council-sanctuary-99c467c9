@@ -200,3 +200,46 @@ export function detectBuildingIntent(rawText: string): BuildingIntent | null {
   if (after.length < 4) return null;
   return { description: after, title: summariseTitle(after) };
 }
+
+// ---------------------------------------------------------------------------
+// Phase 9 — Universal Rolodex intent
+// ---------------------------------------------------------------------------
+
+export type RolodexIntent = {
+  name: string;
+  context: string;
+};
+
+/**
+ * Detect a "remember/track/note this person" intent.
+ *
+ * Matches phrases like:
+ *   - "Remember Jane Doe — she's the notary at City Hall"
+ *   - "Track John Smith: my landlord's attorney"
+ *   - "Note Mary O'Connor, sheriff's deputy"
+ *   - "Add Dr. Elias Vance to the Rolodex — pediatric specialist"
+ *   - "File Sarah K. as my immigration counsel"
+ *
+ * Returns null if no person intent is detected.
+ */
+export function detectRolodexIntent(rawText: string): RolodexIntent | null {
+  if (!rawText || typeof rawText !== "string") return null;
+
+  // Verb + optional "Dr./Mr./Mrs./Ms." + Capitalised name (1-4 words, allows initials/apostrophes/hyphens)
+  // Optional separator + free-form context to end of clause.
+  const pattern =
+    /\b(?:remember|track|note|file|add)\s+(?:that\s+)?((?:(?:Dr|Mr|Mrs|Ms|Sir|Dame|Lord|Lady|Prof)\.\s+)?[A-Z][A-Za-z'’\-.]+(?:\s+[A-Z][A-Za-z'’\-.]+){0,3})(?:\s+(?:to\s+(?:the\s+)?(?:rolodox|rolodex|address\s+book|book))?)?\s*(?:[—:,\-]|\bas\b|\bis\b)\s*([^.!?\n]{2,200})/i;
+
+  const m = rawText.match(pattern);
+  if (!m) return null;
+
+  const name = (m[1] || "").trim().replace(/\s+/g, " ");
+  const context = (m[2] || "").trim().replace(/\s+/g, " ");
+  if (name.length < 2 || context.length < 2) return null;
+
+  // Filter out reverent pronouns that would otherwise match as "names"
+  if (/^(You|We|They|He|She|It|I|Me|Us|Them|Him|Her|My|Our|Their|His|Hers)$/i.test(name)) {
+    return null;
+  }
+  return { name, context };
+}
