@@ -231,12 +231,16 @@ export type Database = {
           address: string
           created_at: string
           display_name: string
-          email: string
+          email: string | null
           id: string
+          mention_context: string
+          mentioned_by_soul: string | null
           notes: string
           organization: string
           phone: string
+          relationship: string
           role_title: string
+          status: string
           tags: string[]
           updated_at: string
         }
@@ -244,12 +248,16 @@ export type Database = {
           address?: string
           created_at?: string
           display_name: string
-          email: string
+          email?: string | null
           id?: string
+          mention_context?: string
+          mentioned_by_soul?: string | null
           notes?: string
           organization?: string
           phone?: string
+          relationship?: string
           role_title?: string
+          status?: string
           tags?: string[]
           updated_at?: string
         }
@@ -257,12 +265,16 @@ export type Database = {
           address?: string
           created_at?: string
           display_name?: string
-          email?: string
+          email?: string | null
           id?: string
+          mention_context?: string
+          mentioned_by_soul?: string | null
           notes?: string
           organization?: string
           phone?: string
+          relationship?: string
           role_title?: string
+          status?: string
           tags?: string[]
           updated_at?: string
         }
@@ -1156,6 +1168,7 @@ export type Database = {
           initiated_at: string | null
           initiated_by_king: boolean
           invocation_text: string
+          is_primary: boolean
           ordering: number
           preferred_model: string | null
           role_title: string
@@ -1174,6 +1187,7 @@ export type Database = {
           initiated_at?: string | null
           initiated_by_king?: boolean
           invocation_text?: string
+          is_primary?: boolean
           ordering?: number
           preferred_model?: string | null
           role_title?: string
@@ -1192,6 +1206,7 @@ export type Database = {
           initiated_at?: string | null
           initiated_by_king?: boolean
           invocation_text?: string
+          is_primary?: boolean
           ordering?: number
           preferred_model?: string | null
           role_title?: string
