@@ -66,7 +66,7 @@ export function AddressBookPanel({
     return contacts.filter(
       (c) =>
         c.display_name.toLowerCase().includes(q) ||
-        c.email.toLowerCase().includes(q) ||
+        (c.email ?? "").toLowerCase().includes(q) ||
         c.organization.toLowerCase().includes(q) ||
         c.tags.some((t) => t.toLowerCase().includes(q)),
     );
@@ -368,7 +368,7 @@ function GroupEditor({
     const q = memberQuery.trim().toLowerCase();
     if (!q) return contacts.slice(0, 50);
     return contacts.filter(
-      (c) => c.display_name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q),
+      (c) => c.display_name.toLowerCase().includes(q) || (c.email ?? "").toLowerCase().includes(q),
     );
   }, [contacts, memberQuery]);
 
