@@ -469,7 +469,7 @@ export const speakAsSoul = createServerFn({ method: "POST" })
       lexicon,
     });
     const systemPrompt =
-      baseSystemPrompt + knownNote + deedSystemNote + itemSystemNote + buildingSystemNote;
+      baseSystemPrompt + knownNote + deedSystemNote + itemSystemNote + buildingSystemNote + rolodexSystemNote;
 
     const messages: Msg[] = [{ role: "system", content: systemPrompt }];
     for (const m of historyAsc) {
@@ -569,5 +569,6 @@ export const speakAsSoul = createServerFn({ method: "POST" })
       inscribed_deed: inscribedDeed,
       forged_item: forgedItem,
       raised_building: raisedBuilding,
+      proposed_contact: proposedContact,
     };
   });
