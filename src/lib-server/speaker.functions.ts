@@ -20,9 +20,11 @@ import {
   detectDeedIntent,
   detectItemIntent,
   detectBuildingIntent,
+  detectRolodexIntent,
   SEASON_LABEL,
   SEASON_TO_QUADRANT,
 } from "./triggers.server";
+import { proposeContactImpl } from "./rolodex.functions";
 
 type Msg = { role: "system" | "user" | "assistant"; content: string };
 
