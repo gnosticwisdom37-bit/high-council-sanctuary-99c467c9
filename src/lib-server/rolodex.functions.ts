@@ -117,11 +117,22 @@ const ConfirmSchema = z.object({
 export const confirmContact = createServerFn({ method: "POST" })
   .inputValidator((d: z.infer<typeof ConfirmSchema>) => ConfirmSchema.parse(d))
   .handler(async ({ data }) => {
-    const patch: Record<string, unknown> = { status: "confirmed" };
+    const patch: {
+      status: "confirmed";
+      display_name?: string;
+      email?: string | null;
+      organization?: string;
+      role_title?: string;
+      relationship?: string;
+      notes?: string;
+    } = { status: "confirmed" };
     if (data.edits) {
-      for (const [k, v] of Object.entries(data.edits)) {
-        if (v !== undefined) patch[k] = v;
-      }
+      if (data.edits.display_name !== undefined) patch.display_name = data.edits.display_name;
+      if (data.edits.email !== undefined) patch.email = data.edits.email;
+      if (data.edits.organization !== undefined) patch.organization = data.edits.organization;
+      if (data.edits.role_title !== undefined) patch.role_title = data.edits.role_title;
+      if (data.edits.relationship !== undefined) patch.relationship = data.edits.relationship;
+      if (data.edits.notes !== undefined) patch.notes = data.edits.notes;
     }
     const { error } = await supabaseAdmin.from("contacts").update(patch).eq("id", data.id);
     if (error) return { ok: false as const, error: error.message };
