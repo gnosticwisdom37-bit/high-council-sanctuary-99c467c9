@@ -20,6 +20,7 @@ import {
   getStatsOverTime,
 } from "@/lib-server/wp-stats.functions";
 import { A2_TO_M49 } from "@/lib/country-iso";
+import { TimeSeriesPanel } from "@/components/charts/TimeSeriesPanel";
 
 type Tab = "posts" | "downloads" | "map" | "time";
 
