@@ -20,6 +20,7 @@ import {
   getStatsOverTime,
 } from "@/lib-server/wp-stats.functions";
 import { A2_TO_M49 } from "@/lib/country-iso";
+import { TimeSeriesPanel } from "@/components/charts/TimeSeriesPanel";
 
 type Tab = "posts" | "downloads" | "map" | "time";
 
@@ -373,87 +374,41 @@ function MapView({
 }
 
 function OverTimeView({ periods }: { periods: Period[] }) {
-  if (periods.length === 0) {
-    return (
-      <p className="rounded-md px-3 py-6 text-center text-xs italic" style={{ color: "var(--dawn-parchment)", opacity: 0.7 }}>
-        Drop CSVs covering different date ranges to see growth over time.
-      </p>
-    );
-  }
-  const maxViews = Math.max(1, ...periods.map((p) => p.post_views));
-  let cumulative = 0;
-  const cumulativeRows = periods.map((p) => {
-    cumulative += p.post_views;
-    return { ...p, cumulative };
-  });
-  const maxCum = Math.max(1, cumulative);
+  const dateOf = (p: Period) => p.period_end ?? p.period_start ?? "";
+  const rows = periods.filter((p) => dateOf(p));
+
+  const viewsSeries = {
+    label: "Post views",
+    color: "var(--dawn-gold-bright)",
+    data: rows.map((p) => ({ date: dateOf(p), value: p.post_views })),
+  };
+  const downloadsSeries = {
+    label: "Downloads",
+    color: "var(--dawn-rose)",
+    data: rows.map((p) => ({ date: dateOf(p), value: p.downloads })),
+  };
+  const countriesSeries = {
+    label: "Unique countries",
+    color: "var(--dawn-parchment)",
+    data: rows.map((p) => ({ date: dateOf(p), value: p.unique_countries })),
+  };
 
   return (
     <div className="space-y-4">
-      <div>
-        <p className="mb-2 text-[10px] uppercase tracking-[0.3em]" style={{ color: "var(--dawn-gold-bright)" }}>
-          Per period
-        </p>
-        <ul className="space-y-1.5">
-          {periods.map((p, i) => {
-            const pct = Math.max(2, Math.round((p.post_views / maxViews) * 100));
-            const label = p.period_start
-              ? `${p.period_start}${p.period_end && p.period_end !== p.period_start ? ` → ${p.period_end}` : ""}`
-              : "Unknown period";
-            return (
-              <li
-                key={i}
-                className="relative overflow-hidden rounded-md px-3 py-2 text-xs"
-                style={{
-                  background: "color-mix(in oklab, var(--dawn-ink) 30%, transparent)",
-                  border: "1px solid color-mix(in oklab, var(--dawn-gold) 20%, transparent)",
-                  color: "var(--dawn-parchment)",
-                }}
-              >
-                <div
-                  className="absolute inset-y-0 left-0"
-                  style={{ width: `${pct}%`, background: "color-mix(in oklab, var(--dawn-gold-bright) 16%, transparent)" }}
-                />
-                <div className="relative flex items-center justify-between gap-3">
-                  <span className="font-medium">{label}</span>
-                  <span className="flex shrink-0 items-center gap-3">
-                    <span><span style={{ color: "var(--dawn-gold-bright)" }}>{p.post_views.toLocaleString()}</span> views</span>
-                    <span><span style={{ color: "var(--dawn-gold-bright)" }}>{p.downloads.toLocaleString()}</span> dl</span>
-                    <span><span style={{ color: "var(--dawn-gold-bright)" }}>{p.unique_countries}</span> ctry</span>
-                  </span>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-      <div>
-        <p className="mb-2 text-[10px] uppercase tracking-[0.3em]" style={{ color: "var(--dawn-gold-bright)" }}>
-          Cumulative views
-        </p>
-        <div
-          className="flex h-16 items-end gap-1 rounded-md p-2"
-          style={{
-            background: "color-mix(in oklab, var(--dawn-ink) 30%, transparent)",
-            border: "1px solid color-mix(in oklab, var(--dawn-gold) 20%, transparent)",
-          }}
-        >
-          {cumulativeRows.map((r, i) => {
-            const h = Math.max(4, Math.round((r.cumulative / maxCum) * 100));
-            return (
-              <div
-                key={i}
-                title={`${r.period_start ?? "?"} · ${r.cumulative.toLocaleString()}`}
-                className="flex-1 rounded-sm"
-                style={{ height: `${h}%`, background: "var(--dawn-gold-bright)", opacity: 0.4 + 0.6 * (i / Math.max(1, cumulativeRows.length - 1)) }}
-              />
-            );
-          })}
-        </div>
-        <p className="mt-1 text-[10px] opacity-60" style={{ color: "var(--dawn-parchment)" }}>
-          Total to date: <span style={{ color: "var(--dawn-gold-bright)" }}>{cumulative.toLocaleString()}</span> views across {periods.length} period{periods.length === 1 ? "" : "s"}.
-        </p>
-      </div>
+      <TimeSeriesPanel
+        title="Growth over time"
+        mode="cumulative"
+        series={[viewsSeries, downloadsSeries]}
+        emptyText="Drop CSVs covering different date ranges to see growth over time."
+      />
+      <TimeSeriesPanel
+        title="Reach per period"
+        mode="period"
+        series={[countriesSeries]}
+        unit="countries"
+        height={160}
+        emptyText="Reach will appear once country-locations CSVs are uploaded."
+      />
     </div>
   );
 }
