@@ -981,6 +981,10 @@ export const sendReply = createServerFn({ method: "POST" })
       };
     }
 
+    const check = validateRecipientList(resolved.to);
+    if (!check.ok) return { ok: false as const, error: badRecipientError(check.bad) };
+
+
     const inkColor = data.ink_color ?? (await resolveDefaultInk());
     const wrapped = wrapInStationery(
       stationeryArgs(stationery as Record<string, unknown>, data.body_html, {
