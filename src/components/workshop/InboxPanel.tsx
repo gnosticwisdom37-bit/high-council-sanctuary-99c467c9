@@ -27,6 +27,7 @@ import {
   Download,
   Trash2,
   Users,
+  RotateCcw,
 } from "lucide-react";
 import {
   listInbox,
@@ -40,6 +41,7 @@ import {
   listScheduledEmails,
   cancelScheduledEmail,
   deleteScheduledEmail,
+  retryScheduledEmail,
   listKnownAddresses,
   listLetterTemplates,
   getDefaultInkColor,
@@ -168,6 +170,7 @@ export function InboxPanel({
   const listScheduledFn = useServerFn(listScheduledEmails);
   const cancelScheduledFn = useServerFn(cancelScheduledEmail);
   const deleteScheduledFn = useServerFn(deleteScheduledEmail);
+  const retryScheduledFn = useServerFn(retryScheduledEmail);
   const listKnownFn = useServerFn(listKnownAddresses);
   const listTemplatesFn = useServerFn(listLetterTemplates);
   const getDefaultInkFn = useServerFn(getDefaultInkColor);
@@ -634,6 +637,18 @@ export function InboxPanel({
             if (!confirm("Permanently delete this scheduled letter from the list?")) return;
             const r = await deleteScheduledFn({ data: { id } });
             if (r.ok) { void refreshScheduled(); setNotice({ kind: "ok", text: "Letter removed." }); }
+            else setNotice({ kind: "err", text: r.error });
+          }}
+          onRetry={async (row) => {
+            const edited = prompt(
+              "Fix the recipient list, then press OK to re-queue this letter.\n(Separate addresses with commas.)",
+              row.to_addr,
+            );
+            if (edited === null) return;
+            const r = await retryScheduledFn({
+              data: { id: row.id, to_addr: edited.trim() },
+            });
+            if (r.ok) { void refreshScheduled(); setNotice({ kind: "ok", text: "Letter re-queued." }); }
             else setNotice({ kind: "err", text: r.error });
           }}
         />
@@ -1572,10 +1587,12 @@ function ScheduledList({
   rows,
   onCancel,
   onDelete,
+  onRetry,
 }: {
   rows: Scheduled[];
   onCancel: (id: string) => void | Promise<void>;
   onDelete: (id: string) => void | Promise<void>;
+  onRetry: (row: Scheduled) => void | Promise<void>;
 }) {
   if (rows.length === 0) {
     return (
@@ -1629,6 +1646,19 @@ function ScheduledList({
                 title="Cancel"
               >
                 <X className="h-3 w-3" />
+              </button>
+            )}
+            {(s.status === "failed" || s.status === "cancelled") && (
+              <button
+                onClick={() => void onRetry(s)}
+                className="shrink-0 rounded-full p-1"
+                style={{
+                  background: "color-mix(in oklab, var(--dawn-gold) 35%, transparent)",
+                  color: "var(--dawn-ink)",
+                }}
+                title="Fix recipients and re-queue"
+              >
+                <RotateCcw className="h-3 w-3" />
               </button>
             )}
             <button

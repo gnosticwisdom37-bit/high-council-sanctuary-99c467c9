@@ -203,6 +203,37 @@ async function sendGmailRaw(
   return { ok: true, id: sent.id };
 }
 
+// ─── recipient guard ──────────────────────────────────────────────────────
+// Splits a To/Cc/Bcc field into tokens (comma OR newline OR semicolon),
+// pulls the address out of any "Name <addr>" form, and validates each with
+// the same regex the Address Book uses. Returns { ok, bad } — `bad` lists
+// every unparseable token so we can tell the King exactly which one to fix.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function extractAddress(token: string): string {
+  const t = token.trim();
+  const m = t.match(/<([^>]+)>\s*$/);
+  return (m ? m[1] : t).trim();
+}
+function validateRecipientList(...fields: (string | null | undefined)[]): {
+  ok: boolean;
+  bad: string[];
+} {
+  const bad: string[] = [];
+  for (const field of fields) {
+    if (!field) continue;
+    const tokens = field.split(/[,\n;]/).map((t) => t.trim()).filter(Boolean);
+    for (const tok of tokens) {
+      const addr = extractAddress(tok);
+      if (!EMAIL_RE.test(addr)) bad.push(tok);
+    }
+  }
+  return { ok: bad.length === 0, bad };
+}
+function badRecipientError(bad: string[]): string {
+  const list = bad.map((b) => `"${b}"`).join(", ");
+  return `Invalid recipient${bad.length > 1 ? "s" : ""}: ${list}. Please fix and resend.`;
+}
+
 // Zod schema for outgoing attachments (≤10 MB raw bytes / file, ≤5 files)
 const outgoingAttachmentSchema = z.object({
   filename: z.string().min(1).max(255),
@@ -950,6 +981,10 @@ export const sendReply = createServerFn({ method: "POST" })
       };
     }
 
+    const check = validateRecipientList(resolved.to);
+    if (!check.ok) return { ok: false as const, error: badRecipientError(check.bad) };
+
+
     const inkColor = data.ink_color ?? (await resolveDefaultInk());
     const wrapped = wrapInStationery(
       stationeryArgs(stationery as Record<string, unknown>, data.body_html, {
@@ -1221,6 +1256,10 @@ export const composeAndSend = createServerFn({ method: "POST" })
     const headers = gmailHeaders();
     if (!headers) return { ok: false as const, error: "Gmail connection not configured." };
 
+    const check = validateRecipientList(data.to_addr, data.cc_addr, data.bcc_addr);
+    if (!check.ok) return { ok: false as const, error: badRecipientError(check.bad) };
+
+
     const { data: stationery } = await supabaseAdmin
       .from("kingdom_stationery").select("*").eq("id", true).single();
     if (!stationery) return { ok: false as const, error: "Stationery missing." };
@@ -1349,6 +1388,11 @@ export const scheduleEmail = createServerFn({ method: "POST" })
       }
     }
 
+    const check = validateRecipientList(toAddr, data.cc_addr, data.bcc_addr);
+    if (!check.ok) return { ok: false as const, error: badRecipientError(check.bad) };
+
+
+
     const { error } = await supabaseAdmin.from("scheduled_emails").insert({
       kind: data.kind,
       thread_id: data.thread_id,
@@ -1452,6 +1496,11 @@ export const dispatchScheduledRow = createServerFn({ method: "POST" })
   .handler(async ({ data: row }): Promise<{ ok: true } | { ok: false; error: string }> => {
     const headers = gmailHeaders();
     if (!headers) return { ok: false, error: "Gmail connection not configured." };
+
+    const check = validateRecipientList(row.to_addr, row.cc_addr, row.bcc_addr);
+    if (!check.ok) return { ok: false, error: badRecipientError(check.bad) };
+
+
 
 
     const { data: stationery } = await supabaseAdmin
@@ -1833,6 +1882,56 @@ export const deleteScheduledEmail = createServerFn({ method: "POST" })
     if (error) return { ok: false as const, error: error.message };
     return { ok: true as const };
   });
+
+// Retry a failed scheduled letter. Optionally overrides the To/Cc/Bcc fields
+// so the King can fix a bad address inline before re-queuing. The row is
+// validated with the same recipient guard and, if clean, flipped back to
+// pending with send_at = now so the dispatcher picks it up on the next tick.
+export const retryScheduledEmail = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        to_addr: z.string().min(3).max(500).optional(),
+        cc_addr: z.string().max(500).optional(),
+        bcc_addr: z.string().max(500).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: row, error: readErr } = await supabaseAdmin
+      .from("scheduled_emails")
+      .select("to_addr, cc_addr, bcc_addr, status")
+      .eq("id", data.id)
+      .single();
+    if (readErr || !row) return { ok: false as const, error: readErr?.message ?? "Row not found." };
+    if (row.status !== "failed" && row.status !== "cancelled") {
+      return { ok: false as const, error: `Cannot retry a letter with status "${row.status}".` };
+    }
+
+    const nextTo = data.to_addr ?? (row.to_addr as string);
+    const nextCc = data.cc_addr ?? ((row.cc_addr as string | null) ?? "");
+    const nextBcc = data.bcc_addr ?? ((row.bcc_addr as string | null) ?? "");
+
+    const check = validateRecipientList(nextTo, nextCc, nextBcc);
+    if (!check.ok) return { ok: false as const, error: badRecipientError(check.bad) };
+
+    const { error } = await supabaseAdmin
+      .from("scheduled_emails")
+      .update({
+        to_addr: nextTo,
+        cc_addr: nextCc,
+        bcc_addr: nextBcc,
+        status: "pending",
+        send_at: new Date().toISOString(),
+        last_error: null,
+        sent_at: null,
+      })
+      .eq("id", data.id);
+    if (error) return { ok: false as const, error: error.message };
+    return { ok: true as const };
+  });
+
 
 // ─── appendSentAttachment: attach files to a sent letter (same day only) ─
 // Uploads files to kingdom-assets and appends them to the message's
