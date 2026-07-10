@@ -638,6 +638,18 @@ export function InboxPanel({
             if (r.ok) { void refreshScheduled(); setNotice({ kind: "ok", text: "Letter removed." }); }
             else setNotice({ kind: "err", text: r.error });
           }}
+          onRetry={async (row) => {
+            const edited = prompt(
+              "Fix the recipient list, then press OK to re-queue this letter.\n(Separate addresses with commas.)",
+              row.to_addr,
+            );
+            if (edited === null) return;
+            const r = await retryScheduledFn({
+              data: { id: row.id, to_addr: edited.trim() },
+            });
+            if (r.ok) { void refreshScheduled(); setNotice({ kind: "ok", text: "Letter re-queued." }); }
+            else setNotice({ kind: "err", text: r.error });
+          }}
         />
       )}
 
