@@ -1497,6 +1497,11 @@ export const dispatchScheduledRow = createServerFn({ method: "POST" })
     const headers = gmailHeaders();
     if (!headers) return { ok: false, error: "Gmail connection not configured." };
 
+    const check = validateRecipientList(row.to_addr, row.cc_addr, row.bcc_addr);
+    if (!check.ok) return { ok: false, error: badRecipientError(check.bad) };
+
+
+
 
     const { data: stationery } = await supabaseAdmin
       .from("kingdom_stationery").select("*").eq("id", true).single();
