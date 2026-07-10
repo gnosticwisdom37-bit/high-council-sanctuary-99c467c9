@@ -1647,6 +1647,19 @@ function ScheduledList({
                 <X className="h-3 w-3" />
               </button>
             )}
+            {(s.status === "failed" || s.status === "cancelled") && (
+              <button
+                onClick={() => void onRetry(s)}
+                className="shrink-0 rounded-full p-1"
+                style={{
+                  background: "color-mix(in oklab, var(--dawn-gold) 35%, transparent)",
+                  color: "var(--dawn-ink)",
+                }}
+                title="Fix recipients and re-queue"
+              >
+                <RotateCcw className="h-3 w-3" />
+              </button>
+            )}
             <button
               onClick={() => void onDelete(s.id)}
               className="shrink-0 rounded-full p-1"
