@@ -1586,10 +1586,12 @@ function ScheduledList({
   rows,
   onCancel,
   onDelete,
+  onRetry,
 }: {
   rows: Scheduled[];
   onCancel: (id: string) => void | Promise<void>;
   onDelete: (id: string) => void | Promise<void>;
+  onRetry: (row: Scheduled) => void | Promise<void>;
 }) {
   if (rows.length === 0) {
     return (
