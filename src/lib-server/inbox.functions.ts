@@ -1256,6 +1256,10 @@ export const composeAndSend = createServerFn({ method: "POST" })
     const headers = gmailHeaders();
     if (!headers) return { ok: false as const, error: "Gmail connection not configured." };
 
+    const check = validateRecipientList(data.to_addr, data.cc_addr, data.bcc_addr);
+    if (!check.ok) return { ok: false as const, error: badRecipientError(check.bad) };
+
+
     const { data: stationery } = await supabaseAdmin
       .from("kingdom_stationery").select("*").eq("id", true).single();
     if (!stationery) return { ok: false as const, error: "Stationery missing." };
