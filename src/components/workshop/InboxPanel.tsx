@@ -169,6 +169,7 @@ export function InboxPanel({
   const listScheduledFn = useServerFn(listScheduledEmails);
   const cancelScheduledFn = useServerFn(cancelScheduledEmail);
   const deleteScheduledFn = useServerFn(deleteScheduledEmail);
+  const retryScheduledFn = useServerFn(retryScheduledEmail);
   const listKnownFn = useServerFn(listKnownAddresses);
   const listTemplatesFn = useServerFn(listLetterTemplates);
   const getDefaultInkFn = useServerFn(getDefaultInkColor);
