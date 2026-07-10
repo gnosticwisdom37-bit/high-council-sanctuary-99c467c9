@@ -1388,6 +1388,11 @@ export const scheduleEmail = createServerFn({ method: "POST" })
       }
     }
 
+    const check = validateRecipientList(toAddr, data.cc_addr, data.bcc_addr);
+    if (!check.ok) return { ok: false as const, error: badRecipientError(check.bad) };
+
+
+
     const { error } = await supabaseAdmin.from("scheduled_emails").insert({
       kind: data.kind,
       thread_id: data.thread_id,
