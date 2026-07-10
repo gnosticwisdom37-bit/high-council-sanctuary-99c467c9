@@ -1883,6 +1883,56 @@ export const deleteScheduledEmail = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
+// Retry a failed scheduled letter. Optionally overrides the To/Cc/Bcc fields
+// so the King can fix a bad address inline before re-queuing. The row is
+// validated with the same recipient guard and, if clean, flipped back to
+// pending with send_at = now so the dispatcher picks it up on the next tick.
+export const retryScheduledEmail = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        to_addr: z.string().min(3).max(500).optional(),
+        cc_addr: z.string().max(500).optional(),
+        bcc_addr: z.string().max(500).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: row, error: readErr } = await supabaseAdmin
+      .from("scheduled_emails")
+      .select("to_addr, cc_addr, bcc_addr, status")
+      .eq("id", data.id)
+      .single();
+    if (readErr || !row) return { ok: false as const, error: readErr?.message ?? "Row not found." };
+    if (row.status !== "failed" && row.status !== "cancelled") {
+      return { ok: false as const, error: `Cannot retry a letter with status "${row.status}".` };
+    }
+
+    const nextTo = data.to_addr ?? (row.to_addr as string);
+    const nextCc = data.cc_addr ?? ((row.cc_addr as string | null) ?? "");
+    const nextBcc = data.bcc_addr ?? ((row.bcc_addr as string | null) ?? "");
+
+    const check = validateRecipientList(nextTo, nextCc, nextBcc);
+    if (!check.ok) return { ok: false as const, error: badRecipientError(check.bad) };
+
+    const { error } = await supabaseAdmin
+      .from("scheduled_emails")
+      .update({
+        to_addr: nextTo,
+        cc_addr: nextCc,
+        bcc_addr: nextBcc,
+        status: "pending",
+        send_at: new Date().toISOString(),
+        last_error: null,
+        sent_at: null,
+      })
+      .eq("id", data.id);
+    if (error) return { ok: false as const, error: error.message };
+    return { ok: true as const };
+  });
+
+
 // ─── appendSentAttachment: attach files to a sent letter (same day only) ─
 // Uploads files to kingdom-assets and appends them to the message's
 // `appended_attachments` jsonb. Only allowed while `sent_at` is within today
