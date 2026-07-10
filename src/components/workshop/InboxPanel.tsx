@@ -40,6 +40,7 @@ import {
   listScheduledEmails,
   cancelScheduledEmail,
   deleteScheduledEmail,
+  retryScheduledEmail,
   listKnownAddresses,
   listLetterTemplates,
   getDefaultInkColor,
