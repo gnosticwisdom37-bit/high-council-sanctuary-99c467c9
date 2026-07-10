@@ -203,6 +203,37 @@ async function sendGmailRaw(
   return { ok: true, id: sent.id };
 }
 
+// ─── recipient guard ──────────────────────────────────────────────────────
+// Splits a To/Cc/Bcc field into tokens (comma OR newline OR semicolon),
+// pulls the address out of any "Name <addr>" form, and validates each with
+// the same regex the Address Book uses. Returns { ok, bad } — `bad` lists
+// every unparseable token so we can tell the King exactly which one to fix.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function extractAddress(token: string): string {
+  const t = token.trim();
+  const m = t.match(/<([^>]+)>\s*$/);
+  return (m ? m[1] : t).trim();
+}
+function validateRecipientList(...fields: (string | null | undefined)[]): {
+  ok: boolean;
+  bad: string[];
+} {
+  const bad: string[] = [];
+  for (const field of fields) {
+    if (!field) continue;
+    const tokens = field.split(/[,\n;]/).map((t) => t.trim()).filter(Boolean);
+    for (const tok of tokens) {
+      const addr = extractAddress(tok);
+      if (!EMAIL_RE.test(addr)) bad.push(tok);
+    }
+  }
+  return { ok: bad.length === 0, bad };
+}
+function badRecipientError(bad: string[]): string {
+  const list = bad.map((b) => `"${b}"`).join(", ");
+  return `Invalid recipient${bad.length > 1 ? "s" : ""}: ${list}. Please fix and resend.`;
+}
+
 // Zod schema for outgoing attachments (≤10 MB raw bytes / file, ≤5 files)
 const outgoingAttachmentSchema = z.object({
   filename: z.string().min(1).max(255),
